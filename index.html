@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trend Detective</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Globe: interactive Earth (globe.js) -->
+  <section id="globe-section">
+    <div id="map"></div>
+  </section>
+
+  <!-- Main app: choose a variable and place, show the trend (app.js, stats.js) -->
+  <main id="app"></main>
+
+  <!-- Map lab: trend maps and timelapse (maplab.js) -->
+  <section id="maplab"></section>
+
+  <!-- Stories (stories.js) -->
+  <section id="stories"></section>
+
+  <!-- Ask a question (ask.js) -->
+  <section id="ask"></section>
+
+  <footer></footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script src="globe.js"></script>
+<script src="stats.js"></script>
+<script src="app.js"></script>
+<script src="i18n.js"></script>
+<script src="maplab.js"></script>
+<script src="stories.js"></script>
+<script src="ask.js"></script>
+<script src="polish.js"></script>
+</body>
+</html>

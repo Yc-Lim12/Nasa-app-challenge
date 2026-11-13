@@ -159,7 +159,15 @@ button, input, select { font: inherit; color: inherit; letter-spacing: inherit; 
   position: absolute; top: clamp(28px, 5vh, 56px); left: clamp(24px, 3.4vw, 56px); right: 24px; z-index: 2;
   max-width: 44rem; pointer-events: none;
 }
-.stage-brand { font-size: 17px; font-weight: 600; color: #86868b; letter-spacing: -0.022em; }
+.stage-brand { font-size: 17px; font-weight: 600; color: #c7c7cc; letter-spacing: -0.022em; }
+/* Readable over any part of the Earth: a soft dark fade behind the top-left text,
+   plus a shadow on the text itself (bright land, ice and cloud sit right behind it). */
+.stage::before {
+  content: ''; position: absolute; top: 0; left: 0; z-index: 2; pointer-events: none;
+  width: min(62rem, 80%); height: min(36rem, 70%);
+  background: radial-gradient(ellipse at 0 0, rgb(0 0 0 / 0.62) 0%, rgb(0 0 0 / 0.38) 42%, rgb(0 0 0 / 0) 72%);
+}
+.stage-head { text-shadow: 0 1px 2px rgb(0 0 0 / 0.85), 0 0 14px rgb(0 0 0 / 0.55); }
 .stage-brand span { color: #f5f5f7; margin-right: 8px; }
 .stage-head h1 {
   margin-top: 10px; font-size: clamp(40px, 4.2vw, 64px); line-height: 1.06; font-weight: 700; letter-spacing: var(--trk-64); color: #f5f5f7;
@@ -167,8 +175,9 @@ button, input, select { font: inherit; color: inherit; letter-spacing: inherit; 
 .stage-head h1 em {
   font-style: normal; display: inline-block; padding-bottom: 0.06em;
   background: linear-gradient(90deg, #64d2ff 0%, #30d158 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+  text-shadow: none; filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.8));
 }
-.stage-head .lede { margin-top: 16px; max-width: 30em; font-size: 19px; line-height: 1.42; font-weight: 500; color: #86868b; letter-spacing: var(--trk-19); }
+.stage-head .lede { margin-top: 16px; max-width: 30em; font-size: 19px; line-height: 1.42; font-weight: 500; color: #d2d2d7; letter-spacing: var(--trk-19); }
 .stage-head .lede strong { color: #f5f5f7; font-weight: 600; }
 
 .stage-foot {
@@ -282,6 +291,14 @@ button, input, select { font: inherit; color: inherit; letter-spacing: inherit; 
 }
 .field select:focus, .field input:focus { outline: none; background: var(--panel); border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent); }
 .row { display: flex; gap: 12px; }
+/* area-to-average slider */
+.size-row { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+.field .size-row input[type="range"] {
+  flex: 1; min-width: 0; height: 28px; margin: 0; padding: 0; background: transparent; border: 0; box-shadow: none; accent-color: var(--accent);
+}
+.field .size-row input[type="range"]:focus { box-shadow: none; background: transparent; }
+.field .size-row input[type="range"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.size-row output { flex: none; min-width: 12.5em; text-align: right; font-size: 15px; font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
 
 /* buttons */
 .run {
@@ -665,7 +682,7 @@ td { font-size: 14px; }
 }
 
 .ask-go:active { transform: scale(0.95); }
-.ask-out { margin-top: 10px; max-width: 32rem; min-height: 1em; font-size: 14px; line-height: 1.45; color: #a1a1a6; pointer-events: auto; }
+.ask-out { margin-top: 10px; max-width: 32rem; min-height: 1em; font-size: 14px; line-height: 1.45; color: #d2d2d7; pointer-events: auto; }
 .ask-out em { display: block; margin-top: 4px; font-style: normal; color: #8e8e93; font-size: 13px; }
 .ask-tag { display: inline-block; margin-right: 6px; padding: 1px 8px; border-radius: 980px; background: rgb(48 209 88 / 0.18); color: #30d158; font-size: 12px; font-weight: 600; }
 .ask-answer { display: block; margin-top: 6px; color: #f5f5f7; font-size: 15px; font-weight: 600; animation: rise .25s var(--ease-out) both; }
@@ -733,6 +750,11 @@ td { font-size: 14px; }
 .lp-player input[type="range"] { flex: 1; accent-color: #0a84ff; min-width: 0; }
 .lp-when { flex: none; min-width: 7.5em; text-align: right; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .lp-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 8px; }
+/* map-area slider in the layer panel */
+.lp-box { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; font-size: 12px; color: #d2d2d7; }
+.lp-box span { font-weight: 600; }
+.lp-box input { flex: 1; min-width: 60px; accent-color: #64d2ff; }
+.lp-box output { color: #a1a1a6; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .lp-seg { display: inline-flex; gap: 2px; padding: 2px; border-radius: 9px; background: rgb(255 255 255 / 0.08); }
 .lp-seg button { padding: 4px 9px; border: 0; border-radius: 7px; cursor: pointer; background: transparent; color: #d2d2d7; font-size: 12px; font-weight: 500; }
 .lp-seg button[aria-pressed="true"] { color: #fff; font-weight: 600; }

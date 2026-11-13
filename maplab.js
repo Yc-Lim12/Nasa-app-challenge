@@ -11,8 +11,17 @@
 (function () {
   'use strict';
 
-  var BOX = 10;              // degrees: the biggest box NASA POWER serves in one request
-  var ZOOM = 3.6;            // globe zoom that frames a 10° box
+  // Map area in degrees. The user picks 2–10 (10 is the biggest box NASA POWER serves
+  // in one request); the globe zooms so the box always fills about the same space.
+  var BOX = 10, BOX_MIN = 2, BOX_MAX = 10;
+  try { var savedBox = parseInt(localStorage.getItem('td-mapbox'), 10); if (savedBox >= BOX_MIN && savedBox <= BOX_MAX) BOX = savedBox; } catch (err) { /* private mode */ }
+  function zoomFor() { return 3.6 * 10 / BOX; }
+  function boxLabel(b) { return b + '° × ' + b + '° (' + T('about {km} km', { km: Math.round(b * 111 / 10) * 10 }) + ')'; }
+  function boxCtl() {
+    return '<label class="lp-box"><span>' + esc(T('Map area')) + '</span>' +
+      '<input type="range" id="lp-box" min="' + BOX_MIN + '" max="' + BOX_MAX + '" step="1" value="' + BOX + '" aria-label="' + esc(T('Map area')) + '">' +
+      '<output id="lp-box-out">' + esc(boxLabel(BOX)) + '</output></label>';
+  }
   var TD, panel, active = '', loadKey = '', token = 0;
   var grid = null;           // { key, cells, dlon, dlat, vr }
   var lapse = { timer: 0, i: 0, mode: 'anom', speed: 1 };
@@ -74,7 +83,7 @@
 
   function gridKey() {
     var s = TD.state;
-    return [s.v, s.lat.toFixed(2), s.lon.toFixed(2), s.y0, s.y1, s.month].join('|');
+    return [s.v, s.lat.toFixed(2), s.lon.toFixed(2), s.y0, s.y1, s.month, BOX].join('|');
   }
 
   function loadGrid() {
@@ -109,8 +118,8 @@
 
   function showTrend() {
     var my = token, vr = TD.variable(TD.state.v);
-    busy(T('Trend map'), T('Testing every grid cell in a 10° box around this place…'));
-    TD.globe.flyTo(TD.state.lat, TD.state.lon, BOX, 1300, ZOOM);
+    busy(T('Trend map'), T('Testing every grid cell in a {b}° box around this place…', { b: BOX }));
+    TD.globe.flyTo(TD.state.lat, TD.state.lon, BOX, 1300, zoomFor());
     loadGrid().then(function (g) {
       if (my !== token) return;
       loadKey = g.key;
@@ -131,6 +140,7 @@
       var dn = ok.filter(function (c) { return c.stats.mk.p < 0.05 && c.stats.sen.slope < 0; });
       var html = '<div class="lp-head"><strong>' + esc(T('Trend map')) + '</strong><span>' + esc(TD.vname(vr)) + ', ' +
         TD.state.y0 + '–' + TD.state.y1 + (TD.state.month ? ', ' + esc(T(TD.MONTHS[TD.state.month])) : '') + '</span></div>';
+      html += boxCtl();
       html += '<div class="lp-scale"><span>' + esc(TD.withUnit(TD.signed(-lim, 2), vr.unit)) + '</span><i class="lp-ramp lp-ramp-div"></i><span>' +
         esc(TD.withUnit(TD.signed(lim, 2), vr.unit)) + '</span></div>';
       html += '<p class="lp-key"><span class="lp-dot"></span>' + esc(T('Dot: statistically significant (p < 0.05). Red: going up, blue: going down, per decade.')) + '</p>';
@@ -166,8 +176,8 @@
 
   function showLapse(startFrame) {
     var my = token;
-    busy(T('Timelapse'), T('Loading every month in a 10° box around this place…'));
-    TD.globe.flyTo(TD.state.lat, TD.state.lon, BOX, 1300, ZOOM);
+    busy(T('Timelapse'), T('Loading every month in a {b}° box around this place…', { b: BOX }));
+    TD.globe.flyTo(TD.state.lat, TD.state.lon, BOX, 1300, zoomFor());
     loadGrid().then(function (g) {
       if (my !== token) return;
       loadKey = g.key;
@@ -226,6 +236,7 @@
       }
       function draw() {
         panel.innerHTML = '<div class="lp-head"><strong>' + esc(T('Timelapse')) + '</strong><span>' + esc(TD.vname(vr)) + '</span></div>' +
+          boxCtl() +
           '<div class="lp-player"><button type="button" class="lp-play" id="lp-play" aria-label="' + esc(T('Play')) + '">' + (lapse.timer ? '❚❚' : '▶') + '</button>' +
           '<input type="range" id="lp-slider" min="0" max="' + (frames.length - 1) + '" value="' + lapse.i + '" aria-label="' + esc(T('Month')) + '">' +
           '<output id="lp-when" class="lp-when"></output></div>' +
@@ -262,17 +273,34 @@
   // ---- rain now (NASA GPM IMERG via GIBS) ----------------------------------------
 
   var GIBS = 'https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0' +
-    '&LAYERS=IMERG_Precipitation_Rate_30min&CRS=EPSG:4326&BBOX=-90,-180,90,180&WIDTH=1024&HEIGHT=512&FORMAT=image/png&TRANSPARENT=true&TIME=';
+    '&LAYERS=IMERG_Precipitation_Rate_30min&CRS=EPSG:4326&BBOX=-90,-180,90,180&WIDTH=1440&HEIGHT=720&FORMAT=image/png&TRANSPARENT=true&TIME=';
 
+  var RW = 1440, RH = 720;
+  // smooth lookup in an equirectangular RGBA image (premultiplied, so rain edges fade softly)
+  function rainAt(data, lon, lat) {
+    var fx = (lon + 180) / 360 * RW - 0.5, fy = (90 - lat) / 180 * RH - 0.5;
+    var x0 = Math.floor(fx), y0 = Math.floor(fy), tx = fx - x0, ty = fy - y0;
+    x0 = ((x0 % RW) + RW) % RW; var x1 = (x0 + 1) % RW;
+    y0 = Math.max(0, Math.min(RH - 1, y0)); var y1 = Math.min(RH - 1, y0 + 1);
+    var o = [(y0 * RW + x0) * 4, (y0 * RW + x1) * 4, (y1 * RW + x0) * 4, (y1 * RW + x1) * 4];
+    var w = [(1 - tx) * (1 - ty), tx * (1 - ty), (1 - tx) * ty, tx * ty];
+    var r = 0, g = 0, b = 0, a = 0;
+    for (var i = 0; i < 4; i++) {
+      var al = data[o[i] + 3] * w[i];
+      r += data[o[i]] * al; g += data[o[i] + 1] * al; b += data[o[i] + 2] * al; a += al;
+    }
+    if (a < 6) return null;
+    return [r / a, g / a, b / a, Math.min(225, a)];
+  }
   function iso(d) { return d.toISOString().slice(0, 17) + '00Z'; }
   function loadFrame(d) {
     return new Promise(function (resolve, reject) {
       var img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = function () {
-        var c = document.createElement('canvas'); c.width = 1024; c.height = 512;
-        var x = c.getContext('2d'); x.drawImage(img, 0, 0);
-        var data = x.getImageData(0, 0, 1024, 512).data, n = 0;
+        var c = document.createElement('canvas'); c.width = RW; c.height = RH;
+        var x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0, RW, RH);
+        var data = x.getImageData(0, 0, RW, RH).data, n = 0;
         for (var i = 3; i < data.length; i += 64) if (data[i]) n++;
         resolve({ time: d, data: data, filled: n });
       };
@@ -314,12 +342,7 @@
         rain.i = i;
         var f = frames[i];
         g.setRaster({
-          sample: function (lon, lat) {
-            var x = Math.min(1023, Math.max(0, Math.floor((lon + 180) / 360 * 1024)));
-            var y = Math.min(511, Math.max(0, Math.floor((90 - lat) / 180 * 512)));
-            var o = (y * 1024 + x) * 4, a = f.data[o + 3];
-            return a ? [f.data[o], f.data[o + 1], f.data[o + 2], Math.min(230, a)] : null;
-          }
+          sample: function (lon, lat) { return rainAt(f.data, lon, lat); }
         });
         var t = f.time;
         var el = $('lp-when');
@@ -350,8 +373,8 @@
   function showWind() {
     var my = token, s = TD.state;
     if (windMonth === null) windMonth = s.month;
-    busy(T('Wind'), T('Loading 10 m wind for a 10° box around this place…'));
-    TD.globe.flyTo(s.lat, s.lon, BOX, 1300, ZOOM);
+    busy(T('Wind'), T('Loading 10 m wind for a {b}° box around this place…', { b: BOX }));
+    TD.globe.flyTo(s.lat, s.lon, BOX, 1300, zoomFor());
     Promise.all(['U10M', 'V10M'].map(function (pm) { return TD.fetchJson(TD.urlFor(pm, s.lat, s.lon, BOX)); })).then(function (js) {
       if (my !== token) return;
       loadKey = gridKey();
@@ -384,6 +407,7 @@
       TD.globe.setField({
         bounds: { lonMin: lons[0], lonMax: lons[lons.length - 1], latMin: lats[0], latMax: lats[lats.length - 1] },
         count: 1100,
+        speed: 0.0045 * BOX / 10,
         sample: function (lon, lat) {
           var i = idx(lons, lon), j = idx(lats, lat);
           var a = get(i, j), c = get(i + 1, j), d = get(i, j + 1), e = get(i + 1, j + 1);
@@ -399,6 +423,7 @@
       if (malaysia && (windMonth === 12 || windMonth === 1 || windMonth === 2)) caption = T('This is the northeast monsoon season: winds blow from the north-east across the South China Sea.');
       else if (malaysia && windMonth >= 6 && windMonth <= 8) caption = T('This is the southwest monsoon season: winds blow from the south-west, and the Strait of Malacca is drier.');
       panel.innerHTML = '<div class="lp-head"><strong>' + esc(T('Wind')) + '</strong><span>' + esc(T('Average at 10 m')) + ', ' + s.y0 + '–' + s.y1 + '</span></div>' +
+        boxCtl() +
         '<div class="lp-seg lp-months" id="lp-wm">' + [0, 1, 4, 7, 10].map(function (m) {
           return '<button type="button" data-wm="' + m + '" aria-pressed="' + (windMonth === m) + '">' + esc(m ? T(TD.MONTHS[m]).slice(0, 3) : T('Year')) + '</button>';
         }).join('') + '</div>' +
@@ -431,6 +456,19 @@
       TD.apply({ lat: pts[0].lat, lon: pts[0].lon, size: 0, keepYears: true, keepMonth: true,
         compare: 'pt:' + pts[1].lat.toFixed(2) + ',' + pts[1].lon.toFixed(2) });
     }, true);
+    // Map-area slider (trend map, timelapse, wind): label follows the thumb, reload on release
+    panel.addEventListener('input', function (e) {
+      if (e.target.id !== 'lp-box') return;
+      var out = $('lp-box-out'); if (out) out.textContent = boxLabel(+e.target.value);
+    });
+    panel.addEventListener('change', function (e) {
+      if (e.target.id !== 'lp-box') return;
+      var b = Math.max(BOX_MIN, Math.min(BOX_MAX, parseInt(e.target.value, 10) || BOX));
+      if (b === BOX) return;
+      BOX = b;
+      try { localStorage.setItem('td-mapbox', String(BOX)); } catch (err) { /* private mode */ }
+      if (active) setLayer(active, { frame: active === 'lapse' ? lapse.i : undefined });
+    });
     // When the case changes, refresh map layers that depend on it.
     document.addEventListener('td:result', function () {
       if ((active === 'trend' || active === 'lapse' || active === 'wind') && loadKey && loadKey !== gridKey()) setLayer(active);

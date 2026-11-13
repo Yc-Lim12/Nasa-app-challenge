@@ -85,13 +85,14 @@
     { id: 'greenland', name: 'central Greenland', short: 'Greenland', lat: 72.0, lon: -40.0, size: 6 }
   ];
 
-  var SIZES = [
-    { v: 0, label: 'One grid cell (about 50 km)' },
-    { v: 2, label: '2° box (about 220 km)' },
-    { v: 4, label: '4° box (about 440 km)' },
-    { v: 6, label: '6° box (about 670 km)' },
-    { v: 10, label: '10° box (about 1,100 km)' }
-  ];
+  // Area to average over: one grid cell, or a box from 2° to 10° (NASA POWER's limits).
+  // The slider runs 1–10, where 1 means a single grid cell.
+  var SIZE_MAX = 10;
+  function sizeLabel(v) {
+    return v < 2 ? T('One grid cell (about 50 km)')
+      : T('{b}° box (about {km} km)', { b: v, km: (Math.round(v * 111 / 10) * 10).toLocaleString() });
+  }
+  function showSize() { var o = $('size-out'); if (o) o.textContent = sizeLabel(state.size); }
 
   var MONTHS = ['Whole year', 'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'];
@@ -1195,7 +1196,6 @@
     $('place').innerHTML = PLACES.map(function (p) {
       return '<option value="' + p.id + '">' + esc(capFirst(p.name)) + '</option>';
     }).join('') + '<option value="custom">A place I chose on the globe</option>';
-    $('size').innerHTML = SIZES.map(function (s) { return '<option value="' + s.v + '">' + s.label + '</option>'; }).join('');
     var ys = '';
     for (var y = FIRST_YEAR; y <= LAST_YEAR; y++) ys += '<option>' + y + '</option>';
     $('y0').innerHTML = ys; $('y1').innerHTML = ys;
@@ -1247,7 +1247,8 @@
     renderVariables();
     $('place').value = state.placeId;
     $('lat').value = state.lat; $('lon').value = state.lon;
-    $('size').value = state.size;
+    $('size').value = state.size || 1;
+    showSize();
     $('y0').value = state.y0; $('y1').value = state.y1;
     $('month').value = state.month;
     updateBrief();
@@ -1258,7 +1259,9 @@
     var lat = parseFloat($('lat').value), lon = parseFloat($('lon').value);
     state.lat = clamp(isNaN(lat) ? 0 : lat, -89.5, 89.5);
     state.lon = clamp(isNaN(lon) ? 0 : lon, -180, 180);
-    state.size = parseInt($('size').value, 10) || 0;
+    var sv = parseInt($('size').value, 10) || 0;
+    state.size = sv >= 2 ? Math.min(SIZE_MAX, sv) : 0;
+    showSize();
     var a = parseInt($('y0').value, 10), b = parseInt($('y1').value, 10);
     state.y0 = Math.min(a, b); state.y1 = Math.max(a, b);
     state.month = parseInt($('month').value, 10) || 0;
@@ -1340,7 +1343,8 @@
     state.placeId = p ? p.id : 'custom';
     state.lat = clamp(parseFloat(q.lat) || 0, -89.5, 89.5);
     state.lon = clamp(parseFloat(q.lon) || 0, -180, 180);
-    state.size = [0, 2, 4, 6, 10].indexOf(parseInt(q.size, 10)) >= 0 ? parseInt(q.size, 10) : 2;
+    var qs = parseInt(q.size, 10);
+    state.size = qs === 0 || (qs >= 2 && qs <= SIZE_MAX) ? qs : 2;
     state.y0 = clamp(parseInt(q.y0, 10) || FIRST_YEAR, FIRST_YEAR, LAST_YEAR);
     state.y1 = clamp(parseInt(q.y1, 10) || LAST_YEAR, FIRST_YEAR, LAST_YEAR);
     state.month = clamp(parseInt(q.m, 10) || 0, 0, 12);
@@ -1456,6 +1460,8 @@
     ['lat', 'lon'].forEach(function (id) {
       $(id).addEventListener('change', function () { $('place').value = 'custom'; readForm(); updateMap(true); });
     });
+    // while dragging: resize the box on the globe live; on release: frame it and re-run
+    $('size').addEventListener('input', function () { readForm(); updateMap(false); });
     $('size').addEventListener('change', function () { readForm(); updateMap(true); });
     // Any change inside the form re-runs an open case (after the handlers above).
     $('case-form').addEventListener('change', function () { readForm(); scheduleLive(); });

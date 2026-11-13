@@ -106,7 +106,10 @@
               <label class="field">Longitude <input id="lon" type="number" step="0.01" min="-180" max="180" inputmode="decimal"></label>
             </div>
             <label class="field">Area to average over
-              <select id="size"></select>
+              <span class="size-row">
+                <input id="size" type="range" min="1" max="10" step="1" aria-describedby="size-out">
+                <output id="size-out" for="size"></output>
+              </span>
             </label>
           </li>
           <li id="step-when">
@@ -302,7 +305,7 @@
     <section>
       <h3>Maps</h3>
       <ul>
-        <li><strong>Trend map</strong>: every NASA POWER grid cell (0.5° × 0.625°) in a 10° × 10° box gets its own Sen’s slope and Mann-Kendall test. Red means rising, blue falling. A dot marks cells where p &lt; 0.05.</li>
+        <li><strong>Trend map</strong>: every NASA POWER grid cell (0.5° × 0.625°) in a box of your choice (2° to 10° a side, 10° by default) gets its own Sen’s slope and Mann-Kendall test. Red means rising, blue falling. A dot marks cells where p &lt; 0.05.</li>
         <li><strong>Opposite trends</strong> are reported when at least three significant cells rise and at least three fall in the same box.</li>
         <li><strong>Timelapse</strong> plays every month in the period. “Difference from normal” subtracts each cell’s own average for that calendar month, so the seasons do not swamp the change.</li>
         <li><strong>Wind</strong> particles follow the average 10-metre wind (MERRA-2 eastward and northward components) for the chosen period and month.</li>

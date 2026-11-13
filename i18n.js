@@ -134,7 +134,7 @@
     'centre': 'tengah', 'east': 'timur', 'north-east': 'timur laut', 'north': 'utara', 'north-west': 'barat laut',
     'west': 'barat', 'south-west': 'barat daya', 'south': 'selatan', 'south-east': 'tenggara',
     'NASA POWER returned no grid cells for this area.': 'NASA POWER tidak memulangkan sebarang sel grid untuk kawasan ini.',
-    'Testing every grid cell in a 10° box around this place…': 'Menguji setiap sel grid dalam kotak 10° di sekitar tempat ini…',
+    'Testing every grid cell in a {b}° box around this place…': 'Menguji setiap sel grid dalam kotak {b}° di sekitar tempat ini…',
     'There is not enough data here for this variable and period.': 'Tidak cukup data di sini untuk pemboleh ubah dan tempoh ini.',
     'Dot: statistically significant (p < 0.05). Red: going up, blue: going down, per decade.':
       'Titik: signifikan secara statistik (p < 0.05). Merah: meningkat, biru: menurun, sedekad.',
@@ -149,7 +149,7 @@
     'No cell has a significant trend. Try a longer period or another variable.':
       'Tiada sel yang mempunyai tren signifikan. Cuba tempoh yang lebih panjang atau pemboleh ubah lain.',
     'Click any cell to open its full chart.': 'Klik mana-mana sel untuk membuka carta penuhnya.',
-    'Loading every month in a 10° box around this place…': 'Memuatkan setiap bulan dalam kotak 10° di sekitar tempat ini…',
+    'Loading every month in a {b}° box around this place…': 'Memuatkan setiap bulan dalam kotak {b}° di sekitar tempat ini…',
     'Colour shows how unusual each month was for that spot: red above its normal, blue below.':
       'Warna menunjukkan betapa luar biasanya setiap bulan bagi tempat itu: merah di atas normal, biru di bawah.',
     'Play': 'Main', 'Pause': 'Jeda', 'Month': 'Bulan', 'Difference from normal': 'Beza daripada normal', 'Monthly values': 'Nilai bulanan',
@@ -159,7 +159,8 @@
     'Loading the last 12 hours…': 'Memuatkan 12 jam terakhir…', 'Hour': 'Jam', 'Light': 'Renyai', 'Heavy': 'Lebat',
     'Satellite rain estimates for the last 12 hours, one frame per hour. Images: NASA GIBS. For viewing only, not used in the trend tests.':
       'Anggaran hujan satelit bagi 12 jam terakhir, satu bingkai sejam. Imej: NASA GIBS. Untuk tontonan sahaja, tidak digunakan dalam ujian tren.',
-    'Loading 10 m wind for a 10° box around this place…': 'Memuatkan angin 10 m bagi kotak 10° di sekitar tempat ini…',
+    'Loading 10 m wind for a {b}° box around this place…': 'Memuatkan angin 10 m bagi kotak {b}° di sekitar tempat ini…',
+    'Map area': 'Kawasan peta', 'One grid cell (about 50 km)': 'Satu sel grid (kira-kira 50 km)', '{b}° box (about {km} km)': 'Kotak {b}° (kira-kira {km} km)', 'about {km} km': 'kira-kira {km} km',
     'This is the northeast monsoon season: winds blow from the north-east across the South China Sea.':
       'Ini musim monsun timur laut: angin bertiup dari timur laut merentasi Laut China Selatan.',
     'This is the southwest monsoon season: winds blow from the south-west, and the Strait of Malacca is drier.':

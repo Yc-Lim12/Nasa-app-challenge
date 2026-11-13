@@ -107,7 +107,12 @@
     var proj = d3.geoOrthographic().clipAngle(90).precision(0.3);
     var path = d3.geoPath(proj);
     var grat = d3.geoGraticule10();
-    var land = null, borders = null;
+    var land = null, borders = null, landLo = null, bordLo = null, restTimer = 0;
+    // once the globe stops, redraw with the detailed outlines (and sharp picture)
+    function rested() {
+      clearTimeout(restTimer);
+      restTimer = setTimeout(function () { if (!drag && !anim && !spinning) render(); }, 80);
+    }
     var W = 300, H = 300, R = 140, k = K_MIN, rot = [-20, -10];
     var sel = null, cmp = null, anim = null, first = true;
     var CX = 150, CY = 150, spinning = false, spinRaf = 0, spinLast = null, badge = null;
@@ -244,10 +249,16 @@
       gNight2.attr('d', night2 ? path(night2) : null);
       if (REDUCED) drawStars(0);
       gGrat.attr('d', path(grat));
-      gLand.attr('d', land ? path(land) : null);
-      gBord.attr('d', borders ? path(borders) : null);
-      if (sat) {
-        var still = !(drag || anim || spinning);
+      var still = !(drag || anim || spinning);
+      var lnd = still || !landLo ? land : landLo, brd = still || !bordLo ? borders : bordLo;
+      gLand.attr('d', lnd ? path(lnd) : null);
+      gBord.attr('d', brd ? path(brd) : null);
+      if (sat && gl) {
+        drawSat(true);
+        if (still) settleSat();
+        var fade = clamp(1.6 - k / 5, 0, 1);
+        gLand.style('stroke-opacity', fade); gBord.style('stroke-opacity', fade);
+      } else if (sat) {
         // a redraw that does not move the globe keeps the sharp picture already on screen
         if (!(still && satKey() === satFine)) {
           drawSat(false); satFine = '';
@@ -307,30 +318,112 @@
       cancelAnimationFrame(spinRaf);
       spinLast = null;
       host.classList.toggle('spinning', spinning);
-      if (!spinning && sat) settleSat();
+      if (!spinning) rested();
       if (spinning) { stopAnim(); spinRaf = requestAnimationFrame(spinFrame); }
     }
 
 
-    // ---- satellite surface (NASA GIBS) ---------------------------------------
-    // The sphere is painted from an equirectangular NASA image: a small one for the
-    // whole Earth, plus a sharp one for the area in view once the globe stops moving.
+    // ---- satellite surface ---------------------------------------------------
+    // The sphere is painted from an equirectangular image of the whole Earth (a local
+    // 8K NASA Blue Marble, or NASA GIBS for the daily picture), plus a sharp GIBS picture
+    // of just the area in view when zoomed in. Drawn on the GPU with WebGL2: every pixel
+    // is projected and filtered (mipmaps + anisotropic) in a shader, so it is sharp at
+    // full screen resolution and costs almost nothing per frame. Falls back to a slower
+    // CPU drawing when WebGL2 is not available.
     var GIBS_WMS = 'https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&CRS=EPSG:4326&FORMAT=image/jpeg';
     var STYLES = {
-      sat: { name: 'Satellite', layer: 'BlueMarble_ShadedRelief_Bathymetry' },
+      sat: { name: 'Satellite', layer: 'BlueMarble_ShadedRelief_Bathymetry', local: 'assets/earth-' },
       live: { name: 'Latest satellite pass', layer: 'VIIRS_NOAA20_CorrectedReflectance_TrueColor', daily: true },
       dark: { name: 'Dark map' }
     };
+    var SMALL = Math.min(window.innerWidth, window.innerHeight) < 700;
     var sCanvas = document.createElement('canvas');
     sCanvas.className = 'g-sat';
     sCanvas.setAttribute('aria-hidden', 'true');
     host.insertBefore(sCanvas, svg.node());
-    var sctx = sCanvas.getContext('2d'), sBuf = document.createElement('canvas'), sbctx = sBuf.getContext('2d');
+    var gl = null, glProg = null, glU = {}, glAniso = null, glAnisoMax = 1, glMaxTex = 4096;
+    try { gl = sCanvas.getContext('webgl2', { alpha: true, premultipliedAlpha: true, antialias: false, depth: false }); } catch (err) { gl = null; }
+    if (gl && !initGL()) {
+      gl = null;
+      var c2 = document.createElement('canvas'); c2.className = sCanvas.className; c2.setAttribute('aria-hidden', 'true');
+      host.replaceChild(c2, sCanvas); sCanvas = c2;
+    }
+    var sctx = gl ? null : sCanvas.getContext('2d'), sBuf = document.createElement('canvas'), sbctx = sBuf.getContext('2d');
     var basemap = 'dark', sat = null, satToken = 0, satTimer = 0, refineTimer = 0, refineKey = '', satFine = '';
     function satKey() {
       return [rot[0].toFixed(4), rot[1].toFixed(4), k.toFixed(5), CX.toFixed(1), CY.toFixed(1), R.toFixed(1), W, H,
         sat ? sat.base.w : 0, sat && sat.region ? sat.region.lon0 + ',' + sat.region.lat0 + ',' + sat.region.w : ''].join('|');
     }
+
+    function initGL() {
+      var VS = '#version 300 es\nin vec2 p;\nvoid main(){ gl_Position = vec4(p, 0.0, 1.0); }';
+      var FS = [
+        '#version 300 es',
+        'precision highp float;',
+        'uniform vec2 uC; uniform float uR, uLam, uSp, uCp, uHasReg, uMid;',
+        'uniform vec4 uBox;',
+        'uniform sampler2D uBase, uReg;',
+        'out vec4 o;',
+        'const float PI = 3.141592653589793;',
+        'void main() {',
+        '  vec2 q = (gl_FragCoord.xy - uC) / uR;',
+        '  float r2 = dot(q, q);',
+        '  if (r2 > 1.0) discard;',
+        '  float a = clamp((1.0 - sqrt(r2)) * uR + 0.5, 0.0, 1.0);',
+        '  float cz = sqrt(max(0.0, 1.0 - r2));',
+        '  float lat = asin(clamp(cz * uSp + q.y * uCp, -1.0, 1.0));',
+        '  float lon = uLam + atan(q.x, cz * uCp - q.y * uSp);',
+        // two copies of u that wrap at different places; use the smooth one so no seam line
+        '  float u = lon / (2.0 * PI) + 0.5;',
+        '  float ua = fract(u), ub = fract(u + 0.5) - 0.5;',
+        '  float uu = fwidth(ua) <= fwidth(ub) + 1e-7 ? ua : ub;',
+        '  vec3 c = texture(uBase, vec2(uu, 0.5 - lat / PI)).rgb;',
+        '  float gx = degrees(lon); gx -= 360.0 * floor((gx - uMid) / 360.0 + 0.5);',
+        '  vec2 rs = vec2((gx - uBox.x) / (uBox.y - uBox.x), (uBox.w - degrees(lat)) / (uBox.w - uBox.z));',
+        '  vec3 rc = texture(uReg, clamp(rs, 0.0, 1.0)).rgb;',
+        '  vec2 e = min(rs, 1.0 - rs);',
+        '  float f = uHasReg * smoothstep(0.0, 0.03, min(e.x, e.y));',
+        '  o = vec4(mix(c, rc, f) * a, a);',
+        '}'].join('\n');
+      function sh(type, src) {
+        var s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.warn(gl.getShaderInfoLog(s)); return null; }
+        return s;
+      }
+      var vs = sh(gl.VERTEX_SHADER, VS), fs = sh(gl.FRAGMENT_SHADER, FS);
+      if (!vs || !fs) return false;
+      glProg = gl.createProgram(); gl.attachShader(glProg, vs); gl.attachShader(glProg, fs);
+      gl.bindAttribLocation(glProg, 0, 'p'); gl.linkProgram(glProg);
+      if (!gl.getProgramParameter(glProg, gl.LINK_STATUS)) return false;
+      ['uC', 'uR', 'uLam', 'uSp', 'uCp', 'uHasReg', 'uMid', 'uBox', 'uBase', 'uReg'].forEach(function (n) { glU[n] = gl.getUniformLocation(glProg, n); });
+      var buf = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);   // one big triangle
+      gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+      glAniso = gl.getExtension('EXT_texture_filter_anisotropic');
+      if (glAniso) glAnisoMax = Math.min(16, gl.getParameter(glAniso.MAX_TEXTURE_MAX_ANISOTROPY_EXT));
+      glMaxTex = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+      gl.clearColor(0, 0, 0, 0);
+      return true;
+    }
+    // Upload an image as a mipmapped texture. Fails (returns null) when the browser
+    // forbids it, e.g. a local file opened straight from disk (file://).
+    function makeTex(img, wrapS) {
+      var t = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, t);
+      try {
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+      } catch (err) { gl.deleteTexture(t); return null; }
+      if (gl.getError() !== gl.NO_ERROR) { gl.deleteTexture(t); return null; }
+      gl.generateMipmap(gl.TEXTURE_2D);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapS);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      if (glAniso) gl.texParameterf(gl.TEXTURE_2D, glAniso.TEXTURE_MAX_ANISOTROPY_EXT, glAnisoMax);
+      return t;
+    }
+    function freeTex(o) { if (gl && o && o.tex) gl.deleteTexture(o.tex); }
 
     function gibsUrl(st, bbox, w, h) {
       var url = GIBS_WMS + '&LAYERS=' + st.layer + '&BBOX=' + bbox.join(',') + '&WIDTH=' + w + '&HEIGHT=' + h;
@@ -338,16 +431,24 @@
       if (st.daily) url += '&TIME=' + new Date(Date.now() - 36 * 3600e3).toISOString().slice(0, 10);
       return url;
     }
-    function loadPixels(url, done) {
+    // Load an image and turn it into what the active renderer needs:
+    // a WebGL texture, or raw pixels for the CPU fallback. null on failure.
+    function loadSurface(url, wrap, done) {
       var img = new Image();
-      img.crossOrigin = 'anonymous';
+      if (/^https?:/.test(url)) img.crossOrigin = 'anonymous';
       img.onload = function () {
+        var w = img.naturalWidth, h = img.naturalHeight;
+        if (gl) {
+          var t = makeTex(img, wrap ? gl.REPEAT : gl.CLAMP_TO_EDGE);
+          done(t ? { tex: t, w: w, h: h } : null);
+          return;
+        }
         try {
           var c = document.createElement('canvas');
-          c.width = img.naturalWidth; c.height = img.naturalHeight;
+          c.width = w; c.height = h;
           var x = c.getContext('2d', { willReadFrequently: true });
           x.drawImage(img, 0, 0);
-          done({ data: x.getImageData(0, 0, c.width, c.height).data, w: c.width, h: c.height });
+          done({ data: x.getImageData(0, 0, w, h).data, w: w, h: h });
         } catch (err) { done(null); }
       };
       img.onerror = function () { done(null); };
@@ -358,90 +459,115 @@
       basemap = style;
       var my = ++satToken, st = STYLES[style];
       clearTimeout(refineTimer); refineKey = '';
+      if (sat) { freeTex(sat.base); freeTex(sat.region); }
       if (!st.layer) {
         sat = null;
         host.classList.remove('has-sat');
-        sctx.clearRect(0, 0, sCanvas.width, sCanvas.height);
+        clearSat();
         render();
         return;
       }
-      var world = [-90, -180, 90, 180], small = Math.min(window.innerWidth, window.innerHeight) < 700;
+      var world = [-90, -180, 90, 180];
+      // biggest picture this device should hold: 8K on desktops with WebGL, 4K otherwise
+      var bigLocal = gl && !SMALL && glMaxTex >= 8192 ? '8k' : '4k';
+      var steps = st.local
+        ? [st.local + '2k.jpg', st.local + bigLocal + '.jpg']
+        : [gibsUrl(st, world, 1024, 512), gibsUrl(st, world, SMALL ? 2048 : 4096, SMALL ? 1024 : 2048)];
+      var fallback = [gibsUrl(st, world, 1024, 512), gibsUrl(st, world, SMALL ? 2048 : 4096, SMALL ? 1024 : 2048)];
       // a quick small picture first, then a sharper one
-      loadPixels(gibsUrl(st, world, 1024, 512), function (px) {
-        if (my !== satToken) return;
-        if (!px) { if (!sat) setBasemap('dark'); return; }
-        sat = { base: px, region: null };
-        host.classList.add('has-sat');
-        render();
-        loadPixels(gibsUrl(st, world, small ? 2048 : 4096, small ? 1024 : 2048), function (big) {
-          if (my !== satToken || !big || !sat) return;
-          sat.base = big;
+      function step(list, i, isFallback) {
+        if (i >= list.length) return;
+        loadSurface(list[i], true, function (px) {
+          if (my !== satToken) { freeTex(px); return; }
+          if (!px) {
+            // the local picture could not be used (e.g. opened from disk): ask NASA GIBS instead
+            if (!isFallback && st.local) { step(fallback, sat ? 1 : 0, true); return; }
+            if (!sat) setBasemap('dark');
+            return;
+          }
+          if (!sat) sat = { base: px, region: null };
+          else { freeTex(sat.base); sat.base = px; }
+          host.classList.add('has-sat');
+          satFine = '';
           render();
+          step(list, i + 1, isFallback);
         });
-      });
+      }
+      step(steps, 0, false);
+    }
+
+    function clearSat() {
+      if (gl) { gl.clear(gl.COLOR_BUFFER_BIT); return; }
+      sctx.clearRect(0, 0, sCanvas.width, sCanvas.height);
+    }
+    function fitSatCanvas() {
+      var cw = Math.round(W * dpr), ch = Math.round(H * dpr);
+      if (sCanvas.width !== cw || sCanvas.height !== ch) { sCanvas.width = cw; sCanvas.height = ch; }
     }
 
     function drawSat(fine) {
       if (!sat) return;
+      fitSatCanvas();
+      if (gl) { drawSatGL(); return; }
+      drawSat2D(fine);
+    }
+
+    function drawSatGL() {
+      var cw = sCanvas.width, ch = sCanvas.height, s = cw / W, RAD = Math.PI / 180, g = sat.region;
+      gl.viewport(0, 0, cw, ch);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.useProgram(glProg);
+      gl.uniform2f(glU.uC, CX * s, (H - CY) * s);
+      gl.uniform1f(glU.uR, R * k * s);
+      gl.uniform1f(glU.uLam, -rot[0] * RAD);
+      gl.uniform1f(glU.uSp, Math.sin(-rot[1] * RAD));
+      gl.uniform1f(glU.uCp, Math.cos(-rot[1] * RAD));
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, sat.base.tex); gl.uniform1i(glU.uBase, 0);
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, g ? g.tex : sat.base.tex); gl.uniform1i(glU.uReg, 1);
+      gl.uniform1f(glU.uHasReg, g ? 1 : 0);
+      gl.uniform1f(glU.uMid, g ? g.lonMid : 0);
+      gl.uniform4f(glU.uBox, g ? g.lon0 : 0, g ? g.lon1 : 1, g ? g.lat0 : 0, g ? g.lat1 : 1);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    }
+
+    // CPU fallback (no WebGL2): sample the picture pixel by pixel.
+    function drawSat2D(fine) {
       var rr = R * k;
       var x0 = Math.max(0, Math.floor(CX - rr)), x1 = Math.min(W, Math.ceil(CX + rr));
       var y0 = Math.max(0, Math.floor(CY - rr)), y1 = Math.min(H, Math.ceil(CY + rr));
       if (x1 <= x0 || y1 <= y0) return;
-      // samples per CSS pixel: one per device pixel at rest (sharp on Retina screens),
-      // coarser while moving, more so when the globe fills the view
-      var dens = fine ? dpr : (k > 2.5 ? 0.5 : 0.75) * Math.min(dpr, 1.5);
+      var dens = fine ? Math.min(dpr, 1.5) : (k > 2.5 ? 0.34 : 0.5);
       var w = Math.ceil((x1 - x0) * dens), h = Math.ceil((y1 - y0) * dens);
       sBuf.width = w; sBuf.height = h;
       var img = sbctx.createImageData(w, h), d = img.data;
       var RAD = Math.PI / 180, lam0 = -rot[0] * RAD, phi0 = -rot[1] * RAD, sp = Math.sin(phi0), cp = Math.cos(phi0);
       var b = sat.base, bd = b.data, bw = b.w, bh = b.h, TWO = 2 * Math.PI;
       var g = sat.region, gd = g && g.data;
-      // bilinear lookup into an image; fx/fy in texel units, x wraps around for the world image
-      function sample(src, sw, sh, fx, fy, wrap, o) {
-        fx -= 0.5; fy -= 0.5;
-        var ix = Math.floor(fx), iy = Math.floor(fy), tx = fx - ix, ty = fy - iy, ix1 = ix + 1, iy1 = iy + 1;
-        if (wrap) { ix = (ix % sw + sw) % sw; ix1 = ix1 % sw; } else { ix = ix < 0 ? 0 : ix >= sw ? sw - 1 : ix; ix1 = ix1 >= sw ? sw - 1 : ix1 < 0 ? 0 : ix1; }
-        iy = iy < 0 ? 0 : iy >= sh ? sh - 1 : iy; iy1 = iy1 >= sh ? sh - 1 : iy1 < 0 ? 0 : iy1;
-        var a = (iy * sw + ix) * 4, bb = (iy * sw + ix1) * 4, c = (iy1 * sw + ix) * 4, e = (iy1 * sw + ix1) * 4;
-        var w00 = (1 - tx) * (1 - ty), w10 = tx * (1 - ty), w01 = (1 - tx) * ty, w11 = tx * ty;
-        d[o] = src[a] * w00 + src[bb] * w10 + src[c] * w01 + src[e] * w11;
-        d[o + 1] = src[a + 1] * w00 + src[bb + 1] * w10 + src[c + 1] * w01 + src[e + 1] * w11;
-        d[o + 2] = src[a + 2] * w00 + src[bb + 2] * w10 + src[c + 2] * w01 + src[e + 2] * w11;
-        d[o + 3] = 255;
-      }
       for (var j = 0; j < h; j++) {
         var yy = (CY - (y0 + (j + 0.5) / dens)) / rr;
         for (var i = 0; i < w; i++) {
           var xx = (x0 + (i + 0.5) / dens - CX) / rr, r2 = xx * xx + yy * yy;
           if (r2 >= 1) continue;
-          // inverse orthographic projection: screen point -> longitude, latitude
           var cz = Math.sqrt(1 - r2);
           var lat = Math.asin(cz * sp + yy * cp);
           var lon = lam0 + Math.atan2(xx, cz * cp - yy * sp);
           var o = (j * w + i) * 4, s;
           if (g) {
-            var gl = lon / RAD; gl = gl - 360 * Math.round((gl - g.lonMid) / 360);
+            var gx = lon / RAD; gx = gx - 360 * Math.round((gx - g.lonMid) / 360);
             var gt = lat / RAD;
-            if (gl >= g.lon0 && gl < g.lon1 && gt > g.lat0 && gt <= g.lat1) {
-              if (fine) sample(gd, g.w, g.h, (gl - g.lon0) / (g.lon1 - g.lon0) * g.w, (g.lat1 - gt) / (g.lat1 - g.lat0) * g.h, false, o);
-              else {
-                s = (Math.min(g.h - 1, Math.floor((g.lat1 - gt) / (g.lat1 - g.lat0) * g.h)) * g.w +
-                  Math.min(g.w - 1, Math.floor((gl - g.lon0) / (g.lon1 - g.lon0) * g.w))) * 4;
-                d[o] = gd[s]; d[o + 1] = gd[s + 1]; d[o + 2] = gd[s + 2]; d[o + 3] = 255;
-              }
+            if (gx >= g.lon0 && gx < g.lon1 && gt > g.lat0 && gt <= g.lat1) {
+              s = (Math.min(g.h - 1, Math.floor((g.lat1 - gt) / (g.lat1 - g.lat0) * g.h)) * g.w +
+                Math.min(g.w - 1, Math.floor((gx - g.lon0) / (g.lon1 - g.lon0) * g.w))) * 4;
+              d[o] = gd[s]; d[o + 1] = gd[s + 1]; d[o + 2] = gd[s + 2]; d[o + 3] = 255;
               continue;
             }
           }
           var u = lon / TWO + 0.5; u -= Math.floor(u);
-          if (fine) { sample(bd, bw, bh, u * bw, (0.5 - lat / Math.PI) * bh, true, o); continue; }
           s = (Math.min(bh - 1, Math.floor((0.5 - lat / Math.PI) * bh)) * bw + Math.min(bw - 1, Math.floor(u * bw))) * 4;
           d[o] = bd[s]; d[o + 1] = bd[s + 1]; d[o + 2] = bd[s + 2]; d[o + 3] = 255;
         }
       }
       sbctx.putImageData(img, 0, 0);
-      if (sCanvas.width !== Math.round(W * dpr) || sCanvas.height !== Math.round(H * dpr)) {
-        sCanvas.width = Math.round(W * dpr); sCanvas.height = Math.round(H * dpr);
-      }
       sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       sctx.clearRect(0, 0, W, H);
       sctx.imageSmoothingEnabled = true;
@@ -449,20 +575,25 @@
       sctx.drawImage(sBuf, x0, y0, w / dens, h / dens);
     }
 
-    // After the globe comes to rest: repaint at full detail, then ask NASA for a
-    // sharper picture of just the area in view.
+    // After the globe comes to rest: repaint at full detail (CPU fallback only; the GPU
+    // is always at full detail), then ask NASA for a sharper picture of the area in view.
     function settleSat() {
       clearTimeout(satTimer);
       satTimer = setTimeout(function () {
         if (!sat || drag || anim || spinning) return;
-        drawSat(true); satFine = satKey();
+        if (!gl) { drawSat(true); satFine = satKey(); }
         clearTimeout(refineTimer);
         refineTimer = setTimeout(refineSat, 250);
       }, 120);
     }
+    function dropRegion() {
+      if (!sat || !sat.region) return;
+      freeTex(sat.region); sat.region = null; refineKey = ''; satFine = '';
+      render();
+    }
     function refineSat() {
       if (!sat || drag || anim || spinning) return;
-      if (k < 1.6) { if (sat.region) { sat.region = null; refineKey = ''; drawSat(true); satFine = satKey(); } return; }
+      if (k < 2) { dropRegion(); return; }
       // lon/lat of a grid of screen points; give up if the edge of the Earth is in view
       var lonMid = wrapLon(-rot[0]), la0 = 90, la1 = -90, lo0 = 1e9, lo1 = -1e9, n = 8;
       for (var a = 0; a <= n; a++) {
@@ -477,18 +608,23 @@
       var padLon = (lo1 - lo0) * 0.08, padLat = (la1 - la0) * 0.08;
       lo0 -= padLon; lo1 += padLon; la0 = Math.max(-90, la0 - padLat); la1 = Math.min(90, la1 + padLat);
       if (lo0 < -180 || lo1 > 180 || lo1 - lo0 > 120) return;       // across the date line or too wide: keep the world image
+      // the world picture is already sharp enough for this zoom: no need to ask NASA
+      var screenPx = Math.max(W, H) * dpr, worldPx = (lo1 - lo0) / 360 * sat.base.w;
+      if (worldPx >= screenPx * 0.9) { dropRegion(); return; }
       var key = [basemap, lo0.toFixed(2), lo1.toFixed(2), la0.toFixed(2), la1.toFixed(2)].join('|');
       if (key === refineKey) return;
       var g = sat.region;
       if (g && lo0 >= g.lon0 && lo1 <= g.lon1 && la0 >= g.lat0 && la1 <= g.lat1 && (g.lon1 - g.lon0) < (lo1 - lo0) * 1.6) return;
       refineKey = key;
-      var MAXPX = Math.min(2400, Math.round(Math.max(W, H) * dpr * 1.15)), ws, hs, ratio = (lo1 - lo0) / (la1 - la0);
+      var MAXPX = Math.min(gl ? 3072 : 2000, Math.round(screenPx * 1.2)), ws, hs, ratio = (lo1 - lo0) / (la1 - la0);
       if (ratio >= 1) { ws = MAXPX; hs = Math.max(128, Math.round(MAXPX / ratio)); } else { hs = MAXPX; ws = Math.max(128, Math.round(MAXPX * ratio)); }
       var my = satToken;
-      loadPixels(gibsUrl(STYLES[basemap], [la0.toFixed(4), lo0.toFixed(4), la1.toFixed(4), lo1.toFixed(4)], ws, hs), function (px) {
-        if (my !== satToken || !px || !sat || refineKey !== key) return;
-        sat.region = { data: px.data, w: px.w, h: px.h, lon0: lo0, lon1: lo1, lat0: la0, lat1: la1, lonMid: (lo0 + lo1) / 2 };
-        if (!drag && !anim && !spinning) { drawSat(true); satFine = satKey(); }
+      loadSurface(gibsUrl(STYLES[basemap], [la0.toFixed(4), lo0.toFixed(4), la1.toFixed(4), lo1.toFixed(4)], ws, hs), false, function (px) {
+        if (my !== satToken || !px || !sat || refineKey !== key) { freeTex(px); return; }
+        freeTex(sat.region);
+        px.lon0 = lo0; px.lon1 = lo1; px.lat0 = la0; px.lat1 = la1; px.lonMid = (lo0 + lo1) / 2;
+        sat.region = px; satFine = '';
+        if (!drag && !anim && !spinning) render();
       });
     }
 
@@ -497,26 +633,81 @@
     function cellShape(c) {
       return { type: 'Polygon', coordinates: [[[c.lon0, c.lat0], [c.lon0, c.lat1], [c.lon1, c.lat1], [c.lon1, c.lat0], [c.lon0, c.lat0]]] };
     }
+    // Grid cells (trend map, timelapse) are painted as one smooth, see-through colour
+    // field on the raster canvas: colours blend between cell centres (bilinear), so the
+    // terrain underneath stays visible and there are no hairline seams between squares.
+    var cellGrid = null;
     function setCells(list) {
       cells = list;
       gCells.selectAll('path').remove();
       gDots.selectAll('circle').remove();
       cellSel = dotSel = null;
-      if (list) {
-        cellSel = gCells.selectAll('path').data(list).enter().append('path')
-          .attr('fill', function (c) { return c.fill; }).attr('fill-opacity', function (c) { return c.opacity == null ? 0.78 : c.opacity; });
+      cellGrid = null;
+      if (list && list.length) {
+        cellSel = true;
         dotSel = gDots.selectAll('circle').data(list.filter(function (c) { return c.dot; })).enter().append('circle').attr('r', 1.8);
+        buildCellGrid(list);
+        paintCellGrid(function (c) { return c.fill; });
       }
-      host.classList.toggle('has-cells', !!list);
+      host.classList.toggle('has-cells', !!(list && list.length));
+      if (!raster) {
+        if (cellGrid) queueRaster();
+        else rctx.clearRect(0, 0, rCanvas.width, rCanvas.height);
+      }
       drawCells();
     }
+    function buildCellGrid(list) {
+      var c0 = list[0], dlon = c0.lon1 - c0.lon0, dlat = c0.lat1 - c0.lat0;
+      var lonMin = Infinity, lonMax = -Infinity, latMin = Infinity, latMax = -Infinity;
+      list.forEach(function (c) {
+        lonMin = Math.min(lonMin, c.lon0); lonMax = Math.max(lonMax, c.lon1);
+        latMin = Math.min(latMin, c.lat0); latMax = Math.max(latMax, c.lat1);
+      });
+      var nx = Math.max(1, Math.round((lonMax - lonMin) / dlon)), ny = Math.max(1, Math.round((latMax - latMin) / dlat));
+      var idx = list.map(function (c) {
+        return Math.min(ny - 1, Math.max(0, Math.round((c.lat0 - latMin) / dlat))) * nx +
+          Math.min(nx - 1, Math.max(0, Math.round((c.lon0 - lonMin) / dlon)));
+      });
+      cellGrid = { lonMin: lonMin, lonMax: lonMax, latMin: latMin, latMax: latMax, dlon: dlon, dlat: dlat, nx: nx, ny: ny,
+        idx: idx, list: list, rgba: new Float32Array(nx * ny * 4) };
+    }
+    // premultiplied colours per grid node; 'transparent' or missing cells are alpha 0
+    function paintCellGrid(fn) {
+      var g = cellGrid, a = g.rgba;
+      a.fill(0);
+      g.list.forEach(function (c, i) {
+        var f = fn(c, i), col = f && f !== 'transparent' ? d3.color(f) : null;
+        if (!col) return;
+        var op = (c.opacity == null ? 0.78 : c.opacity) * 0.86 * (col.opacity == null ? 1 : col.opacity), o = g.idx[i] * 4;
+        a[o] = col.r * op; a[o + 1] = col.g * op; a[o + 2] = col.b * op; a[o + 3] = op;
+      });
+    }
+    function sampleCells(lon, lat) {
+      var g = cellGrid;
+      if (lat < g.latMin || lat > g.latMax) return null;
+      lon = lon - 360 * Math.round((lon - (g.lonMin + g.lonMax) / 2) / 360);
+      if (lon < g.lonMin || lon > g.lonMax) return null;
+      var fx = (lon - g.lonMin) / g.dlon - 0.5, fy = (lat - g.latMin) / g.dlat - 0.5;
+      fx = fx < 0 ? 0 : fx > g.nx - 1 ? g.nx - 1 : fx; fy = fy < 0 ? 0 : fy > g.ny - 1 ? g.ny - 1 : fy;
+      var x0 = Math.floor(fx), y0 = Math.floor(fy), x1 = Math.min(g.nx - 1, x0 + 1), y1 = Math.min(g.ny - 1, y0 + 1);
+      var tx = fx - x0, ty = fy - y0, a = g.rgba;
+      var i00 = (y0 * g.nx + x0) * 4, i10 = (y0 * g.nx + x1) * 4, i01 = (y1 * g.nx + x0) * 4, i11 = (y1 * g.nx + x1) * 4;
+      var w00 = (1 - tx) * (1 - ty), w10 = tx * (1 - ty), w01 = (1 - tx) * ty, w11 = tx * ty;
+      var al = a[i00 + 3] * w00 + a[i10 + 3] * w10 + a[i01 + 3] * w01 + a[i11 + 3] * w11;
+      if (al < 0.02) return null;
+      return [
+        (a[i00] * w00 + a[i10] * w10 + a[i01] * w01 + a[i11] * w11) / al,
+        (a[i00 + 1] * w00 + a[i10 + 1] * w10 + a[i01 + 1] * w01 + a[i11 + 1] * w11) / al,
+        (a[i00 + 2] * w00 + a[i10 + 2] * w10 + a[i01 + 2] * w01 + a[i11 + 2] * w11) / al,
+        al * 255];
+    }
     function recolorCells(fn) {
-      if (!cellSel) return;
-      cellSel.attr('fill', function (c, i) { return fn(c, i); });
+      if (!cellGrid) return;
+      paintCellGrid(fn);
+      if (!raster) queueRaster();   // the lon/lat cache stays valid: only the colours changed
     }
     function drawCells() {
-      if (!cellSel) return;
-      cellSel.attr('d', function (c) { return path(cellShape(c)); });
+      if (!dotSel) return;
       dotSel.each(function (c) {
         var p = [(c.lon0 + c.lon1) / 2, (c.lat0 + c.lat1) / 2], el = d3.select(this);
         if (!visible(p)) { el.attr('display', 'none'); return; }
@@ -545,31 +736,36 @@
     // Raster: an equirectangular image draped on the sphere (live rain).
     function setRaster(r) {
       raster = r;
-      rasterCache = null;
       host.classList.toggle('has-raster', !!r);
-      if (!r) { rctx.clearRect(0, 0, rCanvas.width, rCanvas.height); return; }
+      if (!r && !cellGrid) { rctx.clearRect(0, 0, rCanvas.width, rCanvas.height); return; }
       queueRaster();
     }
     function queueRaster() {
-      if (!raster || rasterQueued) return;
+      if ((!raster && !cellGrid) || rasterQueued) return;
       rasterQueued = true;
       requestAnimationFrame(function () { rasterQueued = false; drawRaster(); });
     }
     function drawRaster() {
-      if (!raster) return;
+      var src = raster ? raster.sample : cellGrid ? sampleCells : null;
+      if (!src) return;
       var moving = !!(drag || anim || spinning);
-      var step = moving ? 4 : 2, w = Math.ceil(W / step), h = Math.ceil(H / step);
+      // CSS pixels per sample: fine at rest, coarser while the globe moves
+      var step = moving ? 3 : Math.max(1, 2 / dpr), w = Math.ceil(W / step), h = Math.ceil(H / step);
       var key = [rot[0].toFixed(3), rot[1].toFixed(3), k.toFixed(4), W, H, step].join('|');
       if (!rasterCache || rasterCache.key !== key) {
         // cache the lon/lat under every sample pixel, so a new frame is just lookups
-        var lon = new Float32Array(w * h), lat = new Float32Array(w * h), rr = R * k, rr2 = rr * rr;
-        for (var y = 0; y < h; y++) {
-          for (var x = 0; x < w; x++) {
-            var px = x * step + step / 2, py = y * step + step / 2, i = y * w + x;
-            var dx = px - CX, dy = py - CY;
-            if (dx * dx + dy * dy >= rr2) { lon[i] = NaN; continue; }
-            var g = proj.invert([px, py]);
-            lon[i] = g ? g[0] : NaN; lat[i] = g ? g[1] : NaN;
+        var lon = new Float32Array(w * h).fill(NaN), lat = new Float32Array(w * h), rr = R * k;
+        var RAD = Math.PI / 180, lam0 = -rot[0], sp = Math.sin(-rot[1] * RAD), cp = Math.cos(-rot[1] * RAD);
+        var ya = Math.max(0, Math.floor((CY - rr) / step)), yb = Math.min(h, Math.ceil((CY + rr) / step));
+        var xa = Math.max(0, Math.floor((CX - rr) / step)), xb = Math.min(w, Math.ceil((CX + rr) / step));
+        for (var y = ya; y < yb; y++) {
+          var yy = (CY - (y + 0.5) * step) / rr;
+          for (var x = xa; x < xb; x++) {
+            var xx = ((x + 0.5) * step - CX) / rr, r2 = xx * xx + yy * yy;
+            if (r2 >= 1) continue;
+            var cz = Math.sqrt(1 - r2), i = y * w + x;
+            lat[i] = Math.asin(cz * sp + yy * cp) / RAD;
+            lon[i] = wrapLon(lam0 + Math.atan2(xx, cz * cp - yy * sp) / RAD);
           }
         }
         rasterCache = { key: key, lon: lon, lat: lat, w: w, h: h };
@@ -579,7 +775,7 @@
       var img = rbctx.createImageData(c.w, c.h), d = img.data;
       for (var j = 0; j < c.lon.length; j++) {
         if (isNaN(c.lon[j])) continue;
-        var col = raster.sample(c.lon[j], c.lat[j]);
+        var col = src(c.lon[j], c.lat[j]);
         if (!col) continue;
         d[j * 4] = col[0]; d[j * 4 + 1] = col[1]; d[j * 4 + 2] = col[2]; d[j * 4 + 3] = col[3];
       }
@@ -587,6 +783,7 @@
       rCanvas.width = Math.round(W * dpr); rCanvas.height = Math.round(H * dpr);
       rctx.setTransform(1, 0, 0, 1, 0, 0);
       rctx.imageSmoothingEnabled = true;
+      rctx.imageSmoothingQuality = 'high';
       rctx.drawImage(rBuf, 0, 0, rCanvas.width, rCanvas.height);
     }
 
@@ -625,7 +822,8 @@
         pctx.globalCompositeOperation = 'source-over';
       }
       var b = field.bounds, s = field.speed || 0.0045;
-      pctx.lineWidth = 1.2; pctx.lineCap = 'round';
+      var edge = 0.12 * Math.min(b.lonMax - b.lonMin, b.latMax - b.latMin) || 1;
+      pctx.lineWidth = 1.3; pctx.lineCap = 'round';
       for (var i = 0; i < particles.length; i++) {
         var p = particles[i], uv = field.sample(p.lon, p.lat);
         if (!uv || p.age > 90 || p.lon < b.lonMin || p.lon > b.lonMax || p.lat < b.latMin || p.lat > b.latMax) { spawn(p); p.age = 0; continue; }
@@ -636,7 +834,12 @@
         if (!visible(a)) continue;
         var xa = proj(a), xb = proj([p.lon, p.lat]);
         var sp = Math.sqrt(uv[0] * uv[0] + uv[1] * uv[1]);
-        pctx.strokeStyle = 'rgba(255,255,255,' + Math.min(0.9, 0.25 + sp / 9).toFixed(2) + ')';
+        // soft edges: streaks fade out near the sides of the box instead of stopping at a hard square
+        var f = Math.min(1, Math.min(p.lon - b.lonMin, b.lonMax - p.lon, p.lat - b.latMin, b.latMax - p.lat) / edge);
+        // slow = pale cyan, fast = white
+        var t = Math.min(1, sp / 10), al = Math.min(0.95, 0.35 + sp / 9) * Math.max(0, f);
+        if (al < 0.02) continue;
+        pctx.strokeStyle = 'rgba(' + Math.round(150 + 105 * t) + ',' + Math.round(225 + 30 * t) + ',255,' + al.toFixed(2) + ')';
         pctx.beginPath(); pctx.moveTo(xa[0], xa[1]); pctx.lineTo(xb[0], xb[1]); pctx.stroke();
       }
     }
@@ -644,7 +847,7 @@
     // ---- motion ------------------------------------------------------------
 
     function stopAnim() {
-      if (anim) { cancelAnimationFrame(anim.raf); clearTimeout(anim.safety); anim = null; if (sat) settleSat(); }
+      if (anim) { cancelAnimationFrame(anim.raf); clearTimeout(anim.safety); anim = null; rested(); }
     }
 
     function animateTo(r1, k1, dur) {
@@ -753,7 +956,7 @@
       if (!drag) return;
       var d = drag; drag = null;
       host.classList.remove('dragging');
-      if (sat) settleSat();
+      rested();
       if (d.moved && !cancel && !REDUCED && d.trail.length > 1) {
         // speed over the last ~100 ms of the drag; a pause before letting go means no flick
         var b = d.trail[d.trail.length - 1], a = d.trail[0];
@@ -823,6 +1026,7 @@
         render();
         // then the more detailed 1:50m coastlines and borders
         d3.json(WORLD_FINE).then(function (f) {
+          landLo = land; bordLo = borders;
           land = topo.feature(f, f.objects.land);
           borders = topo.mesh(f, f.objects.countries, function (a, b) { return a !== b; });
           render();

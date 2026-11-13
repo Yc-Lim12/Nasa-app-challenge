@@ -109,6 +109,13 @@
     var grat = d3.geoGraticule10();
     var land = null, borders = null, landLo = null, bordLo = null, restTimer = 0;
     // once the globe stops, redraw with the detailed outlines (and sharp picture)
+    // Pointer and wheel events can arrive several times per frame; draw once per frame.
+    var frameQueued = false;
+    function requestRender() {
+      if (frameQueued) return;
+      frameQueued = true;
+      requestAnimationFrame(function () { frameQueued = false; render(); });
+    }
     function rested() {
       clearTimeout(restTimer);
       restTimer = setTimeout(function () { if (!drag && !anim && !spinning) render(); }, 80);
@@ -750,7 +757,7 @@
       if (!src) return;
       var moving = !!(drag || anim || spinning);
       // CSS pixels per sample: fine at rest, coarser while the globe moves
-      var step = moving ? 3 : Math.max(1, 2 / dpr), w = Math.ceil(W / step), h = Math.ceil(H / step);
+      var step = moving ? 4 : Math.max(1, 2 / dpr), w = Math.ceil(W / step), h = Math.ceil(H / step);
       var key = [rot[0].toFixed(3), rot[1].toFixed(3), k.toFixed(4), W, H, step].join('|');
       if (!rasterCache || rasterCache.key !== key) {
         // cache the lon/lat under every sample pixel, so a new frame is just lookups
@@ -941,6 +948,7 @@
         if (Math.sqrt(dx * dx + dy * dy) < 4) return;
         drag.moved = true;
         host.classList.add('dragging');
+        if (host.parentNode) host.parentNode.classList.add('globe-moving');
         try { node.setPointerCapture(drag.id); } catch (err) { /* ignore */ }
       }
       var r = node.getBoundingClientRect();
@@ -950,12 +958,13 @@
       drag.sens = sens;
       drag.trail.push({ t: e.timeStamp, x: e.clientX, y: e.clientY });
       if (drag.trail.length > 6) drag.trail.shift();
-      render();
+      requestRender();
     });
     function end(e, cancel) {
       if (!drag) return;
       var d = drag; drag = null;
       host.classList.remove('dragging');
+      if (host.parentNode) host.parentNode.classList.remove('globe-moving');
       rested();
       if (d.moved && !cancel && !REDUCED && d.trail.length > 1) {
         // speed over the last ~100 ms of the drag; a pause before letting go means no flick
@@ -979,10 +988,29 @@
     node.addEventListener('wheel', function (e) {
       var wide = opts.fill && window.matchMedia && window.matchMedia('(min-width: 961px)').matches;
       if (!e.ctrlKey && !wide) return;
-      e.preventDefault(); stopAnim(); spin(false);
-      k = clamp(k * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0022)), K_MIN, K_MAX);
-      render();
+      e.preventDefault(); spin(false);
+      var dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;   // lines -> pixels
+      var from = anim && anim.zoomTo ? anim.zoomTo : k;
+      glideZoom(clamp(from * Math.exp(-dy * (e.ctrlKey ? 0.01 : 0.0022)), K_MIN, K_MAX));
     }, { passive: false });
+    // Ease the zoom towards its target over a few frames instead of jumping per wheel tick.
+    function glideZoom(target) {
+      if (REDUCED) { stopAnim(); k = target; render(); rested(); return; }
+      if (anim && anim.zoomTo) { anim.zoomTo = target; return; }
+      stopAnim();
+      var me = { zoomTo: target, raf: 0, safety: 0 }, last = null;
+      anim = me;
+      function frame(now) {
+        if (anim !== me) return;
+        var dt = last === null ? 16 : Math.min(50, now - last); last = now;
+        var a = 1 - Math.pow(0.78, dt / 16);           // ~22% of the gap per 60 Hz frame
+        k = k * Math.pow(me.zoomTo / k, a);              // log-space, so zooming feels even
+        if (Math.abs(Math.log(me.zoomTo / k)) < 0.002) { k = me.zoomTo; render(); anim = null; rested(); return; }
+        render();
+        me.raf = requestAnimationFrame(frame);
+      }
+      me.raf = requestAnimationFrame(frame);
+    }
     node.addEventListener('keydown', function (e) {
       spin(false);
       var step = 10 / k;

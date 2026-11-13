@@ -4,28 +4,338 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Trend Detective</title>
+<meta name="description" content="Spin the Earth, pick a place, and find out from NASA data whether it is really changing.">
+<meta name="theme-color" content="#000000">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Apple devices use SF Pro (the system font). Inter is only downloaded where SF Pro is missing. -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<script>
+  // Apply a saved theme before the page paints, so it does not flash.
+  try { var t = localStorage.getItem('td-theme'); if (t) document.documentElement.setAttribute('data-theme', t); } catch (e) {}
+  // Apple devices draw the page in SF Pro, which needs different letter-spacing from Inter.
+  if (/Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent)) document.documentElement.classList.add('sf');
+</script>
 </head>
 <body>
+<a class="skip" href="#case-panel">Skip to the case file</a>
 
-  <!-- Globe: interactive Earth (globe.js) -->
-  <section id="globe-section">
-    <div id="map"></div>
-  </section>
+<div class="app">
 
-  <!-- Main app: choose a variable and place, show the trend (app.js, stats.js) -->
-  <main id="app"></main>
+<!-- ===== The observatory: a live globe ===== -->
+<section class="stage" aria-label="Interactive globe">
+  <div id="map" class="globe globe-stage"></div>
 
-  <!-- Map lab: trend maps and timelapse (maplab.js) -->
-  <section id="maplab"></section>
+  <header class="stage-head">
+    <p class="stage-brand"><span>Trend Detective</span> NASA Space Apps 2026</p>
+    <h1 data-i18n>Is it really <em>changing?</em></h1>
+    <p class="lede" data-i18n>Spin the Earth and click any place. <strong>Forty years of NASA data</strong> and two statistics tests tell you whether a change is real, or just the usual wobble from year to year.</p>
+    <form class="ask" id="ask-form" role="search" autocomplete="off">
+      <label class="sr-only" for="ask" data-i18n>Ask a question</label>
+      <svg class="ask-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <input id="ask" type="search" enterkeyhint="search" placeholder="Ask: Is Penang getting rainier?" data-i18n-placeholder>
+      <button type="submit" class="ask-go" aria-label="Ask">↵</button>
+    </form>
+    <p class="ask-out" id="ask-out" aria-live="polite"></p>
+  </header>
 
-  <!-- Stories (stories.js) -->
-  <section id="stories"></section>
+  <div class="layers" id="layers" role="group" aria-label="Map layers">
+    <button type="button" data-layer="" aria-pressed="true" data-i18n>Globe</button>
+    <button type="button" data-layer="trend" aria-pressed="false" data-i18n>Trend map</button>
+    <button type="button" data-layer="lapse" aria-pressed="false" data-i18n>Timelapse</button>
+    <button type="button" data-layer="rain" aria-pressed="false" data-i18n>Rain now</button>
+    <button type="button" data-layer="wind" aria-pressed="false" data-i18n>Wind</button>
+  </div>
+  <div class="layer-panel" id="layer-panel" hidden></div>
 
-  <!-- Ask a question (ask.js) -->
-  <section id="ask"></section>
+  <button type="button" class="panel-tab" id="panel-open" aria-controls="case-panel" aria-expanded="false">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M14.5 5v14" stroke="currentColor" stroke-width="1.8"/></svg>
+    <span data-i18n>Case file</span>
+    <i class="tab-dot" id="panel-dot" hidden></i>
+  </button>
 
-  <footer></footer>
+  <nav class="stage-foot" id="stage-foot" aria-label="Malaysia stories">
+    <p class="stage-label" data-i18n>Malaysia stories</p>
+    <ol class="starters" id="stories"></ol>
+    <ol id="starters" hidden></ol>
+  </nav>
+</section>
+
+<!-- ===== The field notebook ===== -->
+<div class="panel" id="case-panel">
+  <div class="panel-bar">
+    <p class="panel-title"><span data-i18n>Case file</span> <span class="case-loc" id="case-loc"></span></p>
+    <div class="bar-actions">
+      <button type="button" class="icon-btn panel-close" id="panel-close" aria-label="Hide the case file"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button type="button" class="text-btn" data-open-methods data-i18n>Methods</button>
+      <button type="button" class="text-btn lang" id="lang" aria-label="Tukar ke Bahasa Malaysia">BM</button>
+      <button type="button" class="icon-btn" id="theme" aria-label="Switch to dark theme"></button>
+    </div>
+  </div>
+
+  <main class="panel-main">
+
+    <section class="story" id="story" hidden aria-live="polite"></section>
+
+    <section class="brief-block" aria-label="Current case">
+      <p class="brief" id="brief"></p>
+    </section>
+
+    <details class="settings" id="settings" open>
+      <summary>
+        <span class="settings-title" data-i18n>Case settings</span>
+        <span class="settings-hint" data-i18n>What, where and when</span>
+      </summary>
+
+      <form class="case" id="case-form" aria-label="Case settings">
+        <ol class="steps">
+          <li id="step-what">
+            <h2 data-i18n>What to investigate</h2>
+            <div class="topics" id="topics" role="group" aria-label="Topics"></div>
+            <div class="variables" id="variables" role="radiogroup" aria-label="Variables"></div>
+          </li>
+          <li id="step-where">
+            <h2 data-i18n>Where</h2>
+            <label class="field">Place
+              <select id="place"></select>
+            </label>
+            <p class="hint">Or click anywhere on the globe, tap a named dot, or <button type="button" class="link" id="locate">use my location</button>.</p>
+            <div class="row">
+              <label class="field">Latitude <input id="lat" type="number" step="0.01" min="-89.5" max="89.5" inputmode="decimal"></label>
+              <label class="field">Longitude <input id="lon" type="number" step="0.01" min="-180" max="180" inputmode="decimal"></label>
+            </div>
+            <label class="field">Area to average over
+              <select id="size"></select>
+            </label>
+          </li>
+          <li id="step-when">
+            <h2 data-i18n>When</h2>
+            <div class="row">
+              <label class="field">From <select id="y0"></select></label>
+              <label class="field">To <select id="y1"></select></label>
+            </div>
+            <label class="field">Part of the year
+              <select id="month"></select>
+            </label>
+            <p class="hint">Twenty years or more gives the test enough to work with.</p>
+          </li>
+        </ol>
+        <button type="submit" class="run" id="run">Investigate</button>
+        <p class="live-hint" id="live-hint" hidden><i class="pulse" aria-hidden="true"></i>Live: any change updates the result.</p>
+        <p class="status" id="status" role="status" hidden></p>
+      </form>
+    </details>
+
+    <section class="evidence" aria-live="polite">
+      <div class="progress" id="progress" hidden></div>
+
+      <div id="empty" class="empty">
+        <h2 class="howto-title" data-i18n>How it works</h2>
+        <ol class="howto">
+          <li data-i18n><strong>Ask a question, or choose what to test.</strong> Air temperature, rainfall, haze, soil wetness, sunlight and more.</li>
+          <li data-i18n><strong>Click a place on the globe.</strong> Anywhere on Earth, or one of the named places.</li>
+          <li data-i18n><strong>Read the verdict.</strong> NASA data and two statistics tests say whether the change is real.</li>
+        </ol>
+        <p class="muted" data-i18n>Every answer comes from live NASA data, so a new case takes a few seconds.</p>
+      </div>
+
+      <div id="result" hidden>
+        <div class="verdict reveal" id="verdict">
+          <span class="badge" id="verdict-badge"></span>
+          <h2 id="verdict-head"></h2>
+          <p id="verdict-sub"></p>
+        </div>
+
+        <figure class="chart-card viz-root">
+          <figcaption>
+            <span class="chart-title" id="chart-title"></span>
+            <span class="legend" id="legend" aria-hidden="true"></span>
+          </figcaption>
+          <div class="toolbar">
+            <div class="seg" id="mode" role="group" aria-label="What to plot">
+              <button type="button" data-mode="values" aria-pressed="true" data-i18n>Values</button>
+              <button type="button" data-mode="anom" aria-pressed="false" data-i18n>Difference from average</button>
+            </div>
+            <label class="check"><input type="checkbox" id="smooth"> <span data-i18n>5-year average</span></label>
+            <label class="check"><input type="checkbox" id="future"> <span data-i18n>If the trend continues</span></label>
+            <label class="inline-field"><span data-i18n>Compare with</span> <select id="compare"></select></label>
+          </div>
+          <div id="chart" class="chart"></div>
+          <div class="chart-foot">
+            <p class="hint" id="chart-hint"></p>
+            <button type="button" class="link" id="reset-years" hidden></button>
+          </div>
+          <p class="compare-note" id="compare-note" hidden></p>
+          <details class="table-view">
+            <summary data-i18n>Show the numbers as a table</summary>
+            <div class="table-scroll">
+              <table>
+                <thead><tr><th>Year</th><th>Value<span id="table-unit"></span></th><th>Trend line</th></tr></thead>
+                <tbody id="table-body"></tbody>
+              </table>
+            </div>
+          </details>
+          <div class="actions">
+            <button type="button" class="link" id="csv" data-i18n>Download these numbers as CSV</button>
+            <button type="button" class="link" id="png" data-i18n>Save chart as image</button>
+            <button type="button" class="link" id="share" data-i18n>Copy a link to this case</button>
+          </div>
+        </figure>
+
+        <p class="about-var" id="about-var"></p>
+
+        <section class="block">
+          <h3 data-i18n>The evidence</h3>
+          <dl class="tiles" id="tiles"></dl>
+          <p class="caution" id="caution" hidden></p>
+          <p class="spike-note" id="spike" hidden></p>
+        </section>
+
+        <section class="block season-card">
+          <h3 data-i18n>Which months are changing most?</h3>
+          <p id="season-note"></p>
+          <div id="season" class="chart season"></div>
+          <p class="muted">Each bar is the trend for one month on its own, per decade. Solid bars are statistically significant, pale bars are not. Click a bar to investigate that month; click it again for the whole year.</p>
+        </section>
+
+        <section class="block var2-card">
+          <h3 data-i18n>Compare two variables</h3>
+          <p class="muted" data-i18n>See whether two things change together at this place, for example temperature and cloud cover.</p>
+          <label class="inline-field var2-pick"><span data-i18n>Compare with</span> <select id="var2"></select></label>
+          <div class="legend var2-legend" id="var2-legend"></div>
+          <div id="var2-chart" class="chart"></div>
+          <p class="var2-note" id="var2-note"></p>
+        </section>
+
+        <details class="explain">
+          <summary data-i18n>How to read this</summary>
+          <p><strong>Trend.</strong> A trend is a change that keeps going in one direction over many years. One hot year is weather. Thirty years that keep getting hotter is a trend.</p>
+          <p><strong>Significant.</strong> Every measurement wobbles from year to year, so a line through the points almost always tilts a little. A test asks: if nothing were really changing, how often would random wobble alone produce a tilt this clear? That chance is the p-value. When it is below 0.05 (1 in 20), scientists call the trend statistically significant.</p>
+          <p><strong>Two tests.</strong> The t-test assumes the wobble follows a bell curve. The Mann-Kendall test only compares which years are higher than which, so odd years and skewed data do not fool it. This page uses Mann-Kendall for the verdict and shows the t-test beside it.</p>
+          <p><strong>Stripes.</strong> The coloured strip under the chart has one stripe per year, coloured by how far that year was above or below the average of the whole period.</p>
+          <p><strong>Not significant does not mean no change.</strong> It means the record is too short or too noisy to be sure yet.</p>
+        </details>
+
+        <section class="block scan">
+          <h3 data-i18n>What else is changing here?</h3>
+          <p>Run the same test on every variable for this place and period, and see which ones are worth a closer look.</p>
+          <button type="button" class="secondary" id="scan" data-i18n>Scan every variable</button>
+          <span class="scan-status" id="scan-status" role="status"></span>
+          <div id="scan-out" class="table-scroll"></div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p class="foot-disclaimer" data-i18n><strong>A student project.</strong> Trend Detective was built by team Sunway to the Moon for the 2026 NASA Space Apps Challenge, “Be An Earth System Trend Detective!”. It is not made, reviewed or endorsed by NASA. It is for learning, not for official, legal or safety decisions.</p>
+
+    <div class="foot-grid">
+      <div>
+        <h4>Data</h4>
+        <p>NASA Prediction Of Worldwide Energy Resources (POWER) monthly API, NASA Langley Research Center. Temperature, rain, soil, wind, humidity and ozone come from the MERRA-2 reanalysis (NASA Global Modeling and Assimilation Office). Sunlight, cloud and aerosol values come from CERES SYN1deg and GEWEX SRB.</p>
+      </div>
+      <div>
+        <h4>Method</h4>
+        <p><button type="button" class="link" data-open-methods>Read the full methods, sources and limits</button></p>
+        <p>Monthly values are averaged into one value per year, and over the grid cells in the chosen box weighted by area. Trend: least-squares line with a t-test, Mann-Kendall test and Sen’s slope. Linear trends only.</p>
+      </div>
+      <div>
+        <h4>Privacy</h4>
+        <p>No accounts, no analytics and no cookies. Your choices live only in the page address. The light or dark theme you pick is remembered in your own browser’s storage and never leaves your device. The coordinates of the place you investigate are sent to NASA POWER to fetch the data; if you press “use my location”, that position is used the same way and is not stored by this app. The app handles no personal data under Malaysia’s Personal Data Protection Act 2010.</p>
+      </div>
+      <div>
+        <h4>Third-party services</h4>
+        <p>Your browser connects to five outside services: NASA POWER (climate data), NASA GIBS (the satellite pictures on the globe and the live rain images), Google Fonts (typefaces, which means Google receives your IP address), cdnjs (the D3 charting library) and jsDelivr (the topojson-client library and Natural Earth map outlines from the world-atlas package). Each has its own privacy policy. The question box works entirely in your browser; nothing you type is sent anywhere.</p>
+      </div>
+      <div>
+        <h4>Accessibility</h4>
+        <p>Light and dark themes, a phone layout, a table view of every chart and keyboard control throughout. The globe spins with the arrow keys and Enter chooses the place in the centre; the latitude and longitude boxes do the same job.</p>
+      </div>
+      <div>
+        <h4>Licence and credits</h4>
+        <p>Code under the Apache License 2.0. Map outlines from Natural Earth (public domain). Type: SF Pro, the system font on Apple devices, with Inter (SIL Open Font License) on other devices. No NASA logo or insignia is used.</p>
+        <p id="contact">Contact: team Sunway to the Moon<span id="repo-wrap" hidden>, through the <a id="repo-link" href="#">project repository</a></span>.</p>
+      </div>
+    </div>
+  </footer>
+</div>
+</div>
+
+<dialog class="methods" id="methods" aria-labelledby="methods-title">
+  <div class="methods-inner">
+    <header class="methods-head">
+      <h2 id="methods-title">Methods, sources and limits</h2>
+      <button type="button" class="icon-btn" id="methods-close" aria-label="Close">✕</button>
+    </header>
+
+    <section>
+      <h3>What the app measures</h3>
+      <p>For a chosen place, variable and period, Trend Detective turns NASA’s monthly data into one value per year (the mean of the twelve months, or one chosen month) and asks: is there a steady rise or fall, how fast is it, and could it be chance?</p>
+    </section>
+
+    <section>
+      <h3>Data sources</h3>
+      <ul>
+        <li><strong>NASA POWER</strong> (Prediction Of Worldwide Energy Resources), NASA Langley Research Center, monthly API, 1981 onwards. <a href="https://power.larc.nasa.gov/" target="_blank" rel="noopener">power.larc.nasa.gov</a></li>
+        <li><strong>MERRA-2 reanalysis</strong> for temperature, rain, soil wetness, evaporation, humidity, water vapour, snow, wind and ozone. Gelaro, R., et al. (2017). The Modern-Era Retrospective Analysis for Research and Applications, Version 2 (MERRA-2). <em>Journal of Climate</em>, 30(14), 5419–5454.</li>
+        <li><strong>CERES SYN1deg</strong> (from 2001) and <strong>GEWEX SRB</strong> (before 2001) for sunlight, cloud and aerosol. Doelling, D. R., et al. (2013). Geostationary enhanced temporal interpolation for CERES flux products. <em>Journal of Atmospheric and Oceanic Technology</em>, 30(6), 1072–1090.</li>
+        <li><strong>Satellite pictures on the globe</strong>: NASA Blue Marble (shaded relief and bathymetry, NASA Earth Observatory) and the daily true-colour image from the VIIRS instrument on NOAA-20, both delivered by NASA GIBS. They are pictures for viewing, not data for trend tests. The layers button on the globe switches between them and the plain dark map.</li>
+        <li><strong>GPM IMERG</strong> half-hourly precipitation rate, shown in “Rain now”, delivered as images by NASA GIBS (Global Imagery Browse Services). These are pictures for viewing, not data for trend tests.</li>
+        <li>Sea surface temperature is MERRA-2 surface skin temperature over water, which MERRA-2 takes from observed sea temperatures.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h3>Statistics</h3>
+      <ul>
+        <li><strong>Mann-Kendall test</strong> for a monotonic trend, with tie correction and continuity correction. The verdict uses it: p &lt; 0.05 is “significant”, p &lt; 0.10 “borderline”. Mann, H. B. (1945). Nonparametric tests against trend. <em>Econometrica</em>, 13, 245–259. Kendall, M. G. (1975). <em>Rank Correlation Methods</em>. Griffin.</li>
+        <li><strong>Sen’s slope</strong>, the median of all pairwise slopes, for the headline rate. Sen, P. K. (1968). Estimates of the regression coefficient based on Kendall’s tau. <em>Journal of the American Statistical Association</em>, 63, 1379–1389.</li>
+        <li><strong>Least-squares line</strong> with a two-sided t-test and a 95% confidence band, shown beside Mann-Kendall.</li>
+        <li><strong>Years needed to tell</strong> uses the formula of Weatherhead, E. C., et al. (1998). Factors affecting the detection of trends: statistical considerations and applications to environmental data. <em>Journal of Geophysical Research</em>, 103(D14), 17149–17161. It assumes the present trend and year-to-year noise carry on.</li>
+        <li><strong>Spike, not trend</strong> flags years whose distance from the Sen trend line is more than 3.5 robust standard deviations (1.4826 × median absolute deviation), then re-runs the test without them.</li>
+        <li>The code was checked against SciPy (<code>linregress</code>, <code>theilslopes</code>) and a reference Mann-Kendall implementation.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h3>Maps</h3>
+      <ul>
+        <li><strong>Trend map</strong>: every NASA POWER grid cell (0.5° × 0.625°) in a 10° × 10° box gets its own Sen’s slope and Mann-Kendall test. Red means rising, blue falling. A dot marks cells where p &lt; 0.05.</li>
+        <li><strong>Opposite trends</strong> are reported when at least three significant cells rise and at least three fall in the same box.</li>
+        <li><strong>Timelapse</strong> plays every month in the period. “Difference from normal” subtracts each cell’s own average for that calendar month, so the seasons do not swamp the change.</li>
+        <li><strong>Wind</strong> particles follow the average 10-metre wind (MERRA-2 eastward and northward components) for the chosen period and month.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h3>Limits</h3>
+      <ul>
+        <li>Only straight-line (monotonic) trends are tested. A rise then fall can look like no trend.</li>
+        <li>Neighbouring years are often alike. The page warns when lag-1 autocorrelation is strong, but p-values are not corrected for it.</li>
+        <li>Reanalysis data is a model constrained by observations, not a direct measurement, and is coarse (about 50 km). Small towns, hills and coasts are smoothed out.</li>
+        <li>“If the trend continues” only extends the straight line. It is not a forecast or a climate projection.</li>
+        <li>Testing many variables or many map cells at the 0.05 level gives about one false alarm in twenty.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h3>Not included, and why</h3>
+      <ul>
+        <li><strong>Greenness (NDVI)</strong>: NASA’s MODIS NDVI is reachable from a browser only through the ORNL subset service, which returns 10 dates per request (about 17 seconds each). A full 2003–2025 record for one place would take about 15 minutes.</li>
+        <li><strong>Water storage (GRACE)</strong> and <strong>NASA climate projections (NEX-GDDP-CMIP6)</strong>: these come as large NetCDF files with no browser API. They need a small processing step on a computer first, which can then save results for the app to load.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h3>Questions in plain English</h3>
+      <p>The question box does not use an AI service. A small set of rules in your browser looks for words such as “rain”, “haze”, “nights” or “hotter”, and for place names, months and years, then sets up the case. Nothing you type leaves your device.</p>
+    </section>
+  </div>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>

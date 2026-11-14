@@ -1,6 +1,7 @@
 /*
  * Builds data/global/<PARAM>.json: the trend of every 5° × 5° block of the globe,
- * for the whole-globe trend map. A live map can only ask NASA POWER for one 10° box
+ * for the whole-globe trend map; and data/global/<PARAM>_monthly.bin (+ .json header):
+ * every block's average for every month, for the whole-globe timelapse. A live map can only ask NASA POWER for one 10° box
  * at a time (about 3 MB each, 648 boxes for the globe), so this is done once here.
  *
  *   node tools/build_global_trends.mjs T2M PRECTOTCORR
@@ -63,12 +64,12 @@ async function fetchBox(param, lat0, lon0) {
 }
 
 /**
- * Sums for one 10° box: for each 5° block and year, the cos(latitude)-weighted sum
- * of cell values and the total weight. A cell on a shared edge belongs only to the
+ * Sums for one 10° box: for each 5° block and year (y) and month (m, "YYYYMM"), the
+ * cos(latitude)-weighted sum of cell values and the total weight. A cell on a shared edge belongs only to the
  * box whose lower-left corner is at or below it, so no cell is counted twice.
  */
 function boxSums(json, param, lat0, lon0) {
-  const sums = {};
+  const sums = {}, msums = {};
   for (const f of json.features || []) {
     let [lon, lat] = f.geometry.coordinates;
     if (lon >= 180) lon -= 360;
@@ -79,22 +80,30 @@ function boxSums(json, param, lat0, lon0) {
     const bi = Math.min(NLAT - 1, Math.floor((lat + 90) / BLOCK));
     const bj = Math.min(NLON - 1, Math.floor((lon + 180) / BLOCK));
     const key = bi * NLON + bj;
-    const ys = yearly(f.properties.parameter[param] || {});
+    const table = f.properties.parameter[param] || {};
+    const ys = yearly(table);
     const b = sums[key] || (sums[key] = {});
     for (const y in ys) {
       const e = b[y] || (b[y] = [0, 0]);
       e[0] += ys[y] * w; e[1] += w;
     }
+    const mb = msums[key] || (msums[key] = {});
+    for (const k in table) {
+      const v = table[k], mo = +k.slice(4);
+      if (v === null || v < FILL || mo < 1 || mo > 12) continue;
+      const e = mb[k] || (mb[k] = [0, 0]);
+      e[0] += v * w; e[1] += w;
+    }
   }
-  return sums;
+  return { y: sums, m: msums };
 }
 
 async function build(param) {
-  const cacheDir = join(ROOT, 'tools', '.cache', 'global', param);
+  const cacheDir = join(ROOT, 'tools', '.cache', 'global2', param);
   mkdirSync(cacheDir, { recursive: true });
   const boxes = [];
   for (let lat0 = -90; lat0 < 90; lat0 += BOX) for (let lon0 = -180; lon0 < 180; lon0 += BOX) boxes.push([lat0, lon0]);
-  const blocks = {};
+  const blocks = {}, mblocks = {};
   let done = 0, next = 0;
   const t0 = Date.now();
   async function worker() {
@@ -107,11 +116,13 @@ async function build(param) {
         sums = boxSums(await fetchBox(param, lat0, lon0), param, lat0, lon0);
         writeFileSync(file, JSON.stringify(sums));
       }
-      for (const key in sums) {
-        const b = blocks[key] || (blocks[key] = {});
-        for (const y in sums[key]) {
-          const e = b[y] || (b[y] = [0, 0]);
-          e[0] += sums[key][y][0]; e[1] += sums[key][y][1];
+      for (const [into, from] of [[blocks, sums.y], [mblocks, sums.m]]) {
+        for (const key in from) {
+          const b = into[key] || (into[key] = {});
+          for (const t in from[key]) {
+            const e = b[t] || (b[t] = [0, 0]);
+            e[0] += from[key][t][0]; e[1] += from[key][t][1];
+          }
         }
       }
       if (++done % 36 === 0 || done === boxes.length) {
@@ -147,6 +158,24 @@ async function build(param) {
   };
   mkdirSync(join(ROOT, 'data', 'global'), { recursive: true });
   writeFileSync(join(ROOT, 'data', 'global', param + '.json'), JSON.stringify(out));
+  // every block's monthly average, block-major (row = 5° latitude band from the south,
+  // column = 5° longitude from 180°W), as 16-bit integers of value × SCALE; missing = -32768
+  const months = [];
+  for (let y = START; y <= END; y++) for (let m = 1; m <= 12; m++) months.push(y + (m < 10 ? '0' : '') + m);
+  const SCALE = 100;
+  const bin = new Int16Array(NLAT * NLON * months.length).fill(-32768);
+  for (const key in mblocks) {
+    const b = mblocks[key];
+    const wMax = Math.max(...Object.values(b).map(e => e[1]));
+    months.forEach((k, i) => {
+      if (b[k] && b[k][1] >= 0.9 * wMax) bin[key * months.length + i] = Math.max(-32767, Math.min(32767, Math.round(b[k][0] / b[k][1] * SCALE)));
+    });
+  }
+  writeFileSync(join(ROOT, 'data', 'global', param + '_monthly.bin'), Buffer.from(bin.buffer));
+  writeFileSync(join(ROOT, 'data', 'global', param + '_monthly.json'), JSON.stringify({
+    param, start: START, end: END, block: BLOCK, nlat: NLAT, nlon: NLON, months: months.length, scale: SCALE, missing: -32768,
+    layout: 'Int16, little-endian, index = (row * nlon + col) * months + month; row 0 = 90°S-85°S, col 0 = 180°W-175°W'
+  }));
   const nsig = sig.filter(Boolean).length;
   console.log(`${param}: wrote data/global/${param}.json, ${cells.length} blocks, ${nsig} significant after FDR`);
 }

@@ -599,6 +599,8 @@
       '<strong>Peta tren seluruh glob</strong>: NASA POWER hanya menyediakan kotak 10° bagi setiap permintaan, jadi seluruh glob (648 kotak, kira-kira 2 GB) dibina sekali oleh <code>tools/build_global_trends.mjs</code> untuk suhu udara dan hujan, 1981–2025. Setiap sel grid diberi purata tahunan berpemberat hari; sel dipuratakan ke dalam kawasan 5° × 5° berpemberat cos(latitud); setiap kawasan diuji dengan <code>stats.js</code> yang sama (kecerunan Sen, Mann-Kendall terlaras kebergantungan), dan pembetulan kadar penemuan palsu (5%) digunakan merentasi kesemua 2,592 kawasan. <code>maths/check_global.py</code> mengira semula beberapa kawasan terus daripada NASA dengan SciPy dan pymannkendall.',
     'The whole-globe map is ready for air temperature and rain, so this variable shows the area around the place.':
       'Peta seluruh glob tersedia untuk suhu udara dan hujan, jadi pemboleh ubah ini menunjukkan kawasan di sekitar tempat itu.',
+    'Loading every month for the whole globe…': 'Memuatkan setiap bulan untuk seluruh glob…',
+    'Whole globe: the average of every NASA POWER grid cell in each 5° area, month by month, pre-built for this site.': 'Seluruh glob: purata setiap sel grid NASA POWER dalam setiap kawasan 5°, bulan demi bulan, disediakan lebih awal untuk laman ini.',
     'Data sources':
       'Sumber data',
     '<strong>NASA POWER</strong> (Prediction Of Worldwide Energy Resources), NASA Langley Research Center, monthly API, 1981 onwards. <a href="https://power.larc.nasa.gov/" target="_blank" rel="noopener">power.larc.nasa.gov</a>':

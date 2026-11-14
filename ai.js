@@ -18,7 +18,7 @@
 
   function $(id) { return document.getElementById(id); }
   function bm() { return !!(window.TDi18n && window.TDi18n.lang === 'bm'); }
-  function L(en, ms) { return bm() ? ms : en; }
+  function L(en, ms) { var t = window.TDi18n ? window.TDi18n.tr(en) : en; return (bm() && t === en && ms !== undefined) ? ms : t; }
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { return null; } return null; }
   function apiKey() { return (store(KEY_STORE) || '').trim(); }
@@ -43,28 +43,40 @@
   function num(x, dp) { return Number(x).toFixed(dp == null ? 2 : dp); }
   function facts(r) {
     var vr = r.variable, st = r.stats, n = r.years.length, unit = vr.unit || '';
-    var span = r.years[n - 1] - r.years[0];
+    var span = r.years[n - 1] - r.years[0], monthly = r.step === 'month';
+    var y0 = Math.floor(r.years[0]), y1 = Math.floor(r.years[n - 1]);
+    // monthly data: summarise as one mean anomaly per year, so the prompt stays small
+    var perYear = r.years.map(function (y, i) { return [y, +Number(r.values[i]).toFixed(vr.dp)]; });
+    if (monthly) {
+      var acc = {};
+      r.years.forEach(function (y, i) { var k = Math.floor(y); (acc[k] = acc[k] || []).push(r.values[i]); });
+      perYear = Object.keys(acc).map(function (k) {
+        var a = acc[k]; return [+k, +(a.reduce(function (s, v) { return s + v; }, 0) / a.length).toFixed(vr.dp)];
+      });
+    }
     return {
       variable: TD.vname(vr), unit: unit, definition: vr.def, place: r.placeName,
       lat: r.lat, lon: r.lon, area: r.cells > 1 ? r.cells + ' grid cells averaged' : 'one grid cell',
       season: r.month ? TD.MONTHS[r.month] + ' only' : 'whole year',
-      first_year: r.years[0], last_year: r.years[n - 1], years_of_data: n,
+      first_year: y0, last_year: y1, years_of_data: monthly ? perYear.length : n,
+      time_step: monthly ? 'monthly values with the seasonal cycle removed (each month minus its calendar-month mean); both tests adjusted for lag-1 autocorrelation' : 'one value per year; both tests adjusted for lag-1 autocorrelation',
+      effective_sample_size: Math.round(st.ols.nEff),
       sen_slope_per_decade: +num(st.sen.slope * 10, 4),
       total_change_along_trend: +num(st.sen.slope * span, 4),
       ols_slope_per_decade: +num(st.ols.slope * 10, 4),
       ols_95ci_per_decade: [+num(st.ols.ciLow * 10, 4), +num(st.ols.ciHigh * 10, 4)],
-      mann_kendall_p: +st.mk.p.toPrecision(3), kendall_tau: +num(st.mk.tau, 3),
-      t_test_p: +st.ols.p.toPrecision(3), r_squared: +num(st.ols.r2, 3), lag1_autocorrelation: +num(st.ols.lag1, 3),
+      mann_kendall_p_memory_adjusted: +st.mk.pAdj.toPrecision(3), kendall_tau: +num(st.mk.tau, 3),
+      t_test_p_memory_adjusted: +st.ols.pAdj.toPrecision(3), r_squared: +num(st.ols.r2, 3), lag1_autocorrelation: +num(st.ols.lag1, 3),
       verdict: st.verdict, direction: st.direction,
       unusual_years: (r.spikes || []).map(function (s) { return s.year; }),
-      yearly_values: r.years.map(function (y, i) { return [y, +Number(r.values[i]).toFixed(vr.dp)]; })
+      yearly_values: perYear
     };
   }
 
   function amount(x, unit, dp) { return (Math.abs(x) < 1e-9 ? '0' : Math.abs(x).toFixed(dp)) + (unit ? ' ' + unit : ''); }
   function oneIn(p) {
     var k = Math.round(1 / Math.max(p, 1e-9));
-    return k >= 1000 ? L('less than 1 time in 1,000', 'kurang daripada 1 kali dalam 1,000') : L('about 1 time in ' + k, 'kira-kira 1 kali dalam ' + k);
+    return k >= 1000 ? L('less than 1 time in 1,000') : L('about 1 time in ' + k, 'kira-kira 1 kali dalam ' + k);
   }
 
   /** Plain-language summary of the current case: [{title, text}]. */
@@ -75,7 +87,7 @@
     var total = amount(f.total_change_along_trend, f.unit, dp), dec = amount(f.sen_slope_per_decade, f.unit, dp + 1);
 
     // 1. what happened
-    out.push({ title: L('In short', 'Ringkasnya'), text: flat
+    out.push({ title: L('In short'), text: flat
       ? L('Over ' + years + ' years (' + f.first_year + '–' + f.last_year + '), ' + name + ' around ' + place + ' has stayed about the same.',
           'Dalam ' + years + ' tahun (' + f.first_year + '–' + f.last_year + '), ' + name + ' di sekitar ' + place + ' kekal hampir sama.')
       : L('Over ' + years + ' years (' + f.first_year + '–' + f.last_year + '), ' + name + ' around ' + place + ' has gone ' + (up ? 'up' : 'down') +
@@ -84,7 +96,7 @@
           ' kira-kira ' + total + ' secara keseluruhan, iaitu lebih kurang ' + dec + ' setiap 10 tahun.') });
 
     // 2. is it real?
-    var p = st.mk.p, real;
+    var p = st.mk.pAdj, real;
     if (st.verdict === 'significant') {
       real = L('Very likely real. If nothing were actually changing, a pattern this steady would turn up by luck only ' + oneIn(p) + '. Scientists call anything rarer than 1 in 20 "statistically significant".',
         'Besar kemungkinan benar. Jika tiada apa-apa yang berubah, corak sekukuh ini hanya akan muncul secara kebetulan ' + oneIn(p) + '. Saintis menganggap apa-apa yang lebih jarang daripada 1 dalam 20 sebagai "signifikan secara statistik".');
@@ -95,11 +107,11 @@
       real = L('Not proven. The normal ups and downs from one year to the next are bigger than this trend, so it could easily be chance (' + oneIn(p) + ').',
         'Belum terbukti. Turun naik biasa dari tahun ke tahun lebih besar daripada tren ini, jadi ia mungkin sekadar kebetulan (' + oneIn(p) + ').');
     }
-    out.push({ title: L('Is the change real?', 'Adakah perubahan ini benar?'), text: real });
+    out.push({ title: L('Is the change real?'), text: real });
 
     // 3. how big compared with the wobble
     var r2 = Math.round(f.r_squared * 100);
-    out.push({ title: L('Trend vs. normal variation', 'Tren berbanding turun naik biasa'), text:
+    out.push({ title: L('Trend vs. normal variation'), text:
       L('The steady trend explains about ' + r2 + '% of the differences between years. The other ' + (100 - r2) + '% is ordinary year-to-year variation (weather, El Niño and so on).',
         'Tren yang stabil menjelaskan kira-kira ' + r2 + '% perbezaan antara tahun. Baki ' + (100 - r2) + '% ialah turun naik biasa dari tahun ke tahun (cuaca, El Niño dan sebagainya).') });
 
@@ -107,38 +119,60 @@
     var warn = [];
     if (f.unusual_years.length) warn.push(L(f.unusual_years.join(', ') + (f.unusual_years.length > 1 ? ' stood out as unusual one-off years.' : ' stood out as an unusual one-off year.') + ' One extreme year is a spike, not a trend.',
       f.unusual_years.join(', ') + ' menonjol sebagai tahun luar biasa. Satu tahun ekstrem ialah lonjakan, bukan tren.'));
-    if (Math.abs(f.lag1_autocorrelation) > 2 / Math.sqrt(f.years_of_data)) warn.push(L('Each year tends to look like the year before, which can make a trend look more certain than it is.',
-      'Setiap tahun cenderung menyerupai tahun sebelumnya, jadi tren mungkin kelihatan lebih pasti daripada sebenarnya.'));
-    if (warn.length) out.push({ title: L('Be careful', 'Berhati-hati'), text: warn.join(' ') });
+    // stats.js adjusts the tests for year-to-year memory; mention it when it mattered
+    var nPts = r.years.length;
+    if (f.effective_sample_size < nPts * 0.67) {
+      var mon = r.step === 'month';
+      warn.push(L((mon ? 'Neighbouring months look alike, so the ' + nPts + ' monthly values' : 'Each year looks a lot like the year before, so the ' + nPts + ' years') +
+        ' count as only about ' + f.effective_sample_size + ' independent values. The tests were adjusted for this.',
+        (mon ? 'Bulan bersebelahan kelihatan serupa, jadi ' + nPts + ' nilai bulanan' : 'Setiap tahun hampir sama dengan tahun sebelumnya, jadi ' + nPts + ' tahun') +
+        ' dikira sebagai kira-kira ' + f.effective_sample_size + ' nilai bebas sahaja. Ujian telah diselaraskan untuk ini.'));
+    }
+    if (warn.length) out.push({ title: L('Be careful'), text: warn.join(' ') });
 
     // 5. what the tests are
-    out.push({ title: L('The two tests, in one line each', 'Dua ujian, satu ayat setiap satu'), text:
-      L('Mann-Kendall asks: are later years mostly higher (or lower) than earlier ones? Sen’s slope is the typical change per year, worked out so that one freak year barely moves it.',
-        'Mann-Kendall bertanya: adakah tahun kemudian kebanyakannya lebih tinggi (atau rendah) daripada tahun awal? Cerun Sen ialah perubahan biasa setahun, dikira supaya satu tahun luar biasa hampir tidak menjejaskannya.') });
+    out.push({ title: L('The two tests, in one line each'), text:
+      L('Mann-Kendall asks: are later years mostly higher (or lower) than earlier ones? Sen’s slope is the typical change per year, worked out so that one freak year barely moves it.') });
     return out;
   }
 
   // ---- built-in answers (no key) -------------------------------------------------
 
   var GLOSSARY = [
-    { re: /p[\s-]?value|\bp\b|significan|chance|luck|real|kebetulan|signifikan|benar/i, en: 'The p-value is the chance of seeing a pattern this steady if nothing were really changing. Small means "unlikely to be luck". Below 0.05 (1 in 20) we call it statistically significant.', ms: 'Nilai p ialah peluang melihat corak sekukuh ini jika tiada apa-apa yang benar-benar berubah. Nilai kecil bermaksud "tidak mungkin kebetulan". Di bawah 0.05 (1 dalam 20) dianggap signifikan secara statistik.' },
-    { re: /mann|kendall|tau/i, en: 'The Mann-Kendall test compares every pair of years and counts how often the later year is higher. Tau runs from −1 (always falling) to +1 (always rising). It does not care how big the change is, only how consistent.', ms: 'Ujian Mann-Kendall membandingkan setiap pasangan tahun dan mengira berapa kerap tahun kemudian lebih tinggi. Tau dari −1 (sentiasa turun) hingga +1 (sentiasa naik). Ia mengukur konsistensi, bukan saiz perubahan.' },
-    { re: /sen|slope|rate|decade|per year|how fast|cerun|kadar|dekad|laju/i, en: 'Sen’s slope is the middle value of the slopes between every pair of years, so a single extreme year hardly affects it. We show it per decade (10 years) because yearly changes are tiny.', ms: 'Cerun Sen ialah nilai tengah cerun antara setiap pasangan tahun, jadi satu tahun ekstrem hampir tidak menjejaskannya. Kami tunjukkan setiap dekad (10 tahun) kerana perubahan tahunan sangat kecil.' },
-    { re: /spike|outlier|unusual|extreme|lonjakan|luar biasa/i, en: 'A spike is a single year far from the trend line (for example a strong El Niño year). One spike can make a line tilt, so we re-test without it to see whether the trend survives.', ms: 'Lonjakan ialah satu tahun yang jauh dari garis tren (contohnya tahun El Niño yang kuat). Kami uji semula tanpanya untuk melihat sama ada tren masih kekal.' },
-    { re: /why|cause|because|reason|kenapa|mengapa|punca|sebab/i, en: 'These tests show whether something changed, not why. Common drivers include global warming, land-use change (cities, deforestation), and natural cycles such as El Niño. Treat any cause as a hypothesis to check.', ms: 'Ujian ini menunjukkan sama ada sesuatu berubah, bukan mengapa. Punca biasa termasuk pemanasan global, perubahan guna tanah (bandar, penebangan hutan) dan kitaran semula jadi seperti El Niño. Anggap sebarang punca sebagai hipotesis.' },
-    { re: /r2|r²|r-squared|variation|wobble|explain/i, en: 'R² is the share of the year-to-year differences that the straight trend line accounts for. Climate data is noisy, so even a real trend often explains only a small share.', ms: 'R² ialah bahagian perbezaan dari tahun ke tahun yang dijelaskan oleh garis tren. Data iklim banyak hingar, jadi tren sebenar pun selalunya menjelaskan bahagian yang kecil sahaja.' },
-    { re: /data|source|nasa|power|merra|where.*from|sumber/i, en: 'The numbers come from NASA POWER, which serves satellite and model data (such as MERRA-2 and CERES) for any point on Earth since the 1980s.', ms: 'Nombor ini daripada NASA POWER, yang menyediakan data satelit dan model (seperti MERRA-2 dan CERES) untuk mana-mana titik di Bumi sejak 1980-an.' }
+    { re: /p[\s-]?value|\bp\b|significan|chance|luck|real|kebetulan|signifikan|benar/i, en: 'The p-value is the chance of seeing a pattern this steady if nothing were really changing. Small means "unlikely to be luck". Below 0.05 (1 in 20) we call it statistically significant.' },
+    { re: /mann|kendall|tau/i, en: 'The Mann-Kendall test compares every pair of years and counts how often the later year is higher. Tau runs from −1 (always falling) to +1 (always rising). It does not care how big the change is, only how consistent.' },
+    { re: /sen|slope|rate|decade|per year|how fast|cerun|kadar|dekad|laju/i, en: 'Sen’s slope is the middle value of the slopes between every pair of years, so a single extreme year hardly affects it. We show it per decade (10 years) because yearly changes are tiny.' },
+    { re: /spike|outlier|unusual|extreme|lonjakan|luar biasa/i, en: 'A spike is a single year far from the trend line (for example a strong El Niño year). One spike can make a line tilt, so we re-test without it to see whether the trend survives.' },
+    { re: /why|cause|because|reason|kenapa|mengapa|punca|sebab/i, en: 'These tests show whether something changed, not why. Common drivers include global warming, land-use change (cities, deforestation), and natural cycles such as El Niño. Treat any cause as a hypothesis to check.' },
+    { re: /r2|r²|r-squared|variation|wobble|explain/i, en: 'R² is the share of the year-to-year differences that the straight trend line accounts for. Climate data is noisy, so even a real trend often explains only a small share.' },
+    { re: /data|source|nasa|power|merra|where.*from|sumber/i, en: 'The numbers come from NASA POWER, which serves satellite and model data (such as MERRA-2 and CERES) for any point on Earth since the 1980s.' }
   ];
+  // Never let a bad case or an odd question break the chat: check the numbers first,
+  // and catch anything unexpected.
+  function safeExplain(r) {
+    try {
+      var f = facts(r);
+      if (!isFinite(f.sen_slope_per_decade) || !isFinite(f.mann_kendall_p_memory_adjusted) || f.years_of_data < 2) return null;
+      return explain(r);
+    } catch (e) { return null; }
+  }
+  function safeAnswer(q) {
+    try { return offlineAnswer(String(q || '').slice(0, 300)); }
+    catch (e) { return L('Sorry, something went wrong while answering. Please try another question.'); }
+  }
+
   function offlineAnswer(q) {
     var hits = GLOSSARY.filter(function (g) { return g.re.test(q); }).slice(0, 2);
     var parts = hits.map(function (g) { return L(g.en, g.ms); });
     var wantsSummary = /summar|explain (this|the|it)|simpl|result|big|ringkas|terangkan|keputusan|besar/i.test(q);
     if (wantsSummary || !parts.length) {
-      if (res) parts.unshift(explain(res).slice(0, 2).map(function (x) { return '**' + x.title + ':** ' + x.text; }).join('\n'));
-      else parts.unshift(L('Pick a place and a variable first, then I can explain the result.', 'Pilih tempat dan pemboleh ubah dahulu, kemudian saya boleh terangkan keputusannya.'));
+      var ex = res ? safeExplain(res) : null;
+      if (ex) parts.unshift(ex.slice(0, 2).map(function (x) { return '**' + x.title + ':** ' + x.text; }).join('\n'));
+      else if (res) parts.unshift(L('I could not read the numbers for this case. Try another place or period, then ask again.'));
+      else parts.unshift(L('Pick a place and a variable first, then I can explain the result.'));
     }
     if (!hits.length && !wantsSummary) {
-      parts.push(L('For free-form questions, add an OpenAI API key in the AI settings (⚙).', 'Untuk soalan bebas, masukkan kunci API OpenAI dalam tetapan AI (⚙).'));
+      parts.push(L('I can only answer questions about this result. Try: "Is the change real?", "How fast is it changing?" or "Why might it be changing?"'));
     }
     return parts.join('\n\n');
   }
@@ -170,8 +204,8 @@
       if (!r.ok) {
         return r.json().catch(function () { return {}; }).then(function (j) {
           var msg = (j.error && j.error.message) || ('HTTP ' + r.status);
-          if (r.status === 401) msg = L('The API key was not accepted. Check it in the AI settings.', 'Kunci API tidak diterima. Semak dalam tetapan AI.');
-          else if (r.status === 429) msg = L('OpenAI says the limit or quota is reached. Try again later or check your billing.', 'OpenAI menyatakan had atau kuota telah dicapai. Cuba lagi nanti atau semak bil anda.');
+          if (r.status === 401) msg = L('The API key was not accepted. Check it in the AI settings.');
+          else if (r.status === 429) msg = L('OpenAI says the limit or quota is reached. Try again later or check your billing.');
           else if (r.status === 404) msg = L('The model "' + model() + '" is not available to this key. Change it in the AI settings.', 'Model "' + model() + '" tidak tersedia untuk kunci ini. Tukar dalam tetapan AI.');
           throw new Error(msg);
         });
@@ -225,30 +259,29 @@
   }
   function labelExplain() {
     var b = document.querySelector('#ai-explain-btn .ai-btn-label');
-    if (b) b.textContent = L('Explain this simply', 'Terangkan dengan mudah');
-    var a = $('ai-ask-btn'); if (a) a.textContent = L('Ask AI a question →', 'Tanya AI →');
+    if (b) b.textContent = L('Explain this simply');
+    var a = $('ai-ask-btn'); if (a) a.textContent = L('Ask AI a question →');
   }
   function fillExplain() {
     var card = $('ai-explain');
     if (!card || !res) return;
-    var items = explain(res);
-    var html = '<h3>' + esc(L('In plain words', 'Dalam bahasa mudah')) + '</h3><dl>' + items.map(function (x) {
+    var items = safeExplain(res);
+    if (!items) { card.innerHTML = '<p class="ai-note">' + esc(L('I could not read the numbers for this case. Try another place or period, then ask again.')) + '</p>'; return; }
+    var html = '<h3>' + esc(L('In plain words')) + '</h3><dl>' + items.map(function (x) {
       return '<div><dt>' + esc(x.title) + '</dt><dd>' + esc(x.text) + '</dd></div>';
     }).join('') + '</dl>';
     html += apiKey()
-      ? '<div class="ai-more"><button type="button" class="ai-btn ai-btn-sm" id="ai-deeper">' + esc(L('Get an AI explanation', 'Dapatkan penerangan AI')) + '</button><div class="ai-deeper-out" id="ai-deeper-out"></div></div>'
-      : '<p class="ai-note">' + esc(L('This summary is built in and works offline. For a fuller AI explanation and free-form questions, add an OpenAI API key in the AI chat settings.',
-        'Ringkasan ini terbina dalam dan berfungsi luar talian. Untuk penerangan AI yang lebih lengkap, masukkan kunci API OpenAI dalam tetapan sembang AI.')) + '</p>';
+      ? '<div class="ai-more"><button type="button" class="ai-btn ai-btn-sm" id="ai-deeper">' + esc(L('Get an AI explanation')) + '</button><div class="ai-deeper-out" id="ai-deeper-out"></div></div>'
+      : '<p class="ai-note">' + esc(L('This summary is built in and works offline. For a fuller AI explanation and free-form questions, add an OpenAI API key in the AI chat settings.')) + '</p>';
     card.innerHTML = html;
     var deeper = $('ai-deeper');
     if (deeper) deeper.addEventListener('click', function () {
       var out = $('ai-deeper-out');
       deeper.disabled = true;
-      out.innerHTML = '<p class="ai-typing">' + esc(L('Thinking…', 'Sedang berfikir…')) + '</p>';
+      out.innerHTML = '<p class="ai-typing">' + esc(L('Thinking…')) + '</p>';
       askOpenAI([
         { role: 'system', content: systemPrompt() },
-        { role: 'user', content: caseMessage() + '\n\n' + L('Explain this result to a secondary-school student in 4 short bullet points: what changed, whether it is real, how big it is compared with normal variation, and one thing to be careful about.',
-          'Terangkan keputusan ini kepada pelajar sekolah menengah dalam 4 poin ringkas: apa yang berubah, sama ada ia benar, sebesar mana berbanding turun naik biasa, dan satu perkara yang perlu diberi perhatian.') }
+        { role: 'user', content: caseMessage() + '\n\n' + L('Explain this result to a secondary-school student in 4 short bullet points: what changed, whether it is real, how big it is compared with normal variation, and one thing to be careful about.') }
       ], function (t) { out.innerHTML = fmtReply(t); })
         .catch(function (e) { out.innerHTML = '<p class="ai-err">' + esc(e.message) + '</p>'; })
         .finally(function () { deeper.disabled = false; });
@@ -278,7 +311,7 @@
       '</form>' +
       '<div class="ai-log" id="ai-log" aria-live="polite"></div>' +
       '<div class="ai-chips" id="ai-chips"></div>' +
-      '<form class="ai-input" id="ai-form"><input id="ai-q" type="text" autocomplete="off" enterkeyhint="send">' +
+      '<form class="ai-input" id="ai-form"><input id="ai-q" type="text" autocomplete="off" enterkeyhint="send" maxlength="300">' +
         '<button type="submit" class="ai-send" id="ai-send" aria-label="Send">↑</button></form>';
     document.body.appendChild(fab);
     document.body.appendChild(box);
@@ -297,11 +330,11 @@
       $('ai-settings').hidden = true; $('ai-gear').setAttribute('aria-expanded', 'false');
       labelChat(); if (!$('ai-explain').hidden) fillExplain();
       addMsg('bot', k ? L('Saved. I will now answer using OpenAI (' + model() + ').', 'Disimpan. Saya kini akan menjawab menggunakan OpenAI (' + model() + ').')
-        : L('No key saved. I will use the built-in explainer.', 'Tiada kunci disimpan. Saya akan guna penerang terbina dalam.'));
+        : L('No key saved. I will use the built-in explainer.'));
     });
     $('ai-forget').addEventListener('click', function () {
       store(KEY_STORE, null); $('ai-key').value = '';
-      labelChat(); addMsg('bot', L('Key removed from this browser.', 'Kunci dibuang daripada pelayar ini.'));
+      labelChat(); addMsg('bot', L('Key removed from this browser.'));
     });
     $('ai-form').addEventListener('submit', function (e) {
       e.preventDefault();
@@ -317,21 +350,20 @@
     labelChat();
   }
   function labelChat() {
-    var f = document.querySelector('#ai-fab .ai-fab-label'); if (f) f.textContent = L('Ask AI', 'Tanya AI');
+    var f = document.querySelector('#ai-fab .ai-fab-label'); if (f) f.textContent = L('Ask AI');
     if (!$('ai-chat-title')) return;
-    $('ai-chat-title').textContent = L('Trend Detective AI', 'AI Trend Detective');
-    $('ai-mode').textContent = apiKey() ? 'OpenAI · ' + model() : L('built-in', 'terbina dalam');
-    $('ai-gear').setAttribute('aria-label', L('AI settings', 'Tetapan AI'));
-    $('ai-close').setAttribute('aria-label', L('Close', 'Tutup'));
-    $('ai-key-label').textContent = L('OpenAI API key (optional)', 'Kunci API OpenAI (pilihan)');
-    $('ai-model-label').textContent = L('Model', 'Model');
-    $('ai-key-note').textContent = L('Stored only in this browser and sent only to OpenAI. Usage is billed to this key. Leave it empty to use the free built-in explainer.',
-      'Disimpan hanya dalam pelayar ini dan dihantar hanya kepada OpenAI. Penggunaan dicaj kepada kunci ini. Biarkan kosong untuk guna penerang terbina dalam yang percuma.');
-    $('ai-save').textContent = L('Save', 'Simpan');
-    $('ai-forget').textContent = L('Remove key', 'Buang kunci');
-    $('ai-q').placeholder = L('Ask about this result…', 'Tanya tentang keputusan ini…');
-    var chips = [L('Explain this result simply', 'Terangkan keputusan ini dengan mudah'), L('What does the p-value mean?', 'Apa maksud nilai p?'),
-      L('Is this change big?', 'Adakah perubahan ini besar?'), L('Why might this be happening?', 'Mengapa ini berlaku?')];
+    $('ai-chat-title').textContent = L('Trend Detective AI');
+    $('ai-mode').textContent = apiKey() ? 'OpenAI · ' + model() : L('built-in');
+    $('ai-gear').setAttribute('aria-label', L('AI settings'));
+    $('ai-close').setAttribute('aria-label', L('Close'));
+    $('ai-key-label').textContent = L('OpenAI API key (optional)');
+    $('ai-model-label').textContent = L('Model');
+    $('ai-key-note').textContent = L('Stored only in this browser and sent only to OpenAI. Usage is billed to this key. Leave it empty to use the free built-in explainer.');
+    $('ai-save').textContent = L('Save');
+    $('ai-forget').textContent = L('Remove key');
+    $('ai-q').placeholder = L('Ask about this result…');
+    var chips = [L('Explain this result simply'), L('What does the p-value mean?'),
+      L('Is this change big?'), L('Why might this be happening?')];
     $('ai-chips').innerHTML = chips.map(function (c) { return '<button type="button" data-q="' + esc(c) + '">' + esc(c) + '</button>'; }).join('');
   }
   function openChat() {
@@ -341,7 +373,7 @@
       addMsg('bot', res
         ? L('Hi! I can explain the result for ' + TD.vname(res.variable).toLowerCase() + ' around ' + res.placeName + ' in plain words. Ask anything, or tap a suggestion.',
             'Hai! Saya boleh terangkan keputusan untuk ' + TD.vname(res.variable).toLowerCase() + ' di sekitar ' + res.placeName + ' dalam bahasa mudah. Tanya apa sahaja, atau tekan cadangan.')
-        : L('Hi! Pick a place and something to investigate, then ask me what the numbers mean.', 'Hai! Pilih tempat dan perkara untuk disiasat, kemudian tanya saya maksud nombornya.'));
+        : L('Hi! Pick a place and something to investigate, then ask me what the numbers mean.'));
     }
     setTimeout(function () { $('ai-q').focus(); }, 30);
   }
@@ -360,9 +392,9 @@
   }
   function send(q) {
     addMsg('user', q);
-    if (!apiKey()) { addMsg('bot', offlineAnswer(q)); return; }
+    if (!apiKey()) { addMsg('bot', safeAnswer(q)); return; }
     busy = true; $('ai-send').disabled = true;
-    var el = addMsg('bot', L('Thinking…', 'Sedang berfikir…')); el.classList.add('ai-typing');
+    var el = addMsg('bot', L('Thinking…')); el.classList.add('ai-typing');
     history.push({ role: 'user', content: q });
     var msgs = [{ role: 'system', content: systemPrompt() }, { role: 'system', content: caseMessage() }].concat(history.slice(-10));
     askOpenAI(msgs, function (t) {
@@ -373,9 +405,9 @@
     }).catch(function (e) {
       history.pop();
       el.classList.remove('ai-typing');
-      el.innerHTML = e.name === 'AbortError' ? '<p class="ai-err">' + esc(L('Stopped.', 'Dihentikan.')) + '</p>'
-        : '<p class="ai-err">' + esc(e.message || L('Could not reach OpenAI.', 'Tidak dapat menghubungi OpenAI.')) + '</p>' +
-          '<p class="ai-note">' + esc(L('Built-in answer instead:', 'Jawapan terbina dalam:')) + '</p>' + fmtReply(offlineAnswer(q));
+      el.innerHTML = e.name === 'AbortError' ? '<p class="ai-err">' + esc(L('Stopped.')) + '</p>'
+        : '<p class="ai-err">' + esc(e.message || L('Could not reach OpenAI.')) + '</p>' +
+          '<p class="ai-note">' + esc(L('Built-in answer instead:')) + '</p>' + fmtReply(safeAnswer(q));
     }).finally(function () { busy = false; $('ai-send').disabled = false; });
   }
 
@@ -393,6 +425,11 @@
     buildExplainUI();
     buildChat();
     if (TD.current) res = TD.current;
+    // a case that failed: forget the old one, so the AI cannot answer about it
+    document.addEventListener('td:clear', function () {
+      res = null; history = [];
+      var card = $('ai-explain'); if (card) card.hidden = true;
+    });
     document.addEventListener('td:result', function (e) {
       var changed = !res || !e.detail || res.variable.id !== e.detail.variable.id || res.placeName !== e.detail.placeName;
       res = e.detail;

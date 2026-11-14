@@ -1,12 +1,14 @@
 /*
- * Trend Detective statistics.
- * Linear regression with a t-test, the Mann-Kendall trend test and Sen's slope.
- * No dependencies. Works in the browser (window.TDStats) and in Node (module.exports).
+ * Our trend statistics (Sunway to the Moon, NASA Space Apps 2026).
+ * Works in the browser (window.TDStats) and in Node (module.exports).
+ *
+ * Checked against the Python answer key (answer_key.py) by running:  python compare.py
  */
 (function (root) {
   'use strict';
 
-  // ---- special functions -------------------------------------------------
+  // ---- p-value helpers (copied from the example; tested against scipy) ----
+  // You do not need to change anything in this section.
 
   function lgamma(x) {
     // Lanczos approximation (g = 7, n = 9)
@@ -89,8 +91,6 @@
     return erfc(Math.abs(z) / Math.SQRT2);
   }
 
-  // ---- helpers -----------------------------------------------------------
-
   function mean(a) {
     var s = 0;
     for (var i = 0; i < a.length; i++) s += a[i];
@@ -103,15 +103,109 @@
     return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
   }
 
-  // ---- tests -------------------------------------------------------------
+  /** Round to the nearest whole number, halves to the even one (like numpy). */
+  function roundHalfEven(v) {
+    var r = Math.round(v);
+    if (Math.abs(v % 1) === 0.5 && r % 2 !== 0) r -= 1;
+    return r;
+  }
+
+  // ---- our functions -----------------------------------------------------
+
+  var FILL = -990;  // NASA uses -999 for "no data"
 
   /**
-   * Ordinary least squares y = intercept + slope * x, with a t-test on the slope.
+   * Drop missing values.
+   * Returns { years: [...], values: [...] } with only the good pairs.
+   */
+  function clean(years, values) {
+    var outYears = [], outValues = [];
+    for (var i = 0; i < values.length; i++) {
+      var v = values[i];
+      // Check null first: JavaScript treats null as 0, so null > FILL is true.
+      if (v === null || v === undefined || !isFinite(v) || v <= FILL) continue;
+      outYears.push(years[i]);
+      outValues.push(v);
+    }
+    return { years: outYears, values: outValues };
+  }
+
+  /**
+   * Mann-Kendall test: is there a steady rise or fall?
+   * Compares every year with every later year. Returns { n, S, varS, z, p, tau }.
+   * If nEff (effective number of years, from linearRegression) is given, also
+   * returns the memory-adjusted { varSAdj, zAdj, pAdj }: the variance of S is
+   * multiplied by n / nEff, the same effective-sample-size idea as for the line.
+   */
+  function mannKendall(y, nEff) {
+    // Round to 10 significant digits so that values which differ only by
+    // computer rounding (e.g. 0.1 + 0.2 vs 0.3) count as ties, not as a rise.
+    y = y.map(function (v) { return Number(v.toPrecision(10)); });
+    var n = y.length, S = 0, i, j;
+    // +1 for each pair that goes up, -1 for each pair that goes down
+    for (i = 0; i < n - 1; i++) {
+      for (j = i + 1; j < n; j++) S += Math.sign(y[j] - y[i]);
+    }
+    // Tie correction: groups of equal values make S less variable
+    var counts = {};
+    for (i = 0; i < n; i++) counts[y[i]] = (counts[y[i]] || 0) + 1;
+    var ties = 0;
+    for (var k in counts) {
+      var c = counts[k];
+      ties += c * (c - 1) * (2 * c + 5);
+    }
+    var varS = (n * (n - 1) * (2 * n + 5) - ties) / 18;
+    // z score with the continuity correction (move S one step towards 0)
+    var z = 0;
+    if (S > 0) z = (S - 1) / Math.sqrt(varS);
+    else if (S < 0) z = (S + 1) / Math.sqrt(varS);
+    var out = { n: n, S: S, varS: varS, z: z, p: normPValue(z), tau: S / (n * (n - 1) / 2) };
+    if (nEff !== undefined) {
+      out.varSAdj = varS * n / nEff;
+      out.zAdj = 0;
+      if (S > 0) out.zAdj = (S - 1) / Math.sqrt(out.varSAdj);
+      else if (S < 0) out.zAdj = (S + 1) / Math.sqrt(out.varSAdj);
+      out.pAdj = normPValue(out.zAdj);
+    }
+    return out;
+  }
+
+  /**
+   * Sen's slope: how fast is it changing?
+   * The median of the slopes between every pair of points, so one odd year
+   * cannot drag it. Returns { slope, intercept }.
+   * If varS (the Mann-Kendall variance) is given, also returns a 95% range
+   * { ciLow, ciHigh }, picked from the sorted slopes (Sen 1968, as in scipy).
+   */
+  function senSlope(x, y, varS) {
+    var slopes = [];
+    for (var i = 0; i < x.length - 1; i++) {
+      for (var j = i + 1; j < x.length; j++) {
+        if (x[j] !== x[i]) slopes.push((y[j] - y[i]) / (x[j] - x[i]));
+      }
+    }
+    var slope = median(slopes);
+    // Same intercept formula as scipy.stats.theilslopes
+    var out = { slope: slope, intercept: median(y) - slope * median(x) };
+    if (varS !== undefined) {
+      var sorted = slopes.slice().sort(function (p, q) { return p - q; });
+      var N = sorted.length;
+      var half = 1.959963984540054 * Math.sqrt(varS);   // 95%: z = 1.96
+      out.ciLow = sorted[Math.max(roundHalfEven((N - half) / 2) - 1, 0)];
+      out.ciHigh = sorted[Math.min(roundHalfEven((N + half) / 2), N - 1)];
+    }
+    return out;
+  }
+
+  /**
+   * Straight-line fit (least squares) with a t-test, plus a version of the
+   * test adjusted for year-to-year memory (lag-1 autocorrelation).
+   * The 95% range (ciLow, ciHigh) and tCrit use the memory-adjusted numbers,
+   * so the range excludes zero exactly when pAdj < 0.05.
+   * lag1 is the measured memory; lag1Adj is the value actually used (see below).
    */
   function linearRegression(x, y) {
-    var n = x.length;
-    var mx = mean(x), my = mean(y);
-    var sxx = 0, sxy = 0, syy = 0, i;
+    var n = x.length, mx = mean(x), my = mean(y), sxx = 0, sxy = 0, syy = 0, i;
     for (i = 0; i < n; i++) {
       sxx += (x[i] - mx) * (x[i] - mx);
       sxy += (x[i] - mx) * (y[i] - my);
@@ -119,120 +213,90 @@
     }
     var slope = sxy / sxx;
     var intercept = my - slope * mx;
-    var sse = 0;
-    var resid = [];
+
+    // Residuals: how far each year is from the line
+    var resid = [], sse = 0;
     for (i = 0; i < n; i++) {
       var e = y[i] - (intercept + slope * x[i]);
       resid.push(e);
       sse += e * e;
     }
     var df = n - 2;
-    var s = Math.sqrt(sse / df);            // residual standard error
-    var se = s / Math.sqrt(sxx);            // standard error of the slope
+    var residualSE = Math.sqrt(sse / df);     // typical distance from the line
+    var se = residualSE / Math.sqrt(sxx);     // standard error of the slope
+    // A perfectly straight series (e.g. snow depth that is 0 every year) has se = 0:
+    // then t is 0 for a flat line (p = 1) and infinite for a sloped one (p = 0), not 0/0.
     var t = se === 0 ? (slope === 0 ? 0 : Infinity) : slope / se;
-    var p = syy === 0 ? 1 : tPValue(t, df);
-    var tc = tCritical(0.95, df);
-    // lag-1 autocorrelation of the residuals, and the Durbin-Watson statistic
-    var num = 0, den = 0, dsq = 0;
-    for (i = 0; i < n; i++) {
-      den += resid[i] * resid[i];
-      if (i > 0) {
-        num += resid[i] * resid[i - 1];
-        dsq += (resid[i] - resid[i - 1]) * (resid[i] - resid[i - 1]);
-      }
+    var p = se === 0 && slope === 0 ? 1 : tPValue(t, df);
+    var r2 = syy === 0 ? 0 : 1 - sse / syy;   // share of the variation the line explains
+
+    // Memory: correlation between each residual and the next one
+    var a = resid.slice(0, -1), b = resid.slice(1);
+    var ma = mean(a), mb = mean(b), sab = 0, saa = 0, sbb = 0;
+    for (i = 0; i < a.length; i++) {
+      sab += (a[i] - ma) * (b[i] - mb);
+      saa += (a[i] - ma) * (a[i] - ma);
+      sbb += (b[i] - mb) * (b[i] - mb);
     }
+    var lag1 = saa && sbb ? sab / Math.sqrt(saa * sbb) : 0;
+
+    // With few years the measured lag1 comes out too low on average, so add
+    // the usual small-sample bias correction (1 + 4 * lag1) / n. Negative
+    // memory counts as none, and 0.95 caps it so nEff stays above zero.
+    var r = Math.min(Math.max(lag1 + (1 + 4 * lag1) / n, 0), 0.95);
+    // Effective sample size: memory means fewer truly independent years
+    var nEff = n * (1 - r) / (1 + r);
+    var dfAdj = Math.max(nEff - 2, 1);
+    var seAdj = se * Math.sqrt(df / dfAdj);
+    var pAdj = se === 0 ? p : tPValue(slope / seAdj, dfAdj);
+
+    // 95% range of the slope, from the memory-adjusted uncertainty.
+    // tCrit is scaled so that tCrit * se = (critical t) * seAdj.
+    // seAdj / se is just sqrt(df / dfAdj); written that way it stays finite when se = 0
+    var tCrit = tCritical(0.95, dfAdj) * Math.sqrt(df / dfAdj);
+
+    // Added for the chart's diagnostics (does not change any result above):
+    // the plain critical t for n - 2, used for the prediction interval of single years,
+    // and the Durbin-Watson statistic of the residuals.
+    var dsq = 0;
+    for (i = 1; i < n; i++) dsq += (resid[i] - resid[i - 1]) * (resid[i] - resid[i - 1]);
     return {
-      n: n, slope: slope, intercept: intercept, se: se, t: t, df: df, p: p,
-      ciLow: slope - tc * se, ciHigh: slope + tc * se,
-      r2: syy === 0 ? 0 : 1 - sse / syy,
-      residualSE: s, tCrit: tc, meanX: mx, sxx: sxx, resid: resid,
-      lag1: den === 0 ? 0 : num / den,
-      dw: den === 0 ? null : dsq / den
+      n: n, slope: slope, intercept: intercept, se: se, t: t, df: df, p: p, r2: r2,
+      residualSE: residualSE, meanX: mx, sxx: sxx,
+      resid: resid, dw: sse === 0 ? null : dsq / sse, tCritPlain: tCritical(0.95, df),
+      lag1: lag1, lag1Adj: r, nEff: nEff, dfAdj: dfAdj, seAdj: seAdj, pAdj: pAdj,
+      tCrit: tCrit, ciLow: slope - tCrit * se, ciHigh: slope + tCrit * se
     };
   }
 
   /**
-   * The same t-test with fewer, "effective" years when neighbouring years are alike
-   * (Santer et al. 2000): n_eff = n (1 - r1) / (1 + r1), using the residuals' lag-1
-   * autocorrelation r1. Only applied when r1 > 0; null when n_eff is 2 or less.
+   * Benjamini-Hochberg false discovery rate, for maps with many cells.
+   * Returns an array of true (still significant) / false, in the input order.
+   * Cells without a p-value (no data) are false and are not counted.
    */
-  function adjustForAutocorrelation(ols) {
-    var r1 = ols.lag1;
-    var nEff = r1 > 0 ? ols.n * (1 - r1) / (1 + r1) : ols.n;
-    if (nEff <= 2) return { nEff: nEff, se: null, df: null, p: null, ciLow: null, ciHigh: null };
-    var df = nEff - 2;
-    var se = ols.se * Math.sqrt((ols.n - 2) / df);
-    var t = se === 0 ? (ols.slope === 0 ? 0 : Infinity) : ols.slope / se;
-    var tc = tCritical(0.95, df);
-    return { nEff: nEff, se: se, df: df, p: tPValue(t, df), ciLow: ols.slope - tc * se, ciHigh: ols.slope + tc * se };
+  function fdr(pvals, q) {
+    if (q === undefined) q = 0.05;
+    // Positions of the cells that have a real p-value
+    var order = [];
+    for (var i = 0; i < pvals.length; i++) {
+      if (typeof pvals[i] === 'number' && isFinite(pvals[i])) order.push(i);
+    }
+    var n = order.length;
+    // Sorted from smallest p to largest
+    order.sort(function (a, b) { return pvals[a] - pvals[b]; });
+    // Largest rank whose p-value is under its threshold q * rank / n
+    var k = -1;
+    for (var rank = 0; rank < n; rank++) {
+      if (pvals[order[rank]] <= q * (rank + 1) / n) k = rank;
+    }
+    var sig = pvals.map(function () { return false; });
+    for (rank = 0; rank <= k; rank++) sig[order[rank]] = true;
+    return sig;
   }
 
-  /**
-   * Mann-Kendall trend test (values must be in time order).
-   * Uses the tie-corrected variance and the usual continuity correction.
-   */
-  function mannKendall(y) {
-    var n = y.length, S = 0, i, j;
-    for (i = 0; i < n - 1; i++) {
-      for (j = i + 1; j < n; j++) {
-        var d = y[j] - y[i];
-        S += d > 0 ? 1 : (d < 0 ? -1 : 0);
-      }
-    }
-    var counts = {};
-    for (i = 0; i < n; i++) counts[y[i]] = (counts[y[i]] || 0) + 1;
-    var tie = 0;
-    for (var k in counts) {
-      var c = counts[k];
-      if (c > 1) tie += c * (c - 1) * (2 * c + 5);
-    }
-    var varS = (n * (n - 1) * (2 * n + 5) - tie) / 18;
-    var z = 0;
-    if (varS > 0) {
-      if (S > 0) z = (S - 1) / Math.sqrt(varS);
-      else if (S < 0) z = (S + 1) / Math.sqrt(varS);
-    }
-    return { n: n, S: S, varS: varS, z: z, p: normPValue(z), tau: S / (n * (n - 1) / 2) };
-  }
+  // ---- extra diagnostics for the chart (added by step 4; they do not change the verdict) ----
 
   var Z975 = 1.959963984540054;   // standard normal quantile for a two-sided 95% interval
-
-  /** Round to the nearest whole number, halves to the even one (as NumPy does). */
-  function roundHalfEven(v) {
-    var r = Math.round(v);
-    return Math.abs(v % 1) === 0.5 && r % 2 !== 0 ? r - 1 : r;
-  }
-
-  /** Sum of k(k-1)(2k+5) over groups of tied values, used in Kendall-type variances. */
-  function tieTerm(a) {
-    var counts = {}, sum = 0;
-    for (var i = 0; i < a.length; i++) counts[a[i]] = (counts[a[i]] || 0) + 1;
-    for (var k in counts) { var c = counts[k]; if (c > 1) sum += c * (c - 1) * (2 * c + 5); }
-    return sum;
-  }
-
-  /**
-   * Sen's slope: the median of the slopes between every pair of points,
-   * with its 95% confidence interval (Sen 1968, eq. 2.6; the same rule as SciPy's theilslopes).
-   */
-  function senSlope(x, y) {
-    var slopes = [], n = x.length, i, j;
-    for (i = 0; i < n - 1; i++) {
-      for (j = i + 1; j < n; j++) {
-        if (x[j] !== x[i]) slopes.push((y[j] - y[i]) / (x[j] - x[i]));
-      }
-    }
-    slopes.sort(function (p, q) { return p - q; });
-    var slope = median(slopes);
-    var inter = [];
-    for (i = 0; i < n; i++) inter.push(y[i] - slope * x[i]);
-
-    var sigma = Math.sqrt((n * (n - 1) * (2 * n + 5) - tieTerm(x) - tieTerm(y)) / 18);
-    var nt = slopes.length;
-    var hi = Math.min(roundHalfEven((nt + Z975 * sigma) / 2), nt - 1);
-    var lo = Math.max(roundHalfEven((nt - Z975 * sigma) / 2) - 1, 0);
-    return { slope: slope, intercept: median(inter), ciLow: slopes[lo], ciHigh: slopes[hi] };
-  }
 
   /** Ranks 1..n, tied values sharing their average rank. */
   function ranks(a) {
@@ -251,15 +315,16 @@
   }
 
   /**
-   * Mann-Kendall with the Hamed and Rao (1998) variance correction for autocorrelation.
+   * Mann-Kendall with the Hamed and Rao (1998) variance correction for autocorrelation,
+   * shown as a second opinion next to the memory-adjusted p used for the verdict.
    * The series is detrended with Sen's slope and ranked; every lag whose autocorrelation of
    * the ranks is outside ±1.96/√n inflates Var(S). Matches pymannkendall's
    * hamed_rao_modification_test. p is null if the correction makes the variance non-positive.
    */
   function hamedRao(x, y, mk, slope) {
     var n = y.length, k;
-    // Count years from the first one (1, 2, 3 …) rather than 1981, 1982 …: the same detrending,
-    // but without the rounding that can swap two nearly equal values when ranked.
+    // years counted from the first one (1, 2, 3 …): the same detrending, without rounding
+    // that can swap two nearly equal values when ranked
     var r = ranks(y.map(function (v, idx) { return v - slope * (x[idx] - x[0] + 1); }));
     var m = mean(r), d = r.map(function (v) { return v - m; });
     var acov = function (lag) { var s = 0; for (var t = 0; t + lag < n; t++) s += d[t] * d[t + lag]; return s / n; };
@@ -294,39 +359,36 @@
   }
 
   /**
-   * Benjamini–Hochberg (1995): which of many p-values stay significant when they are tested
-   * together, keeping the expected share of false discoveries at q. Returns true/false per p.
+   * Everything for one place and one variable.
+   * verdict: 'significant' (p < 0.05), 'borderline' (p < 0.10), 'none',
+   * or 'insufficient' (fewer than 10 years). The app turns these codes into words.
+   * p is the memory-adjusted Mann-Kendall p-value. It belongs to the same family
+   * as Sen's slope (the rate shown), resists freak years, and in our tests kept
+   * false alarms lowest; see maths/accuracy_test.py.
    */
-  function benjaminiHochberg(ps, q) {
-    var m = ps.length, order = [], i, last = -1;
-    for (i = 0; i < m; i++) order.push(i);
-    order.sort(function (a, b) { return ps[a] - ps[b]; });
-    for (i = 0; i < m; i++) if (ps[order[i]] <= (i + 1) / m * q) last = i;
-    var pass = ps.map(function () { return false; });
-    for (i = 0; i <= last; i++) pass[order[i]] = true;
-    return pass;
-  }
-
-  /**
-   * Run every test on one series and decide a verdict.
-   * Verdict uses the Mann-Kendall p-value: < 0.05 significant, < 0.10 borderline.
-   */
-  function analyze(x, y) {
-    var ols = linearRegression(x, y);
-    var mk = mannKendall(y);
-    var sen = senSlope(x, y);
-    var verdict = mk.p < 0.05 ? 'significant' : (mk.p < 0.10 ? 'borderline' : 'none');
-    var direction = sen.slope > 0 ? 'up' : (sen.slope < 0 ? 'down' : 'flat');
-    return { ols: ols, mk: mk, sen: sen, verdict: verdict, direction: direction,
-      hr: hamedRao(x, y, mk, sen.slope), adj: adjustForAutocorrelation(ols), cp: pettitt(y) };
+  function analyze(years, values) {
+    var c = clean(years, values);
+    var n = c.values.length;
+    if (n < 10) return { n: n, verdict: 'insufficient' };
+    var ols = linearRegression(c.years, c.values);
+    var mk = mannKendall(c.values, ols.nEff);
+    var sen = senSlope(c.years, c.values, mk.varSAdj);
+    var p = mk.pAdj;
+    var verdict = p < 0.05 ? 'significant' : (p < 0.10 ? 'borderline' : 'none');
+    return {
+      n: n, slopePerDecade: sen.slope * 10, p: p, verdict: verdict,
+      direction: sen.slope > 0 ? 'up' : (sen.slope < 0 ? 'down' : 'flat'),
+      years: c.years, values: c.values, mk: mk, sen: sen, ols: ols,
+      // extra diagnostics for the chart; they do not change the verdict
+      hr: hamedRao(c.years, c.values, mk, sen.slope), cp: pettitt(c.values)
+    };
   }
 
   var api = {
-    lgamma: lgamma, ibeta: ibeta, tPValue: tPValue, tCritical: tCritical,
-    normPValue: normPValue, mean: mean, median: median,
-    linearRegression: linearRegression, mannKendall: mannKendall,
-    senSlope: senSlope, hamedRao: hamedRao, adjustForAutocorrelation: adjustForAutocorrelation,
-    ranks: ranks, pettitt: pettitt, benjaminiHochberg: benjaminiHochberg, analyze: analyze
+    tPValue: tPValue, tCritical: tCritical, normPValue: normPValue, mean: mean, median: median,
+    clean: clean, mannKendall: mannKendall, senSlope: senSlope,
+    linearRegression: linearRegression, fdr: fdr, analyze: analyze,
+    ranks: ranks, hamedRao: hamedRao, pettitt: pettitt
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.TDStats = api;

@@ -30,6 +30,7 @@
   ];
 
   // name, lat, lon, box size (degrees, 0 = one grid cell). Longest names are tried first.
+  var BROAD = ['malaysia', 'all of malaysia', 'seluruh malaysia', 'borneo', 'peninsular malaysia', 'semenanjung'];
   var PLACES = [
     ['kuala lumpur', 3.14, 101.69, 2, 'klang'], ['kl', 3.14, 101.69, 2, 'klang'], ['klang valley', 3.1, 101.6, 2, 'klang'], ['lembah klang', 3.1, 101.6, 2, 'klang'],
     ['selangor', 3.3, 101.5, 2], ['shah alam', 3.07, 101.52, 0], ['petaling jaya', 3.11, 101.61, 0], ['putrajaya', 2.93, 101.69, 0], ['cyberjaya', 2.92, 101.65, 0],
@@ -43,7 +44,9 @@
     ['east coast', 5.4, 102.6, 2, 'eastcoast'], ['pantai timur', 5.4, 102.6, 2, 'eastcoast'], ['west coast', 4.2, 100.9, 2], ['pantai barat', 4.2, 100.9, 2],
     ['kota kinabalu', 5.98, 116.07, 2], ['sabah', 5.3, 117.0, 4], ['sandakan', 5.84, 118.12, 2], ['tawau', 4.24, 117.89, 2], ['labuan', 5.28, 115.24, 0],
     ['kuching', 1.55, 110.35, 2], ['sarawak', 2.5, 113.0, 4], ['miri', 4.4, 114.0, 2], ['sibu', 2.29, 111.83, 2], ['bintulu', 3.17, 113.03, 2],
-    ['peninsular malaysia', 4.2, 102.0, 6], ['semenanjung', 4.2, 102.0, 6], ['malaysia', 4.2, 102.0, 6], ['borneo', 1.0, 114.0, 10],
+    ['peninsular malaysia', 4.0, 102.0, 6, 'peninsular'], ['semenanjung', 4.0, 102.0, 6, 'peninsular'],
+    ['all of malaysia', 4.0, 109.5, 20, 'malaysia'], ['seluruh malaysia', 4.0, 109.5, 20, 'malaysia'], ['malaysia', 4.0, 109.5, 20, 'malaysia'],
+    ['borneo', 1.5, 114.0, 12, 'borneo'],
     ['strait of malacca', 3.0, 100.5, 2], ['selat melaka', 3.0, 100.5, 2], ['south china sea', 6.0, 109.0, 4], ['laut china selatan', 6.0, 109.0, 4],
     ['singapore', 1.35, 103.82, 0], ['jakarta', -6.2, 106.85, 2], ['sumatra', 0.0, 101.5, 6], ['bangkok', 13.75, 100.5, 2],
     ['manila', 14.6, 121.0, 2], ['hanoi', 21.03, 105.85, 2], ['ho chi minh', 10.82, 106.63, 2], ['tokyo', 35.68, 139.69, 2], ['beijing', 39.9, 116.4, 2],
@@ -55,7 +58,11 @@
     ['murray darling', -34.0, 145.0, 6, 'murray'], ['central valley', 36.7, -119.8, 4, 'california'], ['california', 36.7, -119.8, 4, 'california'],
     ['alaska', 70.5, -156.8, 4, 'utqiagvik'], ['arctic', 70.5, -156.8, 4, 'utqiagvik'], ['greenland', 72.0, -40.0, 6, 'greenland'],
     ['wisconsin', 44.5, -89.5, 4, 'wisconsin'], ['chicago', 41.88, -87.63, 2], ['toronto', 43.65, -79.38, 2]
-  ].sort(function (a, b) { return b[0].length - a[0].length; });
+  ].sort(function (a, b) {
+    // whole regions only when no more specific place is named ("Penang, Malaysia" is Penang)
+    var ra = BROAD.indexOf(a[0]) >= 0, rb = BROAD.indexOf(b[0]) >= 0;
+    return ra !== rb ? (ra ? 1 : -1) : b[0].length - a[0].length;
+  });
 
   var MONTHS = [
     [1, /\b(january|jan|januari)\b/], [2, /\b(february|feb|februari)\b/], [3, /\b(march|mac)\b/], [4, /\b(april|apr)\b/],

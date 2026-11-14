@@ -85,15 +85,36 @@
     { id: 'california', name: 'the Central Valley, California', short: 'Central Valley', lat: 36.7, lon: -119.8, size: 4 },
     { id: 'utqiagvik', name: 'the Arctic coast of Alaska', short: 'Arctic Alaska', lat: 70.5, lon: -156.8, size: 4 },
     { id: 'wisconsin', name: 'Wisconsin, USA', short: 'Wisconsin', lat: 44.5, lon: -89.5, size: 4 },
-    { id: 'greenland', name: 'central Greenland', short: 'Greenland', lat: 72.0, lon: -40.0, size: 6 }
+    { id: 'greenland', name: 'central Greenland', short: 'Greenland', lat: 72.0, lon: -40.0, size: 6 },
+    // Whole regions: their own bounds instead of a square box. Bigger than 10° means
+    // several NASA POWER requests (see fetchArea).
+    { id: 'peninsular', name: 'Peninsular Malaysia', short: 'Peninsular Malaysia', lat: 4.0, lon: 102.0, size: 6, region: true,
+      bounds: { latMin: 1.0, latMax: 7.0, lonMin: 99.5, lonMax: 104.5 } },
+    { id: 'malaysia', name: 'all of Malaysia (with the sea between)', short: 'Malaysia', lat: 4.0, lon: 109.5, size: 20, region: true,
+      bounds: { latMin: 0.5, latMax: 7.5, lonMin: 99.5, lonMax: 119.5 } },
+    { id: 'borneo', name: 'Borneo', short: 'Borneo', lat: 1.5, lon: 114.0, size: 12, region: true,
+      bounds: { latMin: -4.5, latMax: 7.5, lonMin: 108.5, lonMax: 119.5 } }
   ];
 
-  // Area to average over: one grid cell, or a box from 2° to 10° (NASA POWER's limits).
-  // The slider runs 1–10, where 1 means a single grid cell.
-  var SIZE_MAX = 10;
+  // Area to average over: one grid cell, or a box from 2° to 20°. NASA POWER answers
+  // at most 10° × 10° per request, so bigger boxes are fetched in parts (fetchArea).
+  // The slider position is an index into SIZE_STEPS; 0 means a single grid cell.
+  var SIZE_STEPS = [0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20];
+  var TILE_MAX = 10;   // the largest size is the last entry of SIZE_STEPS
+  function sizeIndex(v) {
+    var best = 0;
+    for (var i = 1; i < SIZE_STEPS.length; i++) if (Math.abs(SIZE_STEPS[i] - v) < Math.abs(SIZE_STEPS[best] - v)) best = i;
+    return best;
+  }
   function sizeLabel(v) {
+    var p = place(state.placeId);
+    if (p && p.bounds) {
+      var b = p.bounds;
+      return T('The whole region ({a}° × {b}°)', { a: b.latMax - b.latMin, b: b.lonMax - b.lonMin });
+    }
     return v < 2 ? T('One grid cell (about 50 km)')
-      : T('{b}° box (about {km} km)', { b: v, km: (Math.round(v * 111 / 10) * 10).toLocaleString() });
+      : T('{b}° box (about {km} km)', { b: v, km: (Math.round(v * 111 / 10) * 10).toLocaleString() }) +
+        (v > TILE_MAX ? ' · ' + T('loads in parts, about a minute') : '');
   }
   function showSize() { var o = $('size-out'); if (o) o.textContent = sizeLabel(state.size); }
 
@@ -122,11 +143,13 @@
   var state = {
     topic: 'heat', v: 'T2M', placeId: HOME.id, placeName: HOME.name, short: HOME.short,
     lat: HOME.lat, lon: HOME.lon, size: HOME.size,
-    y0: FIRST_YEAR, y1: LAST_YEAR, month: 0, compare: ''
+    y0: FIRST_YEAR, y1: LAST_YEAR, month: 0, compare: '',
+    step: 'year'          // 'year': one value per year; 'month': every month, seasonal cycle removed
   };
   var view = { anom: false, smooth: false, future: false };
   var cache = {};
   var runId = 0;
+  var compareRequestId = 0, var2RequestId = 0, scanRequestId = 0;
   var current = null;     // last analysed result
   var compareData = null; // second place, same variable and period
   var globe = null;
@@ -177,8 +200,9 @@
   function fmtP(p) { return p < 0.001 ? '< 0.001' : p.toFixed(3); }
   function pEquals(p) { return p < 0.001 ? 'p < 0.001' : 'p = ' + p.toFixed(3); }
   function coordLabel(lat, lon) {
-    return Math.abs(lat).toFixed(1) + '°' + (lat >= 0 ? 'N' : 'S') + ', ' +
-      Math.abs(lon).toFixed(1) + '°' + (lon >= 0 ? 'E' : 'W');
+    var bm = !!(window.TDi18n && window.TDi18n.lang === 'bm');   // Malay: U(tara), S(elatan), T(imur), B(arat)
+    return Math.abs(lat).toFixed(1) + '°' + (lat >= 0 ? (bm ? 'U' : 'N') : 'S') + ', ' +
+      Math.abs(lon).toFixed(1) + '°' + (lon >= 0 ? (bm ? 'T' : 'E') : (bm ? 'B' : 'W'));
   }
   function capFirst(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
   function verdictLabel(v) { return v === 'significant' ? 'Significant' : (v === 'borderline' ? 'Borderline' : 'No clear trend'); }
@@ -195,6 +219,80 @@
     var la0 = clamp(Math.round((lat - size / 2) * 2) / 2, -90, 90 - size);
     var lo0 = clamp(Math.round((lon - size / 2) * 2) / 2, -180, 180 - size);
     return { latMin: la0, latMax: la0 + size, lonMin: lo0, lonMax: lo0 + size };
+  }
+
+  /** The area a case covers: a named region's bounds, a square box, or null for one grid cell. */
+  function regionOf(st) {
+    var p = place(st.placeId);
+    if (p && p.bounds) return p.bounds;
+    return st.size ? box(st.lat, st.lon, st.size) : null;
+  }
+
+  /** Cut an area into equal tiles of at most 10° a side (NASA POWER's limit). */
+  function splitArea(b) {
+    var nLat = Math.max(1, Math.ceil((b.latMax - b.latMin) / TILE_MAX - 1e-9));
+    var nLon = Math.max(1, Math.ceil((b.lonMax - b.lonMin) / TILE_MAX - 1e-9));
+    var dLat = (b.latMax - b.latMin) / nLat, dLon = (b.lonMax - b.lonMin) / nLon, out = [];
+    for (var i = 0; i < nLat; i++) {
+      for (var j = 0; j < nLon; j++) {
+        out.push({ latMin: b.latMin + i * dLat, latMax: b.latMin + (i + 1) * dLat,
+          lonMin: b.lonMin + j * dLon, lonMax: b.lonMin + (j + 1) * dLon });
+      }
+    }
+    return out;
+  }
+
+  function areaUrl(params, b) {
+    return API + 'regional?parameters=' + params +
+      '&latitude-min=' + b.latMin.toFixed(2) + '&latitude-max=' + b.latMax.toFixed(2) +
+      '&longitude-min=' + b.lonMin.toFixed(2) + '&longitude-max=' + b.lonMax.toFixed(2) +
+      '&community=AG&start=' + FIRST_YEAR + '&end=' + LAST_YEAR + '&format=JSON';
+  }
+
+  /**
+   * Fetch one parameter for a case's area. Areas over 10° are fetched as tiles,
+   * three at a time, and their grid cells merged into one regional answer (cells on
+   * a shared edge are counted once). monthlyTable then averages them as usual.
+   */
+  function fetchArea(params, st, onProgress) {
+    var b = regionOf(st);
+    if (!b) return fetchJson(urlFor(params, st.lat, st.lon, 0));
+    var tiles = splitArea(b);
+    if (tiles.length === 1) return fetchJson(areaUrl(params, tiles[0]));
+    var key = 'area|' + params + '|' + [b.latMin, b.latMax, b.lonMin, b.lonMax].join(',');
+    if (cache[key]) return Promise.resolve(cache[key]);
+    var replies = new Array(tiles.length), next = 0, done = 0;
+    return new Promise(function (resolve, reject) {
+      var failed = false;
+      function launch() {
+        if (failed || next >= tiles.length) return;
+        var i = next++;
+        fetchJson(areaUrl(params, tiles[i])).then(function (j) {
+          replies[i] = j; done++;
+          if (onProgress) onProgress(done, tiles.length);
+          if (done === tiles.length) finish(); else launch();
+        }, function (e) { if (!failed) { failed = true; reject(e); } });
+      }
+      function finish() {
+        var seen = {}, feats = [];
+        replies.forEach(function (j) {
+          (j.features || []).forEach(function (f) {
+            var c = f.geometry.coordinates, id = c[0].toFixed(3) + ',' + c[1].toFixed(3);
+            if (!seen[id]) { seen[id] = 1; feats.push(f); }
+          });
+        });
+        cache[key] = { type: 'FeatureCollection', features: feats };
+        resolve(cache[key]);
+      }
+      for (var k = 0; k < 3; k++) launch();
+    });
+  }
+  function isCached(params, st) {
+    var b = regionOf(st);
+    if (!b) return !!cache[urlFor(params, st.lat, st.lon, 0)];
+    var tiles = splitArea(b);
+    return tiles.length === 1 ? !!cache[areaUrl(params, tiles[0])]
+      : !!cache['area|' + params + '|' + [b.latMin, b.latMax, b.lonMin, b.lonMax].join(',')];
   }
 
   function urlFor(params, lat, lon, size) {
@@ -214,14 +312,13 @@
     return fetch(url).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (j) {
         if (!r.ok) {
-          var msg = (j.messages && j.messages.join(' ')) || j.detail || ('NASA POWER answered with error ' + r.status + '.');
-          throw new Error(typeof msg === 'string' ? msg : 'NASA POWER could not handle that request.');
+          throw new Error(T('NASA POWER answered with error {status}.', { status: r.status }));
         }
         cache[url] = j;
         return j;
       });
     }, function () {
-      throw new Error('Could not reach NASA POWER. Check your internet connection and try again.');
+      throw new Error(T('Could not reach NASA POWER. Check your internet connection and try again.'));
     });
   }
 
@@ -230,13 +327,41 @@
    * A regional response has one feature per grid cell: average them, weighted by
    * cos(latitude) because cells shrink towards the poles.
    */
+  /**
+   * Over open ocean NASA POWER gives topsoil wetness (GWETTOP) as exactly 1 in every
+   * month, while the other land-only variables give -999 there. A cell like that is
+   * ocean, not a measurement, so it is left out (and the raw answer is logged).
+   */
+  var OCEAN_FILL = { GWETTOP: 1 };
+  function isOceanFill(param, t) {
+    var f = OCEAN_FILL[param], n = 0;
+    if (f === undefined || !t) return false;
+    for (var k in t) {
+      var v = t[k];
+      if (v === null || v < FILL) continue;
+      if (Math.abs(v - f) > 1e-6) return false;
+      n++;
+    }
+    return n > 0;
+  }
+  function logOcean(param, n, json) {
+    if (n && window.console) console.info('[Trend Detective] NASA POWER returned ' + param + ' = ' + OCEAN_FILL[param] +
+      ' in every month for ' + n + ' grid cell(s): open ocean, left out of the average. Raw NASA response:', json);
+  }
+
   function monthlyTable(json, param) {
-    if (json.properties) return { table: json.properties.parameter[param] || {}, cells: 1 };
+    if (json.properties) {
+      var pt = json.properties.parameter[param] || {};
+      if (isOceanFill(param, pt)) { logOcean(param, 1, json); return { table: {}, cells: 0, ocean: 1 }; }
+      return { table: pt, cells: 1, ocean: 0 };
+    }
     var feats = json.features || [];
-    var sum = {}, wsum = {};
+    var sum = {}, wsum = {}, ocean = 0, land = 0;
     feats.forEach(function (f) {
       var w = Math.cos(f.geometry.coordinates[1] * Math.PI / 180);
       var t = f.properties.parameter[param] || {};
+      if (isOceanFill(param, t)) { ocean++; return; }
+      land++;
       for (var k in t) {
         var v = t[k];
         if (v === null || v < FILL) continue;
@@ -246,7 +371,8 @@
     });
     var out = {};
     for (var k in sum) out[k] = sum[k] / wsum[k];
-    return { table: out, cells: feats.length };
+    logOcean(param, ocean, json);
+    return { table: out, cells: land, ocean: ocean };
   }
 
   function daysInMonth(y, m) { return new Date(y, m, 0).getDate(); }
@@ -258,29 +384,83 @@
    * computes its own annual value (so February counts a little less).
    */
   function yearlySeries(table, y0, y1, month) {
-    var years = [], values = [];
+    var years = [], values = [], skipped = [];
     var ms = !month ? partMonths(0) : SEASONS[month] || [month];
     for (var y = y0; y <= y1; y++) {
-      var s = 0, days = 0, ok = true;
+      var s = 0, days = 0, missing = [];
       for (var i = 0; i < ms.length; i++) {
         var m = Math.abs(ms[i]), yy = ms[i] < 0 ? y - 1 : y;
         var x = table[yy + (m < 10 ? '0' : '') + m];
-        if (x === undefined || x === null || x < FILL) { ok = false; break; }
+        if (x === undefined || x === null || x < FILL) { missing.push(m); continue; }
         s += x * daysInMonth(yy, m);
         days += daysInMonth(yy, m);
       }
-      if (!ok) continue;
+      // a year with any month missing is left out, and remembered so the page can say so
+      if (missing.length) { skipped.push({ year: y, missing: missing }); continue; }
       years.push(y); values.push(s / days);
     }
-    return { years: years, values: values };
+    return { years: years, values: values, skipped: skipped, expected: y1 - y0 + 1 };
   }
 
-  function loadSeries(vid, st) {
+  /**
+   * Every month as its difference from that calendar month's average over the
+   * period: the seasonal cycle is removed, so a trend shows month by month. Times
+   * are decimal years (mid-month). With a season or month chosen, only its months.
+   */
+  function monthlyAnomalies(table, y0, y1, month) {
+    var ms = partMonths(month).slice().sort(function (a, b) { return a - b; });
+    var key = function (y, m) { return y + (m < 10 ? '0' : '') + m; };
+    var ok = function (v) { return v !== undefined && v !== null && v >= FILL; };
+    var sum = {}, cnt = {}, y, i, m, v;
+    for (y = y0; y <= y1; y++) for (i = 0; i < ms.length; i++) {
+      m = ms[i]; v = table[key(y, m)];
+      if (ok(v)) { sum[m] = (sum[m] || 0) + v; cnt[m] = (cnt[m] || 0) + 1; }
+    }
+    var years = [], values = [], skipped = [];
+    for (y = y0; y <= y1; y++) {
+      var missing = [];
+      for (i = 0; i < ms.length; i++) {
+        m = ms[i]; v = table[key(y, m)];
+        if (!ok(v) || !cnt[m]) { missing.push(m); continue; }
+        years.push(y + (m - 0.5) / 12); values.push(v - sum[m] / cnt[m]);
+      }
+      if (missing.length) skipped.push({ year: y, missing: missing });
+    }
+    return { years: years, values: values, skipped: skipped, monthly: true, expected: (y1 - y0 + 1) * ms.length };
+  }
+
+  /** The series a case tests: yearly values, or monthly anomalies. */
+  function seriesOf(table, st) {
+    return st.step === 'month' ? monthlyAnomalies(table, st.y0, st.y1, st.month) : yearlySeries(table, st.y0, st.y1, st.month);
+  }
+  /**
+   * The tests for a series. stats.js (Ryan) adjusts both tests for year-to-year
+   * memory (lag-1 autocorrelation) for every series, yearly or monthly; the verdict
+   * uses the memory-adjusted Mann-Kendall p-value (mk.pAdj).
+   */
+  function analyzeFor(st, years, values) {
+    return S.analyze(years, values);
+  }
+  /** Distinct calendar years in a series (months share a year). */
+  function yearCount(ser) {
+    var seen = {}, n = 0;
+    ser.years.forEach(function (x) { var y = Math.floor(x); if (!seen[y]) { seen[y] = 1; n++; } });
+    return n;
+  }
+  /** "2015" for a yearly point, "Mar 2015" for a monthly one. */
+  function whenLabel(x) {
+    if (x === Math.floor(x)) return String(x);
+    var y = Math.floor(x), m = Math.round((x - y) * 12 + 0.5);
+    return T(MONTH_SHORT[m - 1]) + ' ' + y;
+  }
+
+  function loadSeries(vid, st, onProgress) {
     var pm = prm(variable(vid));
-    return fetchJson(urlFor(pm, st.lat, st.lon, st.size)).then(function (json) {
+    return fetchArea(pm, st, onProgress).then(function (json) {
       var mt = monthlyTable(json, pm);
-      var ser = yearlySeries(mt.table, st.y0, st.y1, st.month);
+      var ser = seriesOf(mt.table, st);
       ser.cells = mt.cells;
+      ser.ocean = mt.ocean;
       ser.table = mt.table;
       return ser;
     });
@@ -290,10 +470,11 @@
    * Centred k-year running mean; null where the window is incomplete.
    * A window that spans a skipped year is incomplete too.
    */
-  function runningMean(years, vals, k) {
-    var h = Math.floor(k / 2), out = [];
+  function runningMean(years, vals, k, dx) {
+    var h = Math.floor(k / 2), out = [], step = dx || 1;   // dx: spacing of the points (1 year, or 1/12 for months)
     for (var i = 0; i < vals.length; i++) {
-      if (i < h || i >= vals.length - h || years[i + h] - years[i - h] !== 2 * h) { out.push(null); continue; }
+      var span = i < h || i >= vals.length - h ? null : years[i + h] - years[i - h];
+      if (span === null || Math.abs(span - 2 * h * step) > step / 2) { out.push(null); continue; }
       var s = 0;
       for (var j = i - h; j <= i + h; j++) s += vals[j];
       out.push(s / k);
@@ -310,7 +491,7 @@
     S: S, T: T, esc: esc, clamp: clamp, fmtValue: fmtValue, fmtAnom: fmtAnom, pEquals: pEquals, ratePhrase: ratePhrase,
     verdictLabel: verdictLabel, runningMean: runningMean, yearlySeries: yearlySeries, chooseMonth: chooseMonth,
     setPeriod: setPeriod, investigate: investigate, toast: toast, view: view,
-    MONTHS: MONTHS, MONTH_SHORT: MONTH_SHORT, MIN_YEARS: MIN_YEARS, MERRA: MERRA, CERES: CERES, REDUCED: REDUCED,
+    MONTHS: MONTHS, MONTH_SHORT: MONTH_SHORT, MIN_YEARS: MIN_YEARS, MERRA: MERRA, CERES: CERES, REDUCED: REDUCED, whenLabel: whenLabel,
     get current() { return current; }, get compareData() { return compareData; }
   });
   function drawChart(res, animate) { C.drawChart(res, animate); }
@@ -333,7 +514,8 @@
   // ---- results -------------------------------------------------------------
 
   function periodPhrase(res) {
-    var a = res.years[0], b = res.years[res.years.length - 1];
+    // whole years, also for monthly data (whose times are decimal years)
+    var a = Math.floor(res.years[0]), b = Math.floor(res.years[res.years.length - 1]);
     return res.month ? T('each {month} from {a} to {b}', { month: T(MONTHS[res.month]), a: a, b: b })
       : T('from {a} to {b}', { a: a, b: b });
   }
@@ -371,7 +553,9 @@
     if (!w || !o.residualSE) return null;
     var phi = clamp(o.lag1, -0.5, 0.9);
     var nStar = Math.pow((3.3 * o.residualSE / w) * Math.sqrt((1 + phi) / (1 - phi)), 2 / 3);
-    return { total: Math.ceil(nStar), more: Math.ceil(nStar - o.n) };
+    // the formula gives years; monthly data has twelve points a year
+    var have = res.step === 'month' ? res.years[res.years.length - 1] - res.years[0] + 1 / 12 : o.n;
+    return { total: Math.ceil(nStar), more: Math.ceil(nStar - have) };
   }
 
   /**
@@ -401,6 +585,44 @@
     return { list: list, without: without };
   }
 
+  /**
+   * Data quality: how much of the chosen period was used, and why anything was left
+   * out. Runs at the start or end are described as such; gaps are listed.
+   */
+  function qualityText(res) {
+    var sk = res.skipped || [];
+    if (!sk.length) return '';
+    var monthly = res.step === 'month';
+    var used = res.years.length, total = res.expected;
+    var head = monthly ? T('Used {n} of {t} months.', { n: used, t: total }) : T('Used {n} of {t} years.', { n: used, t: total });
+    var yrs = sk.map(function (x) { return x.year; });
+    var lead = [], trail = [], mid = [];
+    var y = res.y0;
+    while (yrs.indexOf(y) >= 0) { lead.push(y); y++; }
+    y = res.y1;
+    while (yrs.indexOf(y) >= 0 && lead.indexOf(y) < 0) { trail.unshift(y); y--; }
+    yrs.forEach(function (x) { if (lead.indexOf(x) < 0 && trail.indexOf(x) < 0) mid.push(x); });
+    var parts = [];
+    var range = function (a) { return a.length > 1 ? a[0] + '–' + a[a.length - 1] : String(a[0]); };
+    if (lead.length) {
+      if (lead.length === 1 && res.month === 15 && lead[0] === FIRST_YEAR && !monthly) {
+        parts.push(T('{y} left out: December to February needs the December before, which is before the record starts.', { y: lead[0] }));
+      } else {
+        parts.push(T('No data for {y} here.', { y: range(lead) }));
+      }
+    }
+    if (mid.length) {
+      var list = mid.slice(0, 6).join(', ') + (mid.length > 6 ? ' ' + T('and {n} more', { n: mid.length - 6 }) : '');
+      parts.push(T(monthly ? '{y}: some months missing.' : '{y} skipped: missing months.', { y: list }));
+    }
+    if (trail.length) {
+      parts.push(trail[trail.length - 1] === LAST_YEAR && trail.length === 1
+        ? T('{y} left out: not every month is in NASA POWER yet.', { y: trail[0] })
+        : T('No data for {y} here.', { y: range(trail) }));
+    }
+    return head + ' ' + parts.join(' ');
+  }
+
   function tile(label, value, note, i) {
     return '<div class="tile" style="--i:' + i + '"><dt>' + esc(label) + '</dt><dd>' + value + '</dd><p>' + note + '</p></div>';
   }
@@ -416,9 +638,9 @@
     var fresh = !current || current.variable.id !== res.variable.id || current.placeName !== res.placeName;
     if (!current) $('settings').open = false;   // first answer: fold the settings away so the result comes first
     current = res;
-    $('result').classList.remove('stale');      // a new answer replaces any faded previous one
-    var vr = res.variable, st = res.stats, n = res.years.length;
-    var spk = findSpikes(res.years, res.values, st);
+    var vr = res.variable, st = res.stats, n = res.years.length, monthly = res.step === 'month';
+    // single months are too noisy to call out as spikes; the spike check is for yearly values
+    var spk = monthly ? { list: [] } : findSpikes(res.years, res.values, st);
     res.spikes = spk.list;
     var need = st.verdict !== 'significant' && st.direction !== 'flat' ? yearsNeeded(res) : null;
     var v = verdictText(res);
@@ -436,7 +658,9 @@
     replay($('verdict'));
 
     $('chart-title').textContent = vname(vr) + (vr.unit ? ' (' + vr.unit + ')' : '') + ', ' +
-      (res.month ? T('{month} average', { month: T(MONTHS[res.month]) }) : T('yearly average')) + ', ' + T(res.placeName);
+      (monthly ? T('each month minus its normal') + (res.month ? ' (' + T(MONTHS[res.month]) + ')' : '')
+        : T(res.month ? '{month} average' : 'yearly average', { month: T(MONTHS[res.month]) })) + ', ' +
+      (res.placeId === 'custom' ? coordLabel(res.lat, res.lon) : T(res.placeName));
     $('empty').hidden = true;
     $('result').hidden = false;
     $('live-hint').hidden = false;
@@ -454,10 +678,12 @@
       esc(T('Slope of the straight line through the points. With 95% confidence the true rate is between {a} and {b}.',
         { a: signed(st.ols.ciLow * 10, 2), b: withUnit(signed(st.ols.ciHigh * 10, 2), vr.unit) })), 0);
     tiles += tile(T('Total change'), esc(withUnit(signed(total, 2), vr.unit)),
-      esc(T('Along the trend line from {a} to {b} ({n} years of data).', { a: res.years[0], b: res.years[n - 1], n: n })), 1);
-    tiles += tile(T('Mann-Kendall test'), esc(pEquals(st.mk.p)),
-      esc(T('Checks whether later years are mostly higher or lower than earlier ones. Below 0.05 counts as significant. Kendall’s tau is {t} (1 is always rising, −1 always falling).', { t: st.mk.tau.toFixed(2) })), 2);
-    tiles += tile(T('t-test on the slope'), esc(pEquals(st.ols.p)),
+      esc(monthly ? T('Along the trend line from {a} to {b} ({n} months of data).', { a: whenLabel(res.years[0]), b: whenLabel(res.years[n - 1]), n: n })
+        : T('Along the trend line from {a} to {b} ({n} years of data).', { a: res.years[0], b: res.years[n - 1], n: n })), 1);
+    tiles += tile(T('Mann-Kendall test'), esc(pEquals(st.mk.pAdj)),
+      esc(T('Checks whether later years are mostly higher or lower than earlier ones. Below 0.05 counts as significant. Kendall’s tau is {t} (1 is always rising, −1 always falling).', { t: st.mk.tau.toFixed(2) })) +
+      ' ' + esc(T('Adjusted for year-to-year memory.')), 2);
+    tiles += tile(T('t-test on the slope'), esc(pEquals(st.ols.pAdj)),
       esc(T('The chance of seeing a slope this steep if there were really no trend. The line explains {r}% of the year-to-year variation.', { r: Math.round(st.ols.r2 * 100) })), 3);
     tiles += tile(T('Sen’s slope'), esc(withUnit(signed(st.sen.slope * 10, 2), vr.unit)) + perDec,
       esc(T('The middle value of the slopes between every pair of years. One freak year barely moves it.')), 4);
@@ -468,13 +694,18 @@
     $('tiles').innerHTML = tiles;
     if (fresh) replay($('tiles')); else $('tiles').classList.remove('reveal');
 
-    var note = '';
-    if (Math.abs(st.ols.lag1) > 2 / Math.sqrt(n)) {
-      note = 'Heads up: each year here resembles the year before it (lag-1 autocorrelation ' + st.ols.lag1.toFixed(2) +
-        '). That can make a trend look more certain than it is, so treat the p-values with some caution.';
+    // stats.js adjusts both tests for memory; say so when it made a real difference
+    var note = '', o = st.ols;
+    if (o.nEff < n * 0.67) {   // only when memory is strong enough to matter
+      note = T(monthly ? 'Neighbouring months are alike (lag-1 autocorrelation {r}), so {n} monthly values carry about as much independent information as {e}. Both tests were adjusted for this.'
+        : 'Each year here resembles the year before it (lag-1 autocorrelation {r}), so {n} years carry about as much independent information as {e}. Both tests were adjusted for this.',
+        { r: o.lag1.toFixed(2), n: n, e: Math.max(2, Math.round(o.nEff)) });
     }
     $('caution').textContent = note;
     $('caution').hidden = !note;
+    var q = qualityText(res);
+    $('quality').textContent = q;
+    $('quality').hidden = !q;
 
     // "Spike, not trend"
     var sp = $('spike');
@@ -498,10 +729,12 @@
 
     $('about-var').innerHTML = '<strong>' + esc(vname(vr)) + '.</strong> ' + esc(T(vr.def)) +
       ' <span class="muted">Source: ' + esc(vr.source) + ', through NASA POWER. ' +
-      (res.cells > 1 ? 'Averaged over ' + res.cells + ' grid cells in the box, weighted by area.' : 'One grid cell at ' + esc(coordLabel(res.lat, res.lon)) + '.') + '</span>';
+      (res.cells > 1 ? 'Averaged over ' + res.cells + ' grid cells in the area, weighted by area.' : 'One grid cell at ' + esc(coordLabel(res.lat, res.lon)) + '.') +
+      (res.ocean ? ' ' + esc(T('{n} open-ocean cells were left out: NASA POWER has no soil there.', { n: res.ocean })) : '') +
+      (monthly ? ' ' + esc(T('Each value is that month minus the average for the same calendar month in {a}–{b}.', { a: res.y0, b: res.y1 })) : '') + '</span>';
 
     $('table-body').innerHTML = res.years.map(function (y, i) {
-      return '<tr><td>' + y + '</td><td>' + res.values[i].toFixed(vr.dp) + '</td><td>' +
+      return '<tr><td>' + whenLabel(y) + '</td><td>' + res.values[i].toFixed(vr.dp) + '</td><td>' +
         (st.ols.intercept + st.ols.slope * y).toFixed(vr.dp) + '</td></tr>';
     }).join('');
     $('table-unit').textContent = vr.unit ? ' (' + vr.unit + ')' : '';
@@ -542,27 +775,38 @@
     setLoading(true);
     if (globe) globe.setBadge({ title: vname(vr), text: T('Asking NASA'), cls: 'loading' });
     document.dispatchEvent(new CustomEvent('td:investigate', { detail: snap }));
-    var cached = !!cache[urlFor(prm(vr), snap.lat, snap.lon, snap.size)];
-    if (!cached) setStatus(T('Fetching {what} for {where} from NASA POWER…', { what: vname(vr).toLowerCase(), where: T(state.placeName) }));
-    loadSeries(vr.id, snap).then(function (ser) {
+    if (!isCached(prm(vr), snap)) setStatus(T('Fetching {what} for {where} from NASA POWER…', {
+      what: T(vr.name).toLowerCase(), where: T(state.placeName)
+    }));
+    loadSeries(vr.id, snap, function (a, b) {
+      if (id === runId) setStatus(T('Fetching a big area in {b} parts from NASA POWER: {a} of {b} done…', { a: a, b: b }));
+    }).then(function (ser) {
       if (id !== runId) return;
-      if (ser.years.length < MIN_YEARS) {
-        throw new Error(T('Only {n} usable years of {what} here for that period. A trend test needs at least {min}. Try a longer period, another place or another variable.',
-          { n: ser.years.length, what: vname(vr).toLowerCase(), min: MIN_YEARS }));
+      var got = yearCount(ser);
+      if (ser.ocean && !ser.cells) {
+        throw new Error(T('{what} is only measured on land, and this spot is open ocean. Choose a place on land, or another variable.', {
+          what: capFirst(T(vr.name).toLowerCase()) }));
+      }
+      if (got < MIN_YEARS) {
+        throw new Error(T('Only {n} usable years of {what} here for that period. A trend test needs at least {min}. Try a longer period, another place or another variable.', {
+          n: got, what: T(vr.name).toLowerCase(), min: MIN_YEARS
+        }));
       }
       render({ variable: vr, years: ser.years, values: ser.values, cells: ser.cells, table: ser.table,
-        stats: S.analyze(ser.years, ser.values), placeName: snap.placeName, short: snap.short, placeId: snap.placeId,
+        skipped: ser.skipped, expected: ser.expected, step: snap.step, ocean: ser.ocean,
+        stats: analyzeFor(snap, ser.years, ser.values), placeName: snap.placeName, short: snap.short, placeId: snap.placeId,
         lat: snap.lat, lon: snap.lon, size: snap.size, month: snap.month, y0: snap.y0, y1: snap.y1 });
       if (opts.scroll) $('result').scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' });
     }).catch(function (e) {
       if (id !== runId) return;
-      // The last good result stays on screen for reference, faded and labelled, so it is
-      // never mistaken for an answer to the case that just failed.
-      var stale = !!current;
-      $('result').classList.toggle('stale', stale);
-      setStatus(e.message + (stale ? ' ' + T('The faded result below is the previous case ({what}, {from}–{to}).',
-        { what: vname(current.variable).toLowerCase(), from: current.years[0], to: current.years[current.years.length - 1] }) : ''), true);
+      setStatus(e.message, true);
       if (globe) globe.setBadge({ title: T('No answer here'), text: T('See the case file for why'), cls: 'none' });
+      // The old answer belonged to other settings: take it away so it cannot be read
+      // as the result of this case. Only the message above stays.
+      current = null; compareData = null;
+      $('result').hidden = true;
+      $('empty').hidden = true;
+      document.dispatchEvent(new CustomEvent('td:clear'));
     }).then(function () {
       if (id !== runId) return;
       btn.disabled = false; btn.textContent = T('Investigate');
@@ -592,6 +836,7 @@
   }
 
   function loadCompare() {
+    var requestId = ++compareRequestId;
     var res = current, note = $('compare-note');
     var p = compareTarget();
     updateMap(false);
@@ -601,13 +846,21 @@
       return;
     }
     var vr = res.variable, myRun = runId;
-    var snap = { lat: p.lat, lon: p.lon, size: res.size, y0: res.y0, y1: res.y1, month: res.month };
-    if (!compareData || compareData.id !== p.id) { note.hidden = false; note.textContent = 'Loading ' + p.short + ' from NASA POWER…'; }
+    // same area size as the main case; a whole region compares against the place's own box
+    var mainP = place(res.placeId);
+    var snap = { lat: p.lat, lon: p.lon, size: mainP && mainP.bounds ? p.size : res.size, placeId: p.id,
+      y0: res.y0, y1: res.y1, month: res.month, step: res.step };
+    if (!compareData || compareData.id !== p.id) {
+      note.hidden = false;
+      note.textContent = T('Loading {name} from NASA POWER…', { name: T(p.short).toLowerCase() });
+    }
     loadSeries(vr.id, snap).then(function (ser) {
-      if (myRun !== runId || state.compare !== p.id) return;
-      if (ser.years.length < MIN_YEARS) throw new Error('There is not enough ' + vr.name.toLowerCase() + ' data for ' + p.short + ' in that period.');
+      if (requestId !== compareRequestId || myRun !== runId || current !== res || state.compare !== p.id) return;
+      if (yearCount(ser) < MIN_YEARS) throw new Error(T('There is not enough {what} data for {where} in that period.', {
+        what: T(vr.name).toLowerCase(), where: T(p.short)
+      }));
       compareData = { id: p.id, v: vr.id, name: p.name, short: p.short, years: ser.years, values: ser.values,
-        table: ser.table, stats: S.analyze(ser.years, ser.values) };   // table: for its own 1991–2020 baseline
+        table: ser.table, stats: analyzeFor(snap, ser.years, ser.values) };   // table: for its own 1991–2020 baseline
       drawChart(current, false);
       var a = res.stats, b = compareData.stats;
       var dir = b.direction === 'up' ? 'rising' : (b.direction === 'down' ? 'falling' : 'flat');
@@ -621,10 +874,10 @@
       }
       note.hidden = false;
       note.innerHTML = '<strong>' + esc(p.short) + ':</strong> ' + dir + ' by about ' + esc(ratePhrase(b, vr)) + ' (' +
-        verdictLabel(b.verdict).toLowerCase() + ', ' + esc(pEquals(b.mk.p)) + ').' + esc(comp) +
+        verdictLabel(b.verdict).toLowerCase() + ', ' + esc(pEquals(b.mk.pAdj)) + ').' + esc(comp) +
         (view.anom ? '' : ' <button type="button" class="link" id="to-anom">Show both as difference from average</button>');
     }).catch(function (e) {
-      if (myRun !== runId) return;
+      if (requestId !== compareRequestId || myRun !== runId || current !== res || state.compare !== p.id) return;
       compareData = null; drawChart(current, false);
       note.hidden = false; note.textContent = e.message;
     });
@@ -655,14 +908,15 @@
   }
 
   function loadVar2() {
+    var requestId = ++var2RequestId;
     fillVar2();
     var id = $('var2').value, host = $('var2-chart'), note = $('var2-note');
     host.innerHTML = ''; note.textContent = '';
     if (!id || !current) return;
     var res = current, vb = variable(id), myRun = runId;
     note.textContent = T('Loading {name} from NASA POWER…', { name: vname(vb).toLowerCase() });
-    loadSeries(vb.id, { lat: res.lat, lon: res.lon, size: res.size, y0: res.y0, y1: res.y1, month: res.month }).then(function (ser) {
-      if (myRun !== runId) return;
+    loadSeries(vb.id, { lat: res.lat, lon: res.lon, size: res.size, placeId: res.placeId, y0: res.y0, y1: res.y1, month: res.month, step: res.step }).then(function (ser) {
+      if (requestId !== var2RequestId || myRun !== runId || current !== res || $('var2').value !== id) return;
       var ys = [], a = [], b = [];
       res.years.forEach(function (y, i) {
         var j = ser.years.indexOf(y);
@@ -685,74 +939,102 @@
         : T('After removing both long-term trends, the link is {s} (r = {r}), which shows how much of it is just two things changing over the same years.',
           { s: strength(rd).replace(/^(a|an) /, ''), r: rd.toFixed(2) });
       note.innerHTML = esc(lead) + ' ' + esc(det) + ' <span class="muted">' + esc(T('A link is not proof that one causes the other.')) + '</span>';
-    }).catch(function (e) { if (myRun === runId) note.textContent = e.message; });
+    }).catch(function (e) {
+      if (requestId === var2RequestId && myRun === runId && current === res && $('var2').value === id) note.textContent = e.message;
+    });
   }
 
   // ---- scan every variable -------------------------------------------------
 
   function scan() {
     if (!current) return;
-    var st = { lat: current.lat, lon: current.lon, size: current.size, y0: current.y0, y1: current.y1, month: current.month };
+    var scanId = ++scanRequestId;
+    var st = { lat: current.lat, lon: current.lon, size: current.size, placeId: current.placeId,
+      y0: current.y0, y1: current.y1, month: current.month, step: current.step };
     var out = $('scan-out'), status = $('scan-status'), btn = $('scan');
+    var area = regionOf(st);
+    if (area && splitArea(area).length > 1) {
+      status.textContent = T('Scanning every variable works for areas up to 10° × 10°. A bigger area would need dozens of slow requests. Choose a smaller area, or test variables one at a time.');
+      return;
+    }
     var myRun = runId;
     btn.disabled = true;
     out.innerHTML = '';
     var results = [];
 
     function add(vr, ser) {
-      if (ser.years.length < MIN_YEARS) { results.push({ vr: vr, skip: true }); return; }
-      results.push({ vr: vr, stats: S.analyze(ser.years, ser.values), n: ser.years.length, y0: ser.years[0] });
+      if (yearCount(ser) < MIN_YEARS) { results.push({ vr: vr, skip: true }); return; }
+      results.push({ vr: vr, stats: analyzeFor(st, ser.years, ser.values), n: ser.years.length, y0: ser.years[0] });
     }
     function finish() {
-      if (myRun !== runId) return;
+      if (myRun !== runId || scanId !== scanRequestId) {
+        btn.disabled = false;
+        status.textContent = '';
+        return;
+      }
       btn.disabled = false;
       status.textContent = '';
-      var ok = results.filter(function (r) { return !r.skip; }).sort(function (a, b) { return a.stats.mk.p - b.stats.mk.p; });
+      var ok = results.filter(function (r) { return !r.skip; }).sort(function (a, b) { return a.stats.mk.pAdj - b.stats.mk.pAdj; });
       var skipped = results.filter(function (r) { return r.skip; });
       var nsig = ok.filter(function (r) { return r.stats.verdict === 'significant'; }).length;
-      var html = '<p><strong>' + nsig + ' of ' + ok.length + '</strong> variables show a significant trend here. Click a name to open it.</p>' +
-        '<table class="leads"><thead><tr><th>Variable</th><th>Direction</th><th>Strength (tau)</th><th>Change per decade</th><th>Mann-Kendall p</th><th>Verdict</th></tr></thead><tbody>';
+      var html = '<p>' + esc(T('{sig} of {n} variables show a significant trend here. Click a name to open it.', {
+        sig: nsig, n: ok.length
+      })) + '</p>' +
+        '<table class="leads"><thead><tr><th>' + esc(T('Variable')) + '</th><th>' + esc(T('Direction')) +
+        '</th><th>' + esc(T('Strength (tau)')) + '</th><th>' + esc(T('Change per decade')) +
+        '</th><th>' + esc(T('Mann-Kendall p')) + '</th><th>' + esc(T('Verdict')) + '</th></tr></thead><tbody>';
       ok.forEach(function (r) {
-        var dir = r.stats.direction === 'up' ? '↑ rising' : (r.stats.direction === 'down' ? '↓ falling' : 'flat');
+        var dir = r.stats.direction === 'up' ? '↑ ' + T('rising')
+          : (r.stats.direction === 'down' ? '↓ ' + T('falling') : T('flat'));
         var tau = r.stats.mk.tau, w = Math.min(50, Math.abs(tau) * 50).toFixed(1);
-        html += '<tr><td><button type="button" class="link" data-v="' + r.vr.id + '">' + esc(r.vr.name) + '</button></td><td>' + dir +
+        html += '<tr><td><button type="button" class="link" data-v="' + r.vr.id + '">' + esc(T(r.vr.name)) + '</button></td><td>' + esc(dir) +
           '</td><td><span class="taubar' + (r.stats.verdict === 'none' ? ' faint' : '') + '" title="tau ' + tau.toFixed(2) + '"><i class="' + (tau < 0 ? 'neg' : 'pos') +
-          '" style="width:' + w + '%"></i></span></td><td>' + esc(withUnit(signed(r.stats.sen.slope * 10, 2), r.vr.unit)) + '</td><td>' + esc(fmtP(r.stats.mk.p)) +
-          '</td><td><span class="badge badge-small badge-' + verdictClass(r.stats.verdict) + '">' + verdictLabel(r.stats.verdict) + '</span></td></tr>';
+          '" style="width:' + w + '%"></i></span></td><td>' + esc(withUnit(signed(r.stats.sen.slope * 10, 2), r.vr.unit)) + '</td><td>' + esc(fmtP(r.stats.mk.pAdj)) +
+          '</td><td><span class="badge badge-small badge-' + verdictClass(r.stats.verdict) + '">' + esc(T(verdictLabel(r.stats.verdict))) + '</span></td></tr>';
       });
       html += '</tbody></table>';
       if (skipped.length) {
-        html += '<p class="muted">Not enough data here for: ' + skipped.map(function (r) { return esc(r.vr.name.toLowerCase()); }).join(', ') + '.</p>';
+        var skippedNames = skipped.map(function (r) { return T(r.vr.name).toLowerCase(); }).join(', ');
+        html += '<p class="muted">' + esc(T('Not enough data here for: {items}.', { items: skippedNames })) + '</p>';
       }
-      html += '<p class="muted">With ' + ok.length + ' tests at the 0.05 level, expect about one false alarm in twenty even where nothing is changing. Treat this list as leads to investigate, not proof.</p>';
+      html += '<p class="muted">' + esc(T('With {n} tests at the 0.05 level, expect about one false alarm in twenty even where nothing is changing. Treat this list as leads to investigate, not proof.', {
+        n: ok.length
+      })) + '</p>';
       out.innerHTML = html;
     }
 
-    if (!st.size) {
-      status.textContent = 'Scanning all ' + VARIABLES.length + ' variables…';
+    if (!area) {
+      status.textContent = T('Scanning all {n} variables…', { n: VARIABLES.length });
       var ids = VARIABLES.map(prm).filter(function (v, i, a) { return a.indexOf(v) === i; }).join(',');
       fetchJson(urlFor(ids, st.lat, st.lon, 0)).then(function (json) {
         VARIABLES.forEach(function (vr) {
-          add(vr, yearlySeries(monthlyTable(json, prm(vr)).table, st.y0, st.y1, st.month));
+          add(vr, seriesOf(monthlyTable(json, prm(vr)).table, st));
         });
         finish();
-      }).catch(function (e) { btn.disabled = false; status.textContent = e.message; });
+      }).catch(function (e) {
+        if (myRun !== runId || scanId !== scanRequestId) {
+          btn.disabled = false; status.textContent = '';
+          return;
+        }
+        btn.disabled = false; status.textContent = e.message;
+      });
       return;
     }
-    // Regional requests take one variable each, so run them two at a time.
+    // Regional requests take one variable each. Keep at most two in flight,
+    // below the requested 3–4 request ceiling and friendlier to NASA POWER.
     var queue = VARIABLES.slice(), done = 0;
     function next() {
-      if (myRun !== runId) { btn.disabled = false; return; }
+      if (myRun !== runId || scanId !== scanRequestId) { finish(); return; }
       var vr = queue.shift();
       if (!vr) return;
       loadSeries(vr.id, st).then(function (ser) { add(vr, ser); }, function () { results.push({ vr: vr, skip: true }); })
         .then(function () {
           done++;
-          status.textContent = 'Scanned ' + done + ' of ' + VARIABLES.length + ' variables…';
+          status.textContent = T('Scanned {done} of {n} variables…', { done: done, n: VARIABLES.length });
           if (done === VARIABLES.length) finish(); else next();
         });
     }
-    status.textContent = 'Scanning ' + VARIABLES.length + ' variables. This takes about half a minute for a box…';
+    status.textContent = T('Scanning {n} variables. This takes about half a minute for a box…', { n: VARIABLES.length });
     next(); next();
   }
 
@@ -802,7 +1084,8 @@
     var part = function (go, text) { return '<button type="button" class="brief-part" data-go="' + go + '">' + esc(text) + '</button>'; };
     $('brief').innerHTML = T('Testing {what} around {where}, {when}, {part}.', {
       what: part('what', vname(vr).toLowerCase()), where: part('where', where), when: part('when', when),
-      part: part('when', state.month ? T('in {month}', { month: T(MONTHS[state.month]) }) : T('whole year')) });
+      part: part('when', (state.month ? T('in {month}', { month: T(MONTHS[state.month]) }) : T('whole year')) +
+        (state.step === 'month' ? ', ' + T('month by month') : '')) });
     $('case-loc').textContent = '· ' + coordLabel(state.lat, state.lon);
   }
 
@@ -819,7 +1102,8 @@
     renderVariables();
     $('place').value = state.placeId;
     $('lat').value = state.lat; $('lon').value = state.lon;
-    $('size').value = state.size || 1;
+    $('size').value = sizeIndex(state.size);
+    $('step').value = state.step;
     showSize();
     $('y0').value = state.y0; $('y1').value = state.y1;
     $('month').value = state.month;
@@ -831,9 +1115,10 @@
     var lat = parseFloat($('lat').value), lon = parseFloat($('lon').value);
     state.lat = clamp(isNaN(lat) ? 0 : lat, -89.5, 89.5);
     state.lon = clamp(isNaN(lon) ? 0 : lon, -180, 180);
-    var sv = parseInt($('size').value, 10) || 0;
-    state.size = sv >= 2 ? Math.min(SIZE_MAX, sv) : 0;
-    showSize();
+    var pr = place($('place').value);
+    if (pr && pr.bounds) state.size = pr.size;           // a whole region keeps its own area
+    else state.size = SIZE_STEPS[clamp(parseInt($('size').value, 10) || 0, 0, SIZE_STEPS.length - 1)];
+    state.step = $('step').value === 'month' ? 'month' : 'year';
     var a = parseInt($('y0').value, 10), b = parseInt($('y1').value, 10);
     state.y0 = Math.min(a, b); state.y1 = Math.max(a, b);
     state.month = parseInt($('month').value, 10) || 0;
@@ -841,6 +1126,7 @@
     var p = place(state.placeId);
     state.placeName = p ? p.name : coordLabel(state.lat, state.lon);
     state.short = p ? p.short : 'Your place';
+    showSize();
     updateBrief();
   }
 
@@ -917,7 +1203,7 @@
   function initMap() {
     if (!window.TDGlobe || !window.d3) { $('map').hidden = true; return; }
     globe = window.TDGlobe.create($('map'), {
-      places: PLACES,
+      places: PLACES.filter(function (p) { return !p.region; }),   // whole regions are chosen from the list
       fill: true,
       onStyle: function (name) { toast(T(name)); },
       onPick: function (lat, lon) {
@@ -949,12 +1235,13 @@
     var arrow = st.direction === 'up' ? '↑ ' : (st.direction === 'down' ? '↓ ' : '');
     var y0 = res.years[0], y1 = res.years[res.years.length - 1];
     var line = function (x) { return st.sen.intercept + st.sen.slope * x; };
+    var fromTo = [Math.floor(y0), Math.floor(y1)];
     globe.setBadge({
       place: (res.placeId === 'custom' ? coordLabel(res.lat, res.lon) : T(res.short || res.placeName)) +
         (res.month ? ' · ' + T(MONTHS[res.month]) : ''),
       title: vname(vr), cls: verdictClass(st.verdict),
       text: arrow + T('{x} per decade', { x: withUnit(signed(st.sen.slope * 10, 2), vr.unit) }), note: T(verdictLabel(st.verdict)),
-      spark: { values: res.values, trend: [line(y0), line(y1)], from: y0, to: y1 },
+      spark: { values: res.values, trend: [line(y0), line(y1)], from: fromTo[0], to: fromTo[1] },
       action: { label: T('See the full case') + ' ›', run: openCase }
     });
   }
@@ -969,7 +1256,7 @@
   }
 
   function selectionFor(lat, lon, size, placeId) {
-    return { lat: lat, lon: lon, size: size, placeId: placeId, box: size ? box(lat, lon, size) : null };
+    return { lat: lat, lon: lon, size: size, placeId: placeId, box: regionOf({ lat: lat, lon: lon, size: size, placeId: placeId }) };
   }
 
   function updateMap(recentre) {
@@ -985,7 +1272,8 @@
   function writeHash() {
     var h = 'v=' + state.v + '&lat=' + state.lat + '&lon=' + state.lon + '&size=' + state.size +
       '&y0=' + state.y0 + '&y1=' + state.y1 + '&m=' + state.month + '&p=' + state.placeId +
-      (state.compare ? '&c=' + state.compare : '') + (view.anom ? '&a=1' : '') + (view.smooth ? '&s=1' : '') + (view.future ? '&f=1' : '');
+      (state.compare ? '&c=' + encodeURIComponent(state.compare) : '') + (view.anom ? '&a=1' : '') + (view.smooth ? '&s=1' : '') + (view.future ? '&f=1' : '') +
+      (state.step === 'month' ? '&ts=m' : '');
     try { history.replaceState(null, '', '#' + h); } catch (e) { /* file preview: ignore */ }
   }
 
@@ -993,20 +1281,37 @@
     var h = location.hash.replace(/^#/, '');
     if (!h) return false;
     var q = {};
-    h.split('&').forEach(function (kv) { var i = kv.indexOf('='); if (i > 0) q[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1)); });
+    try {
+      h.split('&').forEach(function (kv) {
+        var i = kv.indexOf('=');
+        if (i > 0) q[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1).replace(/\+/g, ' '));
+      });
+    } catch (e) { return false; }
     if (!q.v) return false;
     var vr = variable(q.v);
     state.v = vr.id; state.topic = vr.topic;
     var p = place(q.p);
     state.placeId = p ? p.id : 'custom';
-    state.lat = clamp(parseFloat(q.lat) || 0, -89.5, 89.5);
-    state.lon = clamp(parseFloat(q.lon) || 0, -180, 180);
-    var qs = parseInt(q.size, 10);
-    state.size = qs === 0 || (qs >= 2 && qs <= SIZE_MAX) ? qs : 2;
-    state.y0 = clamp(parseInt(q.y0, 10) || FIRST_YEAR, FIRST_YEAR, LAST_YEAR);
-    state.y1 = clamp(parseInt(q.y1, 10) || LAST_YEAR, FIRST_YEAR, LAST_YEAR);
-    state.month = clamp(parseInt(q.m, 10) || 0, 0, 16);
-    state.compare = place(q.c) || (q.c && q.c.indexOf('pt:') === 0) ? q.c : '';
+    var lat = Number(q.lat), lon = Number(q.lon);
+    state.lat = q.lat !== undefined && Number.isFinite(lat) ? clamp(lat, -89.5, 89.5) : (p ? p.lat : HOME.lat);
+    state.lon = q.lon !== undefined && Number.isFinite(lon) ? clamp(lon, -180, 180) : (p ? p.lon : HOME.lon);
+    var qs = Number(q.size);
+    state.size = SIZE_STEPS.indexOf(qs) >= 0 ? qs : 2;
+    if (p && p.bounds) state.size = p.size;            // a whole region keeps its own area
+    state.step = q.ts === 'm' ? 'month' : 'year';
+    var y0 = Number(q.y0), y1 = Number(q.y1);
+    var validYear = function (y) { return Number.isInteger(y) && y >= FIRST_YEAR && y <= LAST_YEAR; };
+    if (validYear(y0) && validYear(y1) && y0 <= y1) {
+      state.y0 = y0; state.y1 = y1;
+    } else {
+      state.y0 = FIRST_YEAR; state.y1 = LAST_YEAR;
+    }
+    var month = Number(q.m);
+    state.month = Number.isInteger(month) && month >= 0 && month <= 16 ? month : 0;
+    var compare = q.c || '';
+    var point = /^pt:([-+]?\d+(?:\.\d+)?),([-+]?\d+(?:\.\d+)?)$/.exec(compare);
+    var validPoint = point && Number(point[1]) >= -90 && Number(point[1]) <= 90 && Number(point[2]) >= -180 && Number(point[2]) <= 180;
+    state.compare = place(compare) || validPoint ? compare : '';
     view.future = q.f === '1';
     view.anom = q.a === '1';
     view.smooth = q.s === '1';
@@ -1016,16 +1321,19 @@
   function downloadCsv() {
     if (!current) return;
     var vr = current.variable, ols = current.stats.ols;
-    var sen = current.stats.sen;
-    var lines = ['year,' + vr.id + (vr.unit ? ' (' + vr.unit + ')' : '') +
-      ',trend_line,band_low_95,band_high_95,prediction_low_95,prediction_high_95,residual,sen_line'];
+    var csvCell = function (value) { return '"' + String(value).replace(/"/g, '""') + '"'; };
+    var monthly = current.step === 'month', sen = current.stats.sen;
+    var lines = [[monthly ? 'month' : 'year', vr.id + (monthly ? '_minus_monthly_normal' : '') + (vr.unit ? ' (' + vr.unit + ')' : ''),
+      'trend_line', 'band_low_95', 'band_high_95', 'prediction_low_95', 'prediction_high_95', 'residual', 'sen_line'].map(csvCell).join(',')];
     current.years.forEach(function (y, i) {
+      var t = monthly ? Math.floor(y) + '-' + ('0' + Math.round((y - Math.floor(y)) * 12 + 0.5)).slice(-2) : y;
       var fit = ols.intercept + ols.slope * y;
       var lever = 1 / ols.n + Math.pow(y - ols.meanX, 2) / ols.sxx;
-      var h = ols.tCrit * ols.residualSE * Math.sqrt(lever);          // confidence band
-      var ph = ols.tCrit * ols.residualSE * Math.sqrt(1 + lever);     // prediction interval
-      lines.push([y, current.values[i], fit, fit - h, fit + h, fit - ph, fit + ph, ols.resid[i], sen.intercept + sen.slope * y]
-        .map(function (v, k) { return k ? v.toFixed(4) : v; }).join(','));
+      var h = ols.tCrit * ols.residualSE * Math.sqrt(lever);             // confidence band, adjusted for memory (as drawn)
+      var ph = ols.tCritPlain * ols.residualSE * Math.sqrt(1 + lever);   // prediction interval for single values
+      var resid = ols.resid ? ols.resid[i] : current.values[i] - fit;
+      lines.push([t].concat([current.values[i], fit, fit - h, fit + h, fit - ph, fit + ph, resid].map(function (v) { return v.toFixed(4); }))
+        .concat(sen ? [(sen.intercept + sen.slope * y).toFixed(4)] : ['']).map(csvCell).join(','));
     });
     var a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([lines.join('\n') + '\n'], { type: 'text/csv' }));
@@ -1127,7 +1435,11 @@
       $(id).addEventListener('change', function () { $('place').value = 'custom'; readForm(); updateMap(true); });
     });
     // while dragging: resize the box on the globe live; on release: frame it and re-run
-    $('size').addEventListener('input', function () { readForm(); updateMap(false); });
+    $('size').addEventListener('input', function () {
+      var p = place($('place').value);
+      if (p && p.bounds) $('place').value = 'custom';   // moving the slider means a box of your own
+      readForm(); updateMap(false);
+    });
     $('size').addEventListener('change', function () { readForm(); updateMap(true); });
     // Any change inside the form re-runs an open case (after the handlers above).
     $('case-form').addEventListener('change', function () { readForm(); scheduleLive(); });
@@ -1215,6 +1527,7 @@
     state.y0 = cfg.y0 || (cfg.keepYears ? state.y0 : FIRST_YEAR);
     state.y1 = cfg.y1 || (cfg.keepYears ? state.y1 : LAST_YEAR);
     if (cfg.month !== undefined) state.month = cfg.month; else if (!cfg.keepMonth) state.month = 0;
+    if (cfg.step !== undefined) state.step = cfg.step === 'month' ? 'month' : 'year';
     if (cfg.compare !== undefined) state.compare = cfg.compare;
     if (cfg.anom !== undefined) view.anom = !!cfg.anom;
     if (cfg.smooth !== undefined) view.smooth = !!cfg.smooth;
@@ -1229,6 +1542,8 @@
     FIRST_YEAR: FIRST_YEAR, LAST_YEAR: LAST_YEAR, MIN_YEARS: MIN_YEARS,
     variable: variable, place: place, prm: prm, vname: vname, box: box, urlFor: urlFor, fetchJson: fetchJson,
     monthlyTable: monthlyTable, yearlySeries: yearlySeries, loadSeries: loadSeries, partMonths: partMonths,
+    seriesOf: seriesOf, monthlyAnomalies: monthlyAnomalies, isOceanFill: isOceanFill,
+    raw: function (url) { return cache[url]; },   // debugging: the raw NASA answer behind a URL regionOf: regionOf, splitArea: splitArea, whenLabel: whenLabel,
     esc: esc, withUnit: withUnit, signed: signed, sig: sig, fmtP: fmtP, pEquals: pEquals, coordLabel: coordLabel, capFirst: capFirst,
     toast: toast, apply: apply, investigate: investigate, openStep: openStep,
     get globe() { return globe; }, get current() { return current; },

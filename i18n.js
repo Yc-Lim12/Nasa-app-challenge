@@ -107,6 +107,26 @@
 
     // ---- buttons, status ----
     'Asking NASA…': 'Bertanya kepada NASA…', 'Asking NASA': 'Bertanya kepada NASA', 'Investigate': 'Siasat', 'Nothing': 'Tiada',
+    'NASA POWER answered with error {status}.': 'NASA POWER membalas dengan ralat {status}.',
+    'Could not reach NASA POWER. Check your internet connection and try again.': 'Tidak dapat menghubungi NASA POWER. Semak sambungan internet anda dan cuba lagi.',
+    'There is not enough {what} data for {where} in that period.': 'Data {what} tidak mencukupi untuk {where} bagi tempoh itu.',
+    'Fetching {what} for {where} from NASA POWER…': 'Sedang mendapatkan {what} untuk {where} daripada NASA POWER…',
+    'Only {n} usable years of {what} here for that period. A trend test needs at least {min}. Try a longer period, another place or another variable.':
+      'Hanya {n} tahun data {what} yang boleh digunakan untuk tempoh ini. Ujian tren memerlukan sekurang-kurangnya {min} tahun. Cuba tempoh lebih panjang, tempat lain atau pemboleh ubah lain.',
+    'Scanning all {n} variables…': 'Sedang mengimbas kesemua {n} pemboleh ubah…',
+    'Scanning {n} variables. This takes about half a minute for a box…': 'Sedang mengimbas {n} pemboleh ubah. Ini mengambil masa kira-kira setengah minit bagi setiap kotak…',
+    'Scanned {done} of {n} variables…': 'Telah mengimbas {done} daripada {n} pemboleh ubah…',
+    'Run the same test on every variable for this place and period, and see which ones are worth a closer look.':
+      'Jalankan ujian yang sama bagi setiap pemboleh ubah di tempat dan tempoh ini untuk melihat yang mana wajar diteliti dengan lebih lanjut.',
+    'yearly average': 'purata tahunan', '{month} average': 'purata {month}',
+    '{sig} of {n} variables show a significant trend here. Click a name to open it.':
+      '{sig} daripada {n} pemboleh ubah menunjukkan tren yang signifikan di sini. Klik nama untuk membukanya.',
+    'Not enough data here for: {items}.': 'Data tidak mencukupi di sini untuk: {items}.',
+    'With {n} tests at the 0.05 level, expect about one false alarm in twenty even where nothing is changing. Treat this list as leads to investigate, not proof.':
+      'Dengan {n} ujian pada aras 0.05, jangkakan kira-kira satu amaran palsu bagi setiap dua puluh ujian walaupun tiada perubahan. Anggap senarai ini sebagai petunjuk untuk disiasat, bukan bukti.',
+    'Variable': 'Pemboleh ubah', 'Direction': 'Arah', 'Strength (tau)': 'Kekuatan (tau)',
+    'Change per decade': 'Perubahan setiap dekad', 'Mann-Kendall p': 'Nilai p Mann-Kendall', 'Verdict': 'Keputusan',
+    'rising': 'meningkat', 'falling': 'menurun', 'flat': 'mendatar',
 
     // ---- compare two variables ----
     'Choose a second variable': 'Pilih pemboleh ubah kedua',
@@ -129,7 +149,6 @@
     // ---- case summary ----
     'Testing {what} around {where}, {when}, {part}.': 'Menguji {what} di sekitar {where}, {when}, {part}.',
     'in {month}': 'pada {month}', 'whole year': 'sepanjang tahun',
-    'yearly average': 'purata tahunan', '{month} average': 'purata {month}',
 
     // ---- map tools ----
     'centre': 'tengah', 'east': 'timur', 'north-east': 'timur laut', 'north': 'utara', 'north-west': 'barat laut',
@@ -172,6 +191,63 @@
 
     // ---- stories ----
     'See the full case': 'Lihat kes penuh',
+    'Time step': 'Langkah masa', 'One value per year': 'Satu nilai setahun', 'Every month, seasonal cycle removed': 'Setiap bulan, kitaran musim dibuang',
+    'month by month': 'bulan demi bulan', 'each month minus its normal': 'setiap bulan tolak normalnya',
+    'Monthly value': 'Nilai bulanan', 'Each month minus its normal': 'Setiap bulan tolak normalnya',
+    'Used {n} of {t} years.': '{n} daripada {t} tahun digunakan.', 'Used {n} of {t} months.': '{n} daripada {t} bulan digunakan.',
+    'No data for {y} here.': 'Tiada data untuk {y} di sini.', 'and {n} more': 'dan {n} lagi',
+    '{y} skipped: missing months.': '{y} dilangkau: ada bulan yang tiada data.', '{y}: some months missing.': '{y}: ada bulan yang tiada data.',
+    '{y} left out: not every month is in NASA POWER yet.': '{y} tidak dimasukkan: belum semua bulan ada dalam NASA POWER.',
+    '{y} left out: December to February needs the December before, which is before the record starts.':
+      '{y} tidak dimasukkan: Disember hingga Februari memerlukan Disember sebelumnya, yang berlaku sebelum rekod bermula.',
+    'Neighbouring months are alike (lag-1 autocorrelation {r}), so {n} monthly values carry about as much independent information as {e}. Both tests were corrected for this.':
+      'Bulan-bulan bersebelahan adalah serupa (autokorelasi lag-1 {r}), jadi {n} nilai bulanan membawa maklumat bebas lebih kurang sama seperti {e}. Kedua-dua ujian telah dibetulkan untuk ini.',
+    'Neighbouring months are not alike here, so no correction for autocorrelation was needed.':
+      'Bulan-bulan bersebelahan tidak serupa di sini, jadi tiada pembetulan autokorelasi diperlukan.',
+    'Along the trend line from {a} to {b} ({n} months of data).': 'Sepanjang garis tren dari {a} hingga {b} ({n} bulan data).',
+    'Each value is that month minus the average for the same calendar month in {a}–{b}.': 'Setiap nilai ialah bulan itu tolak purata bulan kalendar yang sama pada {a}–{b}.',
+    'The whole region ({a}° × {b}°)': 'Seluruh kawasan ({a}° × {b}°)', 'loads in parts, about a minute': 'dimuat secara berperingkat, kira-kira seminit',
+    'Fetching {v} for {p} from NASA POWER…': 'Mengambil {v} untuk {p} daripada NASA POWER…',
+    'Fetching a big area in {b} parts from NASA POWER: {a} of {b} done…': 'Mengambil kawasan besar dalam {b} bahagian daripada NASA POWER: {a} daripada {b} siap…',
+    'Only {n} usable years of {v} here for that period. A trend test needs at least {m}. Try a longer period, another place or another variable.':
+      'Hanya {n} tahun data {v} yang boleh digunakan di sini untuk tempoh itu. Ujian tren memerlukan sekurang-kurangnya {m}. Cuba tempoh lebih panjang, tempat lain atau pemboleh ubah lain.',
+    'Scanning every variable works for areas up to 10° × 10°. A bigger area would need dozens of slow requests. Choose a smaller area, or test variables one at a time.':
+      'Imbasan semua pemboleh ubah berfungsi untuk kawasan sehingga 10° × 10°. Kawasan lebih besar memerlukan berpuluh permintaan yang perlahan. Pilih kawasan lebih kecil, atau uji satu pemboleh ubah pada satu masa.',
+    'Peninsular Malaysia': 'Semenanjung Malaysia', 'all of Malaysia (with the sea between)': 'seluruh Malaysia (termasuk laut di antaranya)', 'Malaysia': 'Malaysia',
+    'Adjusted for year-to-year memory.': 'Diselaraskan untuk ingatan dari tahun ke tahun.',
+    'Neighbouring months are alike (lag-1 autocorrelation {r}), so {n} monthly values carry about as much independent information as {e}. Both tests were adjusted for this.':
+      'Bulan-bulan bersebelahan adalah serupa (autokorelasi lag-1 {r}), jadi {n} nilai bulanan membawa maklumat bebas lebih kurang sama seperti {e}. Kedua-dua ujian telah diselaraskan untuk ini.',
+    'Each year here resembles the year before it (lag-1 autocorrelation {r}), so {n} years carry about as much independent information as {e}. Both tests were adjusted for this.':
+      'Setiap tahun di sini menyerupai tahun sebelumnya (autokorelasi lag-1 {r}), jadi {n} tahun membawa maklumat bebas lebih kurang sama seperti {e}. Kedua-dua ujian telah diselaraskan untuk ini.',
+    'Grey areas: no satellite photo (polar night or no pass yet). NASA Blue Marble shown.': 'Kawasan kelabu: tiada foto satelit (malam kutub atau belum dilalui). NASA Blue Marble ditunjukkan.',
+    'Grey areas: no satellite photo (polar night or no pass yet). NASA Blue Marble shown, with sea ice from {d} (NASA GHRSST).': 'Kawasan kelabu: tiada foto satelit (malam kutub atau belum dilalui). NASA Blue Marble ditunjukkan, dengan ais laut pada {d} (NASA GHRSST).',
+    '{what} is only measured on land, and this spot is open ocean. Choose a place on land, or another variable.':
+      '{what} hanya diukur di darat, dan tempat ini ialah lautan terbuka. Pilih tempat di darat, atau pemboleh ubah lain.',
+    '{n} open-ocean cells were left out: NASA POWER has no soil there.': '{n} sel lautan terbuka tidak dimasukkan: NASA POWER tiada data tanah di sana.',
+    'How to use': 'Cara guna', 'New here?': 'Baru di sini?', 'Show me': 'Tunjukkan', 'No thanks': 'Tidak, terima kasih', 'Close tour': 'Tutup lawatan',
+    'Take a one-minute tour of what to click and what each part shows.': 'Ikuti lawatan seminit tentang apa yang perlu diklik dan apa yang ditunjukkan setiap bahagian.',
+    'The globe': 'Glob', 'Not sure what to test?': 'Tidak pasti apa yang hendak diuji?', 'Map layers': 'Lapisan peta',
+    'The answer': 'Jawapan', 'The chart': 'Carta', 'Change the case': 'Ubah kes',
+    'Drag to spin the Earth, scroll or pinch to zoom. Click any place to test it: forty years of NASA data are fetched for that spot.':
+      'Seret untuk memutar Bumi, tatal atau cubit untuk zum. Klik mana-mana tempat untuk mengujinya: empat puluh tahun data NASA diambil untuk tempat itu.',
+    'Or type a question in plain words, such as “Is Penang getting rainier?” or “Is the Arctic warming since 2000?”. It sets up the case for you.':
+      'Atau taip soalan dalam bahasa mudah, seperti “Adakah Pulau Pinang semakin kerap hujan?”. Ia menyediakan kes untuk anda.',
+    'Answer three short questions (what kind of place, what you are curious about, where) and get suggested NASA variables to test.':
+      'Jawab tiga soalan ringkas (jenis tempat, apa yang anda ingin tahu, di mana) dan dapatkan cadangan pemboleh ubah NASA untuk diuji.',
+    'Step-by-step examples with real data: city heat, haze, monsoon rain, a warming sea and wildfire smoke. A good place to start.':
+      'Contoh langkah demi langkah dengan data sebenar: haba bandar, jerebu, hujan monsun, laut yang memanas dan asap kebakaran hutan. Tempat yang baik untuk bermula.',
+    'Trend map: the trend in every grid cell around the place (a dot means significant). Timelapse: every month, one after another. Rain now and Wind: current conditions.':
+      'Peta tren: tren dalam setiap sel grid di sekitar tempat itu (titik bermaksud signifikan). Selang masa: setiap bulan, satu demi satu. Hujan kini dan Angin: keadaan semasa.',
+    'The verdict in one sentence: is it really changing, and how fast? The badge says whether the change is statistically significant or could be chance.':
+      'Keputusan dalam satu ayat: adakah ia benar-benar berubah, dan berapa cepat? Lencana menunjukkan sama ada perubahan itu signifikan secara statistik atau mungkin kebetulan.',
+    'One dot per year, with the trend line and its 95% range. Hover for values. Drag across the chart to test only part of the record. The coloured stripes show warm and cool years.':
+      'Satu titik setahun, dengan garis tren dan julat 95%. Halakan tetikus untuk nilai. Seret merentasi carta untuk menguji sebahagian rekod sahaja. Jalur berwarna menunjukkan tahun panas dan sejuk.',
+    'The numbers behind the verdict: rate per decade, total change, the two tests (Mann-Kendall and t-test) and how many years a test would need.':
+      'Nombor di sebalik keputusan: kadar sedekad, jumlah perubahan, dua ujian (Mann-Kendall dan ujian-t) dan berapa tahun yang diperlukan oleh ujian.',
+    'What, where and when: the variable, the place and area, the years, a season or a month, and one value per year or every month.':
+      'Apa, di mana dan bila: pemboleh ubah, tempat dan kawasan, tahun, musim atau bulan, dan satu nilai setahun atau setiap bulan.',
+    'Explains the result in plain words and answers questions about it. It works without an account; an OpenAI key in its settings gives longer answers.':
+      'Menerangkan keputusan dalam bahasa mudah dan menjawab soalan tentangnya. Ia berfungsi tanpa akaun; kunci OpenAI dalam tetapannya memberi jawapan lebih panjang.',
     'Grid cells': 'Sel grid', 'Smooth': 'Licin', 'Opacity': 'Kelegapan', 'How to draw the grid': 'Cara melukis grid',
     'Guided stories': 'Kisah berpandu', 'World story': 'Kisah dunia',
     'Wildfire smoke over Wisconsin': 'Asap kebakaran hutan di Wisconsin', 'Summer haze far from the fires': 'Jerebu musim panas jauh dari kebakaran',
@@ -282,6 +358,99 @@
     'The weight of all the air above, pressing on the ground. It is lower on high ground and falls when storms pass.':
       'Berat semua udara di atas yang menekan tanah. Ia lebih rendah di tanah tinggi dan jatuh apabila ribut melintas.',
 
+    // ---- wizard (moved here from wizard.js) ----
+    'What kind of place?': 'Jenis tempat apa?',
+    'What are you curious about?': 'Apa yang anda ingin tahu?',
+    'Where exactly?': 'Di mana tepatnya?',
+    'Try one of these': 'Cuba salah satu',
+    'Example': 'Contoh',
+    'The place I have open now': 'Tempat yang sedang dibuka',
+    'I will click a place on the globe': 'Saya akan klik tempat pada glob',
+    'Ask AI for more ideas': 'Tanya AI untuk idea lain',
+    'Question {a} of 3': 'Soalan {a} daripada 3',
+    'Close': 'Tutup',
+    'Now click a place on the globe to test it.': 'Sekarang klik tempat pada glob untuk mengujinya.',
+    'Not sure what to ask? Help me choose': 'Tidak pasti apa hendak ditanya? Bantu saya pilih',
+    'A big city': 'Bandar besar',
+    'A rainforest': 'Hutan hujan',
+    'Borneo': 'Borneo',
+    'A desert or dry land': 'Gurun atau tanah kering',
+    'A coast or river mouth': 'Pantai atau muara sungai',
+    'Mekong delta, Vietnam': 'Delta Mekong, Vietnam',
+    'Farmland': 'Tanah ladang',
+    'A cold or snowy place': 'Tempat sejuk atau bersalji',
+    'The open sea': 'Laut terbuka',
+    'South China Sea': 'Laut China Selatan',
+    'Strait of Malacca': 'Selat Melaka',
+    'Mountains': 'Pergunungan',
+    'Tibetan Plateau': 'Dataran Tinggi Tibet',
+    'Swiss Alps': 'Alps Switzerland',
+    'Show me what matters most': 'Tunjukkan yang paling penting',
+    'Is it getting hotter?': 'Adakah semakin panas?',
+    'Wetter or drier?': 'Lebih basah atau kering?',
+    'Air, haze and wind': 'Udara, jerebu dan angin',
+    'Sun and clouds': 'Matahari dan awan',
+
+    // ---- AI explainer (moved here from ai.js) ----
+    'less than 1 time in 1,000': 'kurang daripada 1 kali dalam 1,000',
+    'In short': 'Ringkasnya',
+    'Is the change real?': 'Adakah perubahan ini benar?',
+    'Trend vs. normal variation': 'Tren berbanding turun naik biasa',
+    'Each year tends to look like the year before, which can make a trend look more certain than it is.': 'Setiap tahun cenderung menyerupai tahun sebelumnya, jadi tren mungkin kelihatan lebih pasti daripada sebenarnya.',
+    'Be careful': 'Berhati-hati',
+    'The two tests, in one line each': 'Dua ujian, satu ayat setiap satu',
+    'Mann-Kendall asks: are later years mostly higher (or lower) than earlier ones? Sen’s slope is the typical change per year, worked out so that one freak year barely moves it.': 'Mann-Kendall bertanya: adakah tahun kemudian kebanyakannya lebih tinggi (atau rendah) daripada tahun awal? Cerun Sen ialah perubahan biasa setahun, dikira supaya satu tahun luar biasa hampir tidak menjejaskannya.',
+    'Pick a place and a variable first, then I can explain the result.': 'Pilih tempat dan pemboleh ubah dahulu, kemudian saya boleh terangkan keputusannya.',
+    'For free-form questions, add an OpenAI API key in the AI settings (⚙).': 'Untuk soalan bebas, masukkan kunci API OpenAI dalam tetapan AI (⚙).',
+    'The API key was not accepted. Check it in the AI settings.': 'Kunci API tidak diterima. Semak dalam tetapan AI.',
+    'OpenAI says the limit or quota is reached. Try again later or check your billing.': 'OpenAI menyatakan had atau kuota telah dicapai. Cuba lagi nanti atau semak bil anda.',
+    'Explain this simply': 'Terangkan dengan mudah',
+    'Ask AI a question →': 'Tanya AI →',
+    'In plain words': 'Dalam bahasa mudah',
+    'Get an AI explanation': 'Dapatkan penerangan AI',
+    'This summary is built in and works offline. For a fuller AI explanation and free-form questions, add an OpenAI API key in the AI chat settings.': 'Ringkasan ini terbina dalam dan berfungsi luar talian. Untuk penerangan AI yang lebih lengkap, masukkan kunci API OpenAI dalam tetapan sembang AI.',
+    'Thinking…': 'Sedang berfikir…',
+    'Explain this result to a secondary-school student in 4 short bullet points: what changed, whether it is real, how big it is compared with normal variation, and one thing to be careful about.': 'Terangkan keputusan ini kepada pelajar sekolah menengah dalam 4 poin ringkas: apa yang berubah, sama ada ia benar, sebesar mana berbanding turun naik biasa, dan satu perkara yang perlu diberi perhatian.',
+    'No key saved. I will use the built-in explainer.': 'Tiada kunci disimpan. Saya akan guna penerang terbina dalam.',
+    'Key removed from this browser.': 'Kunci dibuang daripada pelayar ini.',
+    'Ask AI': 'Tanya AI',
+    'Trend Detective AI': 'AI Trend Detective',
+    'built-in': 'terbina dalam',
+    'AI settings': 'Tetapan AI',
+    'OpenAI API key (optional)': 'Kunci API OpenAI (pilihan)',
+    'Model': 'Model',
+    'Stored only in this browser and sent only to OpenAI. Usage is billed to this key. Leave it empty to use the free built-in explainer.': 'Disimpan hanya dalam pelayar ini dan dihantar hanya kepada OpenAI. Penggunaan dicaj kepada kunci ini. Biarkan kosong untuk guna penerang terbina dalam yang percuma.',
+    'Save': 'Simpan',
+    'Remove key': 'Buang kunci',
+    'Ask about this result…': 'Tanya tentang keputusan ini…',
+    'Explain this result simply': 'Terangkan keputusan ini dengan mudah',
+    'What does the p-value mean?': 'Apa maksud nilai p?',
+    'Is this change big?': 'Adakah perubahan ini besar?',
+    'Why might this be happening?': 'Mengapa ini berlaku?',
+    'Hi! Pick a place and something to investigate, then ask me what the numbers mean.': 'Hai! Pilih tempat dan perkara untuk disiasat, kemudian tanya saya maksud nombornya.',
+    'Stopped.': 'Dihentikan.',
+    'Could not reach OpenAI.': 'Tidak dapat menghubungi OpenAI.',
+    'Built-in answer instead:': 'Jawapan terbina dalam:',
+    'The p-value is the chance of seeing a pattern this steady if nothing were really changing. Small means "unlikely to be luck". Below 0.05 (1 in 20) we call it statistically significant.': 'Nilai p ialah peluang melihat corak sekukuh ini jika tiada apa-apa yang benar-benar berubah. Nilai kecil bermaksud "tidak mungkin kebetulan". Di bawah 0.05 (1 dalam 20) dianggap signifikan secara statistik.',
+    'The Mann-Kendall test compares every pair of years and counts how often the later year is higher. Tau runs from −1 (always falling) to +1 (always rising). It does not care how big the change is, only how consistent.': 'Ujian Mann-Kendall membandingkan setiap pasangan tahun dan mengira berapa kerap tahun kemudian lebih tinggi. Tau dari −1 (sentiasa turun) hingga +1 (sentiasa naik). Ia mengukur konsistensi, bukan saiz perubahan.',
+    'Sen’s slope is the middle value of the slopes between every pair of years, so a single extreme year hardly affects it. We show it per decade (10 years) because yearly changes are tiny.': 'Cerun Sen ialah nilai tengah cerun antara setiap pasangan tahun, jadi satu tahun ekstrem hampir tidak menjejaskannya. Kami tunjukkan setiap dekad (10 tahun) kerana perubahan tahunan sangat kecil.',
+    'A spike is a single year far from the trend line (for example a strong El Niño year). One spike can make a line tilt, so we re-test without it to see whether the trend survives.': 'Lonjakan ialah satu tahun yang jauh dari garis tren (contohnya tahun El Niño yang kuat). Kami uji semula tanpanya untuk melihat sama ada tren masih kekal.',
+    'These tests show whether something changed, not why. Common drivers include global warming, land-use change (cities, deforestation), and natural cycles such as El Niño. Treat any cause as a hypothesis to check.': 'Ujian ini menunjukkan sama ada sesuatu berubah, bukan mengapa. Punca biasa termasuk pemanasan global, perubahan guna tanah (bandar, penebangan hutan) dan kitaran semula jadi seperti El Niño. Anggap sebarang punca sebagai hipotesis.',
+    'R² is the share of the year-to-year differences that the straight trend line accounts for. Climate data is noisy, so even a real trend often explains only a small share.': 'R² ialah bahagian perbezaan dari tahun ke tahun yang dijelaskan oleh garis tren. Data iklim banyak hingar, jadi tren sebenar pun selalunya menjelaskan bahagian yang kecil sahaja.',
+    'The numbers come from NASA POWER, which serves satellite and model data (such as MERRA-2 and CERES) for any point on Earth since the 1980s.': 'Nombor ini daripada NASA POWER, yang menyediakan data satelit dan model (seperti MERRA-2 dan CERES) untuk mana-mana titik di Bumi sejak 1980-an.',
+
+    // ---- AI chat: safe answers ----
+    'I could not read the numbers for this case. Try another place or period, then ask again.': 'Saya tidak dapat membaca nombor bagi kes ini. Cuba tempat atau tempoh lain, kemudian tanya semula.',
+    'I can only answer questions about this result. Try: "Is the change real?", "How fast is it changing?" or "Why might it be changing?"': 'Saya hanya boleh menjawab soalan tentang keputusan ini. Cuba: "Adakah perubahan ini benar?", "Berapa cepat ia berubah?" atau "Kenapa ia mungkin berubah?"',
+    'Sorry, something went wrong while answering. Please try another question.': 'Maaf, berlaku masalah semasa menjawab. Sila cuba soalan lain.',
+
+    // ---- chart card: legend, hint, tooltip, table ----
+    '95% confidence band': 'Jalur keyakinan 95%', 'Value': 'Nilai',
+    'Drag across the chart to test only those years. Stripes: {lo} years were below the average, {hi} years above.':
+      'Seret merentasi carta untuk menguji tahun-tahun itu sahaja. Jalur warna: tahun {lo} berada di bawah purata, tahun {hi} di atas purata.',
+    'blue': 'biru', 'red': 'merah', 'brown': 'coklat', 'teal': 'hijau kebiruan',
+    '{x} vs average': '{x} berbanding purata', '{x} on the trend line': '{x} pada garis tren',
+
     // ---- months ----
     'Whole year': 'Sepanjang tahun', 'January': 'Januari', 'February': 'Februari', 'March': 'Mac', 'May': 'Mei', 'June': 'Jun',
     'July': 'Julai', 'August': 'Ogos', 'October': 'Oktober', 'December': 'Disember',
@@ -300,7 +469,7 @@
     '{n} years.': '{n} tahun.', 'Let go to test this period.': 'Lepaskan untuk menguji tempoh ini.',
     'Pick at least {n} years.': 'Pilih sekurang-kurangnya {n} tahun.',
     'Pick at least {n} years to test a trend.': 'Pilih sekurang-kurangnya {n} tahun untuk menguji tren.',
-    '95% confidence band': 'Jalur keyakinan 95%', '95% prediction interval': 'Selang ramalan 95%', 'Change point': 'Titik perubahan',
+    '95% prediction interval': 'Selang ramalan 95%', 'Change point': 'Titik perubahan',
     'Straight line fitted by least squares': 'Garis lurus yang dipadankan dengan kaedah kuasa dua terkecil',
     'Where the true trend line probably lies (95% confidence). Single years scatter much more widely, so most dots sit outside it.':
       'Kedudukan sebenar garis tren yang paling mungkin (keyakinan 95%). Setiap tahun bertaburan lebih luas, jadi kebanyakan titik berada di luarnya.',
@@ -314,7 +483,6 @@
       'Garis tren dilanjutkan 10 tahun. Kawasan berlorek ialah julat yang mungkin bagi satu tahun (jalur ramalan 95%) jika tren tidak berubah. Ini bukan ramalan.',
     'Drag across the chart to test only those years. Stripes: {lo} years were below the {ref}, {hi} years above.':
       'Seret merentasi carta untuk menguji tahun-tahun itu sahaja. Jalur: tahun {lo} di bawah {ref}, tahun {hi} di atasnya.',
-    'blue': 'biru', 'red': 'merah', 'brown': 'perang', 'teal': 'hijau kebiruan',
 
     // ---- residuals and trend-vs-start-year panels ----
     'Residuals: observed minus trend line': 'Baki: nilai cerapan tolak garis tren',
@@ -350,8 +518,8 @@
     'annual mean (months weighted by days)': 'purata tahunan (bulan diberi pemberat mengikut bilangan hari)',
     '{s}° box centred on {lat}°, {lon}° (area-weighted mean of {c} grid cells)': 'kotak {s}° berpusat di {lat}°, {lon}° (purata berpemberat luas bagi {c} sel grid)',
     'single grid cell at {lat}°, {lon}°': 'satu sel grid di {lat}°, {lon}°', '{k} skipped: incomplete months': '{k} dilangkau: bulan tidak lengkap',
-    'Two-sided tests, α = 0.05. Per-decade values are the per-year slope × 10. The verdict above uses the Mann–Kendall p-value. A steady trend can also make the Pettitt test significant, so a change point is most convincing when the residuals jump at that year too.':
-      'Ujian dua hujung, α = 0.05. Nilai sedekad ialah cerun setahun × 10. Keputusan di atas menggunakan nilai p Mann–Kendall. Tren yang mantap juga boleh menjadikan ujian Pettitt signifikan, jadi titik perubahan paling meyakinkan apabila baki turut melonjak pada tahun itu.',
+    'Two-sided tests, α = 0.05. Per-decade values are the per-year slope × 10. The verdict above uses the Mann–Kendall p-value adjusted for year-to-year memory. A steady trend can also make the Pettitt test significant, so a change point is most convincing when the residuals jump at that year too.':
+      'Ujian dua hujung, α = 0.05. Nilai sedekad ialah cerun setahun × 10. Keputusan di atas menggunakan nilai p Mann–Kendall yang dilaraskan untuk ingatan dari tahun ke tahun. Tren yang mantap juga boleh menjadikan ujian Pettitt signifikan, jadi titik perubahan paling meyakinkan apabila baki turut melonjak pada tahun itu.',
     'References:': 'Rujukan:',
 
     // ---- months panel ----
@@ -363,6 +531,15 @@
     'Click to go back to the whole year': 'Klik untuk kembali ke sepanjang tahun', 'Click to investigate this month': 'Klik untuk menyiasat bulan ini',
 
     // ---- "At this spot" card, trend-map correction, two variables, failed case ----
+    'average of each calendar month, {a}–{b}': 'purata setiap bulan kalendar, {a}–{b}',
+    'Where the true trend line probably lies (95% confidence, allowing for year-to-year memory). Single values scatter much more widely, so most dots sit outside it.':
+      'Kedudukan sebenar garis tren yang paling mungkin (keyakinan 95%, mengambil kira ingatan dari tahun ke tahun). Setiap nilai bertaburan lebih luas, jadi kebanyakan titik berada di luarnya.',
+    'each month minus its calendar-month average': 'setiap bulan tolak purata bulan kalendarnya',
+    'Lag-1 r used, with small-sample correction': 'r lat-1 yang digunakan, dengan pembetulan sampel kecil',
+    'Effective sample size n_eff': 'Saiz sampel berkesan n_eff', '{a} of {n} values': '{a} daripada {n} nilai',
+    'Slope 95% CI, adjusted (drawn as the band)': 'Selang keyakinan 95% cerun, dilaraskan (dilukis sebagai jalur)',
+    'p adjusted for year-to-year memory (used for the verdict)': 'p dilaraskan untuk ingatan dari tahun ke tahun (digunakan untuk keputusan)',
+    'Period · values used': 'Tempoh · nilai digunakan', '{k} years with missing months': '{k} tahun dengan bulan yang hilang',
     'At this spot': 'Di lokasi ini', 'No data here': 'Tiada data di sini',
     'One grid cell, yearly averages from NASA POWER. Pick one to open the full case: chart, tests and evidence.':
       'Satu sel grid, purata tahunan daripada NASA POWER. Pilih satu untuk membuka kes penuh: carta, ujian dan bukti.',
@@ -373,10 +550,6 @@
       'Selepas kedua-dua tren jangka panjang dibuang, hubungan itu berbalik arah ({s}, r = {r}): tahun dengan {a} lebih tinggi daripada biasa cenderung mempunyai {b} lebih rendah. Hubungan pertama datang daripada kedua-duanya meningkat atau menurun dalam tahun yang sama.',
     'After removing both long-term trends, the link turns the other way ({s}, r = {r}): a year with more {a} than usual tends to have more {b}. The first link came from both rising or falling over the same years.':
       'Selepas kedua-dua tren jangka panjang dibuang, hubungan itu berbalik arah ({s}, r = {r}): tahun dengan {a} lebih tinggi daripada biasa cenderung mempunyai {b} lebih tinggi juga. Hubungan pertama datang daripada kedua-duanya meningkat atau menurun dalam tahun yang sama.',
-    'The faded result below is the previous case ({what}, {from}–{to}).': 'Keputusan pudar di bawah ialah kes sebelumnya ({what}, {from}–{to}).',
-    'Fetching {what} for {where} from NASA POWER…': 'Mengambil {what} untuk {where} daripada NASA POWER…',
-    'Only {n} usable years of {what} here for that period. A trend test needs at least {min}. Try a longer period, another place or another variable.':
-      'Hanya {n} tahun data {what} yang boleh digunakan di sini bagi tempoh itu. Ujian tren memerlukan sekurang-kurangnya {min}. Cuba tempoh lebih panjang, tempat lain atau pemboleh ubah lain.'
   };
 
   var lang = 'en';

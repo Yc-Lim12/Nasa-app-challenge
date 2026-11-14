@@ -112,6 +112,8 @@
         var lon = f.geometry.coordinates[0], lat = f.geometry.coordinates[1];
         lons.push(lon); lats.push(lat);
         var table = f.properties.parameter[pm] || {};
+        // open-ocean cells of a land-only variable have no data (see isOceanFill in app.js)
+        if (TD.isOceanFill(pm, table)) return { lon: lon, lat: lat, table: {}, stats: null };
         var ser = TD.yearlySeries(table, s.y0, s.y1, s.month);
         var st = ser.years.length >= TD.MIN_YEARS ? TD.S.analyze(ser.years, ser.values) : null;
         return { lon: lon, lat: lat, table: table, stats: st };
@@ -142,11 +144,12 @@
       if (!ok.length) { fail(T('Trend map'), T('There is not enough data here for this variable and period.')); return; }
       var rates = ok.map(function (c) { return c.stats.sen.slope * 10; });
       var lim = percentile(rates.map(Math.abs), 0.95) || Math.max.apply(null, rates.map(Math.abs)) || 1;
-      // Many cells are tested at once, so about 1 in 20 would pass p < 0.05 by chance alone.
-      // Dots use the Benjamini–Hochberg false discovery rate correction (5%) across all cells.
-      var pass = TD.S.benjaminiHochberg(ok.map(function (c) { return c.stats.mk.p; }), 0.05);
+      // Each cell uses the memory-adjusted Mann-Kendall p-value, as in the main verdict.
+      // Many cells are tested at once, so about 1 in 20 would pass p < 0.05 by chance alone:
+      // dots use the Benjamini–Hochberg false discovery rate correction (5%) across all cells.
+      var pass = TD.S.fdr(ok.map(function (c) { return c.stats.mk.pAdj; }), 0.05);
       ok.forEach(function (c, i) { c.fdr = pass[i]; });
-      var rawSig = ok.filter(function (c) { return c.stats.mk.p < 0.05; }).length;
+      var rawSig = ok.filter(function (c) { return c.stats.mk.pAdj < 0.05; }).length;
       var list = ok.map(function (c) {
         var b = cellBounds(c), r = c.stats.sen.slope * 10, t = Math.max(-1, Math.min(1, r / lim));
         b.fill = d3.interpolateRdBu(0.5 - t / 2);

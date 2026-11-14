@@ -107,6 +107,26 @@
 
     // ---- buttons, status ----
     'Asking NASA…': 'Bertanya kepada NASA…', 'Asking NASA': 'Bertanya kepada NASA', 'Investigate': 'Siasat', 'Nothing': 'Tiada',
+    'NASA POWER answered with error {status}.': 'NASA POWER membalas dengan ralat {status}.',
+    'Could not reach NASA POWER. Check your internet connection and try again.': 'Tidak dapat menghubungi NASA POWER. Semak sambungan internet anda dan cuba lagi.',
+    'There is not enough {what} data for {where} in that period.': 'Data {what} tidak mencukupi untuk {where} bagi tempoh itu.',
+    'Fetching {what} for {where} from NASA POWER…': 'Sedang mendapatkan {what} untuk {where} daripada NASA POWER…',
+    'Only {n} usable years of {what} here for that period. A trend test needs at least {min}. Try a longer period, another place or another variable.':
+      'Hanya {n} tahun data {what} yang boleh digunakan untuk tempoh ini. Ujian tren memerlukan sekurang-kurangnya {min} tahun. Cuba tempoh lebih panjang, tempat lain atau pemboleh ubah lain.',
+    'Scanning all {n} variables…': 'Sedang mengimbas kesemua {n} pemboleh ubah…',
+    'Scanning {n} variables. This takes about half a minute for a box…': 'Sedang mengimbas {n} pemboleh ubah. Ini mengambil masa kira-kira setengah minit bagi setiap kotak…',
+    'Scanned {done} of {n} variables…': 'Telah mengimbas {done} daripada {n} pemboleh ubah…',
+    'Run the same test on every variable for this place and period, and see which ones are worth a closer look.':
+      'Jalankan ujian yang sama bagi setiap pemboleh ubah di tempat dan tempoh ini untuk melihat yang mana wajar diteliti dengan lebih lanjut.',
+    'yearly average': 'purata tahunan', '{month} average': 'purata {month}',
+    '{sig} of {n} variables show a significant trend here. Click a name to open it.':
+      '{sig} daripada {n} pemboleh ubah menunjukkan tren yang signifikan di sini. Klik nama untuk membukanya.',
+    'Not enough data here for: {items}.': 'Data tidak mencukupi di sini untuk: {items}.',
+    'With {n} tests at the 0.05 level, expect about one false alarm in twenty even where nothing is changing. Treat this list as leads to investigate, not proof.':
+      'Dengan {n} ujian pada aras 0.05, jangkakan kira-kira satu amaran palsu bagi setiap dua puluh ujian walaupun tiada perubahan. Anggap senarai ini sebagai petunjuk untuk disiasat, bukan bukti.',
+    'Variable': 'Pemboleh ubah', 'Direction': 'Arah', 'Strength (tau)': 'Kekuatan (tau)',
+    'Change per decade': 'Perubahan setiap dekad', 'Mann-Kendall p': 'Nilai p Mann-Kendall', 'Verdict': 'Keputusan',
+    'rising': 'meningkat', 'falling': 'menurun', 'flat': 'mendatar',
 
     // ---- compare two variables ----
     'Choose a second variable': 'Pilih pemboleh ubah kedua',

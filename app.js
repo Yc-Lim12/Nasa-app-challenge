@@ -127,6 +127,7 @@
   var view = { anom: false, smooth: false, future: false };
   var cache = {};
   var runId = 0;
+  var compareRequestId = 0, var2RequestId = 0, scanRequestId = 0;
   var current = null;     // last analysed result
   var compareData = null; // second place, same variable and period
   var globe = null;
@@ -214,14 +215,13 @@
     return fetch(url).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (j) {
         if (!r.ok) {
-          var msg = (j.messages && j.messages.join(' ')) || j.detail || ('NASA POWER answered with error ' + r.status + '.');
-          throw new Error(typeof msg === 'string' ? msg : 'NASA POWER could not handle that request.');
+          throw new Error(T('NASA POWER answered with error {status}.', { status: r.status }));
         }
         cache[url] = j;
         return j;
       });
     }, function () {
-      throw new Error('Could not reach NASA POWER. Check your internet connection and try again.');
+      throw new Error(T('Could not reach NASA POWER. Check your internet connection and try again.'));
     });
   }
 
@@ -427,7 +427,7 @@
     replay($('verdict'));
 
     $('chart-title').textContent = vname(vr) + (vr.unit ? ' (' + vr.unit + ')' : '') + ', ' +
-      (res.month ? MONTHS[res.month] + ' average' : 'yearly average') + ', ' + res.placeName;
+      T(res.month ? '{month} average' : 'yearly average', { month: T(MONTHS[res.month]) }) + ', ' + res.placeName;
     $('empty').hidden = true;
     $('result').hidden = false;
     $('live-hint').hidden = false;
@@ -534,12 +534,15 @@
     if (globe) globe.setBadge({ title: vname(vr), text: T('Asking NASA'), cls: 'loading' });
     document.dispatchEvent(new CustomEvent('td:investigate', { detail: snap }));
     var cached = !!cache[urlFor(prm(vr), snap.lat, snap.lon, snap.size)];
-    if (!cached) setStatus('Fetching ' + vr.name.toLowerCase() + ' for ' + state.placeName + ' from NASA POWER…');
+    if (!cached) setStatus(T('Fetching {what} for {where} from NASA POWER…', {
+      what: T(vr.name).toLowerCase(), where: T(state.placeName)
+    }));
     loadSeries(vr.id, snap).then(function (ser) {
       if (id !== runId) return;
       if (ser.years.length < MIN_YEARS) {
-        throw new Error('Only ' + ser.years.length + ' usable years of ' + vr.name.toLowerCase() +
-          ' here for that period. A trend test needs at least ' + MIN_YEARS + '. Try a longer period, another place or another variable.');
+        throw new Error(T('Only {n} usable years of {what} here for that period. A trend test needs at least {min}. Try a longer period, another place or another variable.', {
+          n: ser.years.length, what: T(vr.name).toLowerCase(), min: MIN_YEARS
+        }));
       }
       render({ variable: vr, years: ser.years, values: ser.values, cells: ser.cells, table: ser.table,
         stats: S.analyze(ser.years, ser.values), placeName: snap.placeName, short: snap.short, placeId: snap.placeId,
@@ -578,6 +581,7 @@
   }
 
   function loadCompare() {
+    var requestId = ++compareRequestId;
     var res = current, note = $('compare-note');
     var p = compareTarget();
     updateMap(false);
@@ -588,10 +592,15 @@
     }
     var vr = res.variable, myRun = runId;
     var snap = { lat: p.lat, lon: p.lon, size: res.size, y0: res.y0, y1: res.y1, month: res.month };
-    if (!compareData || compareData.id !== p.id) { note.hidden = false; note.textContent = 'Loading ' + p.short + ' from NASA POWER…'; }
+    if (!compareData || compareData.id !== p.id) {
+      note.hidden = false;
+      note.textContent = T('Loading {name} from NASA POWER…', { name: T(p.short).toLowerCase() });
+    }
     loadSeries(vr.id, snap).then(function (ser) {
-      if (myRun !== runId || state.compare !== p.id) return;
-      if (ser.years.length < MIN_YEARS) throw new Error('There is not enough ' + vr.name.toLowerCase() + ' data for ' + p.short + ' in that period.');
+      if (requestId !== compareRequestId || myRun !== runId || current !== res || state.compare !== p.id) return;
+      if (ser.years.length < MIN_YEARS) throw new Error(T('There is not enough {what} data for {where} in that period.', {
+        what: T(vr.name).toLowerCase(), where: T(p.short)
+      }));
       compareData = { id: p.id, v: vr.id, name: p.name, short: p.short, years: ser.years, values: ser.values,
         stats: S.analyze(ser.years, ser.values) };
       drawChart(current, false);
@@ -610,7 +619,7 @@
         verdictLabel(b.verdict).toLowerCase() + ', ' + esc(pEquals(b.mk.p)) + ').' + esc(comp) +
         (view.anom ? '' : ' <button type="button" class="link" id="to-anom">Show both as difference from average</button>');
     }).catch(function (e) {
-      if (myRun !== runId) return;
+      if (requestId !== compareRequestId || myRun !== runId || current !== res || state.compare !== p.id) return;
       compareData = null; drawChart(current, false);
       note.hidden = false; note.textContent = e.message;
     });
@@ -641,6 +650,7 @@
   }
 
   function loadVar2() {
+    var requestId = ++var2RequestId;
     fillVar2();
     var id = $('var2').value, host = $('var2-chart'), note = $('var2-note');
     host.innerHTML = ''; note.textContent = '';
@@ -648,7 +658,7 @@
     var res = current, vb = variable(id), myRun = runId;
     note.textContent = T('Loading {name} from NASA POWER…', { name: vname(vb).toLowerCase() });
     loadSeries(vb.id, { lat: res.lat, lon: res.lon, size: res.size, y0: res.y0, y1: res.y1, month: res.month }).then(function (ser) {
-      if (myRun !== runId) return;
+      if (requestId !== var2RequestId || myRun !== runId || current !== res || $('var2').value !== id) return;
       var ys = [], a = [], b = [];
       res.years.forEach(function (y, i) {
         var j = ser.years.indexOf(y);
@@ -665,13 +675,16 @@
       var det = T('After removing both long-term trends, the link is {s} (r = {r}), which shows how much of it is just two things changing over the same years.',
         { s: strength(rd).replace(/^(a|an) /, ''), r: rd.toFixed(2) });
       note.innerHTML = esc(lead) + ' ' + esc(det) + ' <span class="muted">' + esc(T('A link is not proof that one causes the other.')) + '</span>';
-    }).catch(function (e) { if (myRun === runId) note.textContent = e.message; });
+    }).catch(function (e) {
+      if (requestId === var2RequestId && myRun === runId && current === res && $('var2').value === id) note.textContent = e.message;
+    });
   }
 
   // ---- scan every variable -------------------------------------------------
 
   function scan() {
     if (!current) return;
+    var scanId = ++scanRequestId;
     var st = { lat: current.lat, lon: current.lon, size: current.size, y0: current.y0, y1: current.y1, month: current.month };
     var out = $('scan-out'), status = $('scan-status'), btn = $('scan');
     var myRun = runId;
@@ -684,55 +697,74 @@
       results.push({ vr: vr, stats: S.analyze(ser.years, ser.values), n: ser.years.length, y0: ser.years[0] });
     }
     function finish() {
-      if (myRun !== runId) return;
+      if (myRun !== runId || scanId !== scanRequestId) {
+        btn.disabled = false;
+        status.textContent = '';
+        return;
+      }
       btn.disabled = false;
       status.textContent = '';
       var ok = results.filter(function (r) { return !r.skip; }).sort(function (a, b) { return a.stats.mk.p - b.stats.mk.p; });
       var skipped = results.filter(function (r) { return r.skip; });
       var nsig = ok.filter(function (r) { return r.stats.verdict === 'significant'; }).length;
-      var html = '<p><strong>' + nsig + ' of ' + ok.length + '</strong> variables show a significant trend here. Click a name to open it.</p>' +
-        '<table class="leads"><thead><tr><th>Variable</th><th>Direction</th><th>Strength (tau)</th><th>Change per decade</th><th>Mann-Kendall p</th><th>Verdict</th></tr></thead><tbody>';
+      var html = '<p>' + esc(T('{sig} of {n} variables show a significant trend here. Click a name to open it.', {
+        sig: nsig, n: ok.length
+      })) + '</p>' +
+        '<table class="leads"><thead><tr><th>' + esc(T('Variable')) + '</th><th>' + esc(T('Direction')) +
+        '</th><th>' + esc(T('Strength (tau)')) + '</th><th>' + esc(T('Change per decade')) +
+        '</th><th>' + esc(T('Mann-Kendall p')) + '</th><th>' + esc(T('Verdict')) + '</th></tr></thead><tbody>';
       ok.forEach(function (r) {
-        var dir = r.stats.direction === 'up' ? '↑ rising' : (r.stats.direction === 'down' ? '↓ falling' : 'flat');
+        var dir = r.stats.direction === 'up' ? '↑ ' + T('rising')
+          : (r.stats.direction === 'down' ? '↓ ' + T('falling') : T('flat'));
         var tau = r.stats.mk.tau, w = Math.min(50, Math.abs(tau) * 50).toFixed(1);
-        html += '<tr><td><button type="button" class="link" data-v="' + r.vr.id + '">' + esc(r.vr.name) + '</button></td><td>' + dir +
+        html += '<tr><td><button type="button" class="link" data-v="' + r.vr.id + '">' + esc(T(r.vr.name)) + '</button></td><td>' + esc(dir) +
           '</td><td><span class="taubar' + (r.stats.verdict === 'none' ? ' faint' : '') + '" title="tau ' + tau.toFixed(2) + '"><i class="' + (tau < 0 ? 'neg' : 'pos') +
           '" style="width:' + w + '%"></i></span></td><td>' + esc(withUnit(signed(r.stats.sen.slope * 10, 2), r.vr.unit)) + '</td><td>' + esc(fmtP(r.stats.mk.p)) +
-          '</td><td><span class="badge badge-small badge-' + verdictClass(r.stats.verdict) + '">' + verdictLabel(r.stats.verdict) + '</span></td></tr>';
+          '</td><td><span class="badge badge-small badge-' + verdictClass(r.stats.verdict) + '">' + esc(T(verdictLabel(r.stats.verdict))) + '</span></td></tr>';
       });
       html += '</tbody></table>';
       if (skipped.length) {
-        html += '<p class="muted">Not enough data here for: ' + skipped.map(function (r) { return esc(r.vr.name.toLowerCase()); }).join(', ') + '.</p>';
+        var skippedNames = skipped.map(function (r) { return T(r.vr.name).toLowerCase(); }).join(', ');
+        html += '<p class="muted">' + esc(T('Not enough data here for: {items}.', { items: skippedNames })) + '</p>';
       }
-      html += '<p class="muted">With ' + ok.length + ' tests at the 0.05 level, expect about one false alarm in twenty even where nothing is changing. Treat this list as leads to investigate, not proof.</p>';
+      html += '<p class="muted">' + esc(T('With {n} tests at the 0.05 level, expect about one false alarm in twenty even where nothing is changing. Treat this list as leads to investigate, not proof.', {
+        n: ok.length
+      })) + '</p>';
       out.innerHTML = html;
     }
 
     if (!st.size) {
-      status.textContent = 'Scanning all ' + VARIABLES.length + ' variables…';
+      status.textContent = T('Scanning all {n} variables…', { n: VARIABLES.length });
       var ids = VARIABLES.map(prm).filter(function (v, i, a) { return a.indexOf(v) === i; }).join(',');
       fetchJson(urlFor(ids, st.lat, st.lon, 0)).then(function (json) {
         VARIABLES.forEach(function (vr) {
           add(vr, yearlySeries(monthlyTable(json, prm(vr)).table, st.y0, st.y1, st.month));
         });
         finish();
-      }).catch(function (e) { btn.disabled = false; status.textContent = e.message; });
+      }).catch(function (e) {
+        if (myRun !== runId || scanId !== scanRequestId) {
+          btn.disabled = false; status.textContent = '';
+          return;
+        }
+        btn.disabled = false; status.textContent = e.message;
+      });
       return;
     }
-    // Regional requests take one variable each, so run them two at a time.
+    // Regional requests take one variable each. Keep at most two in flight,
+    // below the requested 3–4 request ceiling and friendlier to NASA POWER.
     var queue = VARIABLES.slice(), done = 0;
     function next() {
-      if (myRun !== runId) { btn.disabled = false; return; }
+      if (myRun !== runId || scanId !== scanRequestId) { finish(); return; }
       var vr = queue.shift();
       if (!vr) return;
       loadSeries(vr.id, st).then(function (ser) { add(vr, ser); }, function () { results.push({ vr: vr, skip: true }); })
         .then(function () {
           done++;
-          status.textContent = 'Scanned ' + done + ' of ' + VARIABLES.length + ' variables…';
+          status.textContent = T('Scanned {done} of {n} variables…', { done: done, n: VARIABLES.length });
           if (done === VARIABLES.length) finish(); else next();
         });
     }
-    status.textContent = 'Scanning ' + VARIABLES.length + ' variables. This takes about half a minute for a box…';
+    status.textContent = T('Scanning {n} variables. This takes about half a minute for a box…', { n: VARIABLES.length });
     next(); next();
   }
 
@@ -896,7 +928,7 @@
   function writeHash() {
     var h = 'v=' + state.v + '&lat=' + state.lat + '&lon=' + state.lon + '&size=' + state.size +
       '&y0=' + state.y0 + '&y1=' + state.y1 + '&m=' + state.month + '&p=' + state.placeId +
-      (state.compare ? '&c=' + state.compare : '') + (view.anom ? '&a=1' : '') + (view.smooth ? '&s=1' : '') + (view.future ? '&f=1' : '');
+      (state.compare ? '&c=' + encodeURIComponent(state.compare) : '') + (view.anom ? '&a=1' : '') + (view.smooth ? '&s=1' : '') + (view.future ? '&f=1' : '');
     try { history.replaceState(null, '', '#' + h); } catch (e) { /* file preview: ignore */ }
   }
 
@@ -904,20 +936,35 @@
     var h = location.hash.replace(/^#/, '');
     if (!h) return false;
     var q = {};
-    h.split('&').forEach(function (kv) { var i = kv.indexOf('='); if (i > 0) q[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1)); });
+    try {
+      h.split('&').forEach(function (kv) {
+        var i = kv.indexOf('=');
+        if (i > 0) q[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1).replace(/\+/g, ' '));
+      });
+    } catch (e) { return false; }
     if (!q.v) return false;
     var vr = variable(q.v);
     state.v = vr.id; state.topic = vr.topic;
     var p = place(q.p);
     state.placeId = p ? p.id : 'custom';
-    state.lat = clamp(parseFloat(q.lat) || 0, -89.5, 89.5);
-    state.lon = clamp(parseFloat(q.lon) || 0, -180, 180);
-    var qs = parseInt(q.size, 10);
-    state.size = qs === 0 || (qs >= 2 && qs <= SIZE_MAX) ? qs : 2;
-    state.y0 = clamp(parseInt(q.y0, 10) || FIRST_YEAR, FIRST_YEAR, LAST_YEAR);
-    state.y1 = clamp(parseInt(q.y1, 10) || LAST_YEAR, FIRST_YEAR, LAST_YEAR);
-    state.month = clamp(parseInt(q.m, 10) || 0, 0, 16);
-    state.compare = place(q.c) || (q.c && q.c.indexOf('pt:') === 0) ? q.c : '';
+    var lat = Number(q.lat), lon = Number(q.lon);
+    state.lat = q.lat !== undefined && Number.isFinite(lat) ? clamp(lat, -89.5, 89.5) : (p ? p.lat : HOME.lat);
+    state.lon = q.lon !== undefined && Number.isFinite(lon) ? clamp(lon, -180, 180) : (p ? p.lon : HOME.lon);
+    var qs = Number(q.size);
+    state.size = qs === 0 || (Number.isInteger(qs) && qs >= 2 && qs <= SIZE_MAX) ? qs : 2;
+    var y0 = Number(q.y0), y1 = Number(q.y1);
+    var validYear = function (y) { return Number.isInteger(y) && y >= FIRST_YEAR && y <= LAST_YEAR; };
+    if (validYear(y0) && validYear(y1) && y0 <= y1) {
+      state.y0 = y0; state.y1 = y1;
+    } else {
+      state.y0 = FIRST_YEAR; state.y1 = LAST_YEAR;
+    }
+    var month = Number(q.m);
+    state.month = Number.isInteger(month) && month >= 0 && month <= 16 ? month : 0;
+    var compare = q.c || '';
+    var point = /^pt:([-+]?\d+(?:\.\d+)?),([-+]?\d+(?:\.\d+)?)$/.exec(compare);
+    var validPoint = point && Number(point[1]) >= -90 && Number(point[1]) <= 90 && Number(point[2]) >= -180 && Number(point[2]) <= 180;
+    state.compare = place(compare) || validPoint ? compare : '';
     view.future = q.f === '1';
     view.anom = q.a === '1';
     view.smooth = q.s === '1';
@@ -927,9 +974,10 @@
   function downloadCsv() {
     if (!current) return;
     var vr = current.variable, ols = current.stats.ols;
-    var lines = ['year,' + vr.id + (vr.unit ? ' (' + vr.unit + ')' : '') + ',trend_line'];
+    var csvCell = function (value) { return '"' + String(value).replace(/"/g, '""') + '"'; };
+    var lines = [[ 'year', vr.id + (vr.unit ? ' (' + vr.unit + ')' : ''), 'trend_line' ].map(csvCell).join(',')];
     current.years.forEach(function (y, i) {
-      lines.push(y + ',' + current.values[i].toFixed(4) + ',' + (ols.intercept + ols.slope * y).toFixed(4));
+      lines.push([y, current.values[i].toFixed(4), (ols.intercept + ols.slope * y).toFixed(4)].map(csvCell).join(','));
     });
     var a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([lines.join('\n') + '\n'], { type: 'text/csv' }));

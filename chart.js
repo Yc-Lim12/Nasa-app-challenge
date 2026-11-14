@@ -466,10 +466,17 @@
         (t > 0 ? '+' : t < 0 ? '−' : '') + Math.abs(t).toFixed(dp)));
     });
     svg.appendChild(svgEl('line', { x1: m.l, x2: m.l + iw, y1: sy(0), y2: sy(0), class: 'zero-solid' }));
-    var every = f1 - f0 > 30 ? 10 : (f1 - f0 > 12 ? 5 : 2);
+    // A label every 5 years (2 for short records), plus the first and last start year so
+    // the axis shows exactly where the dots begin and end. A 5-year label too close to
+    // either end on screen (less than a label's width, ~34 px) is left out so labels never overlap.
+    var every = f1 - f0 > 12 ? 5 : 2, ticks = [f0], gap = 34;
     for (var y = Math.ceil(f0 / every) * every; y <= f1; y += every) {
-      svg.appendChild(svgEl('text', { x: sx(y), y: H - 18, 'text-anchor': 'middle', class: 'tick' }, y));
+      if (sx(y) - sx(f0) >= gap && sx(f1) - sx(y) >= gap) ticks.push(y);
     }
+    if (f1 !== f0) ticks.push(f1);
+    ticks.forEach(function (t) {
+      svg.appendChild(svgEl('text', { x: sx(t), y: H - 18, 'text-anchor': 'middle', class: 'tick' }, t));
+    });
     svg.appendChild(svgEl('text', { x: m.l + iw / 2, y: H - 3, 'text-anchor': 'middle', class: 'axis-title' }, T('Start year')));
 
     // one error bar per start year; filled when the 95% interval excludes zero. Click to test that period.

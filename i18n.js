@@ -73,7 +73,7 @@
     'Significant': 'Signifikan', 'No clear trend': 'Tiada tren jelas',
 
     // ---- evidence tiles ----
-    'per decade': 'sedekad', 'Rate of change': 'Kadar perubahan', 'Total change': 'Jumlah perubahan',
+    'per decade': 'sedekad', 'Rate of change': 'Kadar perubahan', 'Straight-line rate': 'Kadar garis lurus', 'Total change': 'Jumlah perubahan',
     'Slope of the straight line through the points. With 95% confidence the true rate is between {a} and {b}.':
       'Kecerunan garis lurus melalui titik-titik. Dengan keyakinan 95%, kadar sebenar adalah antara {a} dan {b}.',
     'Along the trend line from {a} to {b} ({n} years of data).': 'Sepanjang garis tren dari {a} hingga {b} ({n} tahun data).',
@@ -580,6 +580,10 @@
       'Bagi tempat, pemboleh ubah dan tempoh yang dipilih, Trend Detective menukar data bulanan NASA kepada satu nilai setahun (purata dua belas bulan, satu bulan yang dipilih, atau satu musim tiga bulan; Disember hingga Februari mengambil Disember daripada tahun sebelumnya) dan bertanya: adakah terdapat kenaikan atau penurunan yang konsisten, berapa cepat ia berlaku, dan mungkinkah ia hanya kebetulan?',
     'For a chosen place, variable and period, Trend Detective turns NASA’s monthly data into one value per year (the mean of the twelve months weighted by their number of days, as NASA POWER computes its own annual values; one chosen month; or a three-month season, also weighted by days; December to February takes December from the year before) and asks: is there a steady rise or fall, how fast is it, and could it be chance?':
       'Bagi tempat, pemboleh ubah dan tempoh yang dipilih, Trend Detective menukar data bulanan NASA kepada satu nilai setahun (purata dua belas bulan yang diberi pemberat mengikut bilangan hari, seperti cara NASA POWER mengira nilai tahunannya sendiri; satu bulan yang dipilih; atau satu musim tiga bulan, juga diberi pemberat mengikut hari; Disember hingga Februari mengambil Disember daripada tahun sebelumnya) dan bertanya: adakah terdapat kenaikan atau penurunan yang konsisten, berapa cepat ia berlaku, dan mungkinkah ia hanya kebetulan?',
+    '{y} left out: before {f} this variable comes from a different satellite dataset (GEWEX SRB) that does not match the later one (CERES), and the jump between them would look like a trend.':
+      '{y} tidak digunakan: sebelum {f} pemboleh ubah ini datang daripada set data satelit yang berbeza (GEWEX SRB) yang tidak sepadan dengan set data kemudian (CERES), dan lonjakan antara keduanya akan kelihatan seperti tren.',
+    '<strong>Sunlight and cloud cover start in 2001.</strong> The two datasets do not match where they join: over Kuala Lumpur, cloud cover jumps from about 75% to 85% in 2001. A trend test across the join would report that jump as a trend, so these two variables use CERES only, from 2001.':
+      '<strong>Cahaya matahari dan litupan awan bermula pada 2001.</strong> Kedua-dua set data tidak sepadan di titik sambungannya: di atas Kuala Lumpur, litupan awan melonjak daripada kira-kira 75% kepada 85% pada 2001. Ujian tren merentasi sambungan itu akan melaporkan lonjakan tersebut sebagai tren, jadi kedua-dua pemboleh ubah ini hanya menggunakan CERES, dari 2001.',
     'Data sources':
       'Sumber data',
     '<strong>NASA POWER</strong> (Prediction Of Worldwide Energy Resources), NASA Langley Research Center, monthly API, 1981 onwards. <a href="https://power.larc.nasa.gov/" target="_blank" rel="noopener">power.larc.nasa.gov</a>':

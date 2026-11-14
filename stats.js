@@ -88,7 +88,8 @@
 
   /** Two-sided p-value for a standard normal z score. */
   function normPValue(z) {
-    return erfc(Math.abs(z) / Math.SQRT2);
+    // erfc's tiny approximation error can push p a hair above 1 at z = 0
+    return Math.min(1, erfc(Math.abs(z) / Math.SQRT2));
   }
 
   function mean(a) {

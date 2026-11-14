@@ -292,15 +292,32 @@
       if (!show) { badgeEl.style('display', 'none'); return; }
       var xy = proj([sel.lon, sel.lat]);
       var r = node.getBoundingClientRect(), sx = r.width / W || 1;
-      var y = xy[1] * sx;
-      badgeEl.style('display', null).style('left', xy[0] * sx + 'px')
-        .classed('flip', xy[0] > (W - inset) * (W - inset < 600 ? 0.5 : 0.62));
-      // keep a tall card on screen; the connector line still points at the place
-      if (badgeH === null) badgeH = badgeEl.node().offsetHeight;
-      var half = badgeH / 2 + 12, top = Math.max(half, Math.min(r.height - half, y));
-      badgeEl.style('top', top + 'px').style('--dy', (y - top) + 'px');
+      var x = xy[0] * sx, y = xy[1] * sx, avail = (W - inset) * sx, gap = 24, edge = 8;
+      badgeEl.style('display', null);
+      if (badgeH === null) { var bn = badgeEl.node(); badgeH = bn.offsetHeight; badgeW = bn.offsetWidth; }
+      // Beside the place, on the side with more room. On a narrow screen where
+      // neither side fits, sit just below (or above) the place instead.
+      var flip = x > avail * (avail < 600 ? 0.5 : 0.62);
+      var fits = function (l) { return l >= edge && l + badgeW <= avail - edge; };
+      var left = flip ? x - gap - badgeW : x + gap, under = false;
+      if (!fits(left)) {
+        var other = flip ? x + gap : x - gap - badgeW;
+        if (fits(other)) { left = other; flip = !flip; } else under = true;
+      }
+      var top, half = badgeH / 2;
+      if (under) {
+        left = Math.max(edge, Math.min(avail - edge - badgeW, x - badgeW / 2));
+        top = y + 22 + half;                                   // below the pin
+        if (top + half > r.height - edge) top = y - 22 - half; // or above it
+        top = Math.max(half + edge, Math.min(r.height - half - edge, top));
+      } else {
+        // keep a tall card on screen; the connector line still points at the place
+        top = Math.max(half + 12, Math.min(r.height - half - 12, y));
+      }
+      badgeEl.classed('flip', flip && !under).classed('under', under)
+        .style('left', left + 'px').style('top', top + 'px').style('--dy', (y - top) + 'px');
     }
-    var badgeH = null;   // measured once per badge, not on every frame
+    var badgeH = null, badgeW = 0;   // measured once per badge, not on every frame
 
     /** A small chart of the yearly values and their trend line, inside the badge. */
     function sparkline(sp) {
@@ -322,7 +339,7 @@
     }
 
     function setBadge(b) {
-      badge = b; badgeH = null;
+      badge = b; badgeH = null; badgeW = 0;
       if (b) {
         badgeEl.attr('class', 'g-badge ' + (b.cls || '') + (b.spark ? ' g-card' : '')).html('');
         if (b.place) badgeEl.append('small').attr('class', 'g-badge-place').text(b.place);

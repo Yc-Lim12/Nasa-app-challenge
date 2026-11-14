@@ -4,8 +4,9 @@ Check the website's statistics (stats.js) against SciPy and textbook formulas.
     pip install -r tools/requirements.txt
     python tools/validate_stats.py
 
-Every number the website reports is recomputed independently here and compared.
-Exit code 0 means every check passed.
+Every number the website reports is recomputed independently here and compared:
+the plain tests against SciPy, and the year-to-year memory adjustment against the
+formulas in the Methods section. Exit code 0 means every check passed.
 """
 import sys
 
@@ -28,86 +29,90 @@ def mann_kendall(y):
     _, counts = np.unique(y, return_counts=True)
     ties = sum(c * (c - 1) * (2 * c + 5) for c in counts if c > 1)
     var = (n * (n - 1) * (2 * n + 5) - ties) / 18
-    z = 0.0 if s == 0 else (s - np.sign(s)) / np.sqrt(var)
-    return s, var, z, 2 * stats.norm.sf(abs(z))
+    return s, var
 
 
-def ar1_factor(r1, n):
-    """n / n* for AR(1) data (Matalas & Langbein 1962; Yue & Wang 2004)."""
-    if r1 <= 0:
-        return 1.0
-    k = np.arange(1, n)
-    return 1 + 2 * np.sum((1 - k / n) * r1 ** k)
+def z_of(s, var):
+    return 0.0 if s == 0 else (s - np.sign(s)) / np.sqrt(var)
 
 
-def reference(x, y, ar1=False):
+def reference(x, y):
     x, y = np.asarray(x, float), np.asarray(y, float)
     n = len(x)
     lr = stats.linregress(x, y)
     resid = y - (lr.intercept + lr.slope * x)
-    lag1 = np.sum(resid[1:] * resid[:-1]) / np.sum(resid ** 2)
-    s, var, z, p_mk = mann_kendall(y)
-    se, df, p_t = lr.stderr, n - 2, lr.pvalue
-    if ar1:
-        f = ar1_factor(min(0.95, lag1), n)
-        if f > 1:
-            var *= f
-            z = 0.0 if s == 0 else (s - np.sign(s)) / np.sqrt(var)
-            p_mk = 2 * stats.norm.sf(abs(z))
-            se = lr.stderr * np.sqrt(f)
-            df = max(2, round(n / f) - 2)
-            p_t = 2 * stats.t.sf(abs(lr.slope / se), df)
-    tc = stats.t.ppf(0.975, df)
-    ts = stats.theilslopes(y, x)
+    # memory: Pearson correlation of each residual with the next, plus the
+    # small-sample bias correction, kept between 0 and 0.95
+    lag1 = np.corrcoef(resid[:-1], resid[1:])[0, 1]
+    r = min(max(lag1 + (1 + 4 * lag1) / n, 0.0), 0.95)
+    n_eff = n * (1 - r) / (1 + r)
+    df, df_adj = n - 2, max(n_eff - 2, 1)
+    se_adj = lr.stderr * np.sqrt(df / df_adj)
+    p_adj = 2 * stats.t.sf(abs(lr.slope / se_adj), df_adj)
+    half = stats.t.ppf(0.975, df_adj) * se_adj
+    s, var = mann_kendall(y)
+    z = z_of(s, var)
+    var_adj = var * n / n_eff
+    z_adj = z_of(s, var_adj)
+    ts = stats.theilslopes(y, x)       # median of pairwise slopes; intercept median(y) - slope * median(x)
+    # Sen's 95% range from the sorted pairwise slopes and the adjusted MK variance (Sen 1968)
+    slopes = np.sort([(y[j] - y[i]) / (x[j] - x[i]) for i in range(n - 1) for j in range(i + 1, n) if x[j] != x[i]])
+    N, w = len(slopes), 1.959963984540054 * np.sqrt(var_adj)
+    lo = slopes[max(int(np.round((N - w) / 2)) - 1, 0)]
+    hi = slopes[min(int(np.round((N + w) / 2)), N - 1)]
     return {
-        "ols.slope": lr.slope, "ols.intercept": lr.intercept, "ols.se": se, "ols.p": p_t,
-        "ols.ciLow": lr.slope - tc * se, "ols.ciHigh": lr.slope + tc * se, "ols.r2": lr.rvalue ** 2,
-        "ols.lag1": lag1,
-        "mk.S": s, "mk.varS": var, "mk.z": z, "mk.p": p_mk, "mk.tau": s / (n * (n - 1) / 2),
-        # Sen's slope: SciPy's theilslopes is the median of pairwise slopes, the same definition.
-        # (SciPy's intercept uses a different convention, so the intercept is checked directly.)
-        "sen.slope": ts.slope, "sen.intercept": np.median(y - ts.slope * x),
+        "ols.slope": lr.slope, "ols.intercept": lr.intercept, "ols.se": lr.stderr, "ols.p": lr.pvalue,
+        "ols.r2": lr.rvalue ** 2, "ols.lag1": lag1, "ols.lag1Adj": r, "ols.nEff": n_eff,
+        "ols.seAdj": se_adj, "ols.pAdj": p_adj, "ols.ciLow": lr.slope - half, "ols.ciHigh": lr.slope + half,
+        "mk.S": s, "mk.varS": var, "mk.z": z, "mk.p": 2 * stats.norm.sf(abs(z)), "mk.tau": s / (n * (n - 1) / 2),
+        "mk.varSAdj": var_adj, "mk.zAdj": z_adj, "mk.pAdj": 2 * stats.norm.sf(abs(z_adj)),
+        "sen.slope": ts.slope, "sen.intercept": ts.intercept, "sen.ciLow": lo, "sen.ciHigh": hi,
     }
 
 
 # ---- test series --------------------------------------------------------------
 
+def ar1(rng, n, phi):
+    e = np.zeros(n)
+    for k in range(1, n):
+        e[k] = phi * e[k - 1] + rng.normal()
+    return e
+
+
 def make_cases():
     rng = np.random.default_rng(2026)
     cases = []
     years = np.arange(1981, 2026)
-    for i in range(12):                                   # yearly, white noise, with and without a trend
+    for i in range(12):                                   # yearly, with and without a trend
         slope = [0, 0.01, 0.02, -0.03][i % 4]
-        cases.append(("yearly white noise #%d" % i, years, 26 + slope * (years - 1981) + rng.normal(0, 0.3, len(years)), False))
+        cases.append(("yearly white noise #%d" % i, years, 26 + slope * (years - 1981) + rng.normal(0, 0.3, len(years))))
+    for i, phi in enumerate([0.3, 0.6]):                  # yearly with year-to-year memory
+        cases.append(("yearly AR(1) phi=%.1f" % phi, years, 0.01 * (years - 1981) + 0.3 * ar1(rng, len(years), phi)))
     for i in range(4):                                    # ties: values rounded to one decimal
-        cases.append(("yearly with ties #%d" % i, years, np.round(5 + 0.01 * (years - 1981) + rng.normal(0, 0.2, len(years)), 1), False))
+        cases.append(("yearly with ties #%d" % i, years, np.round(5 + 0.01 * (years - 1981) + rng.normal(0, 0.2, len(years)), 1)))
     short = np.arange(2010, 2020)                         # the shortest record the app accepts
-    cases.append(("10 years only", short, 1 + 0.05 * (short - 2010) + rng.normal(0, 0.1, 10), False))
-    t = 1981 + (np.arange(540) + 0.5) / 12                # monthly, AR(1) noise, autocorrelation-corrected
-    for i, phi in enumerate([0.0, 0.3, 0.6, 0.8]):
-        e = np.zeros(540)
-        for k in range(1, 540):
-            e[k] = phi * e[k - 1] + rng.normal()
-        cases.append(("monthly AR(1) phi=%.1f, corrected" % phi, t, 0.015 * (t - 1981) + e, True))
+    cases.append(("10 years only", short, 1 + 0.05 * (short - 2010) + rng.normal(0, 0.1, 10)))
+    t = 1981 + (np.arange(540) + 0.5) / 12                # monthly, seasonal cycle removed
+    for phi in [0.0, 0.3, 0.6, 0.8]:
+        cases.append(("monthly AR(1) phi=%.1f" % phi, t, 0.015 * (t - 1981) + ar1(rng, 540, phi)))
     return cases
 
 
 def main():
     cases = make_cases()
-    js = run_js([{"x": x, "y": y, "opts": {"ar1": True} if ar1 else None} for _, x, y, ar1 in cases])
+    js = run_js([{"x": x, "y": y} for _, x, y in cases])
     failures, checks = [], 0
-    for (name, x, y, ar1), got in zip(cases, js):
-        ref = reference(x, y, ar1)
-        for key, want in ref.items():
+    for (name, x, y), got in zip(cases, js):
+        for key, want in reference(x, y).items():
             part, field = key.split(".")
             have = got[part][field]
             checks += 1
-            if key.endswith(".p"):
+            if key.endswith(".p") or key.endswith("pAdj"):
                 ok = abs(have - want) <= P_TOL
             else:
                 ok = abs(have - want) <= TOL * max(1.0, abs(want))
             if not ok:
-                failures.append("%-38s %-14s stats.js=%.10g reference=%.10g" % (name, key, have, want))
+                failures.append("%-28s %-14s stats.js=%.10g reference=%.10g" % (name, key, have, want))
     print("Checked %d numbers on %d series against SciPy %s." % (checks, len(cases), __import__("scipy").__version__))
     if failures:
         print("%d MISMATCHES:" % len(failures))

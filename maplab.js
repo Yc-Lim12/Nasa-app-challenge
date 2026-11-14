@@ -145,14 +145,14 @@
         var b = cellBounds(c), r = c.stats.sen.slope * 10, t = Math.max(-1, Math.min(1, r / lim));
         b.fill = d3.interpolateRdBu(0.5 - t / 2);
         b.opacity = 0.82;
-        b.dot = c.stats.mk.p < 0.05;
+        b.dot = c.stats.mk.pAdj < 0.05;   // memory-adjusted, as in the main verdict
         return b;
       });
       TD.globe.setCellStyle(CELLS.mode, CELLS.alpha);
       TD.globe.setCells(list);
 
-      var up = ok.filter(function (c) { return c.stats.mk.p < 0.05 && c.stats.sen.slope > 0; });
-      var dn = ok.filter(function (c) { return c.stats.mk.p < 0.05 && c.stats.sen.slope < 0; });
+      var up = ok.filter(function (c) { return c.stats.mk.pAdj < 0.05 && c.stats.sen.slope > 0; });
+      var dn = ok.filter(function (c) { return c.stats.mk.pAdj < 0.05 && c.stats.sen.slope < 0; });
       var html = '<div class="lp-head"><strong>' + esc(T('Trend map')) + '</strong><span>' + esc(TD.vname(vr)) + ', ' +
         TD.state.y0 + '–' + TD.state.y1 + (TD.state.month ? ', ' + esc(T(TD.MONTHS[TD.state.month])) : '') + '</span></div>';
       html += boxCtl() + cellCtl();

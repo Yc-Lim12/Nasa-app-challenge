@@ -87,13 +87,15 @@ box, grid cells are averaged with cos(latitude) weights. Years with any missing 
 - Mann-Kendall test with tie correction and continuity correction. The verdict uses this
   test: p < 0.05 is "significant", p < 0.10 is "borderline".
 - Sen's slope (median of all pairwise slopes) for the reported rate of change.
+- Both tests are adjusted for year-to-year memory (lag-1 autocorrelation, effective
+  sample size n* = n(1 − r)/(1 + r) with a small-sample bias correction); the verdict uses
+  the memory-adjusted Mann-Kendall p-value. `stats.js` by Ryan.
 - Optional monthly mode: each month minus its calendar-month average (seasonal cycle
-  removed), with both tests corrected for lag-1 autocorrelation (effective sample size,
-  Matalas & Langbein 1962; Yue & Wang 2004).
+  removed), tested with the same adjustment.
 - Areas over 10° are fetched from NASA POWER as tiles of at most 10° and merged.
 
-Limits: linear trends only; yearly values are not corrected for autocorrelation (the page
-warns when it is strong); areas up to 20° × 20°, no whole-world average.
+Limits: linear trends only; the memory adjustment uses lag-1 autocorrelation only; areas
+up to 20° × 20°, no whole-world average.
 
 ## Validation (Python)
 

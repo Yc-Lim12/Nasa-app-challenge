@@ -98,8 +98,8 @@
 
     function trendAt(x) { return ols.intercept + ols.slope * x - base; }
     function ctrendAt(x) { return cols.intercept + cols.slope * x - cbase; }
-    function half(x) {   // bandScale widens the band when the tests were corrected for autocorrelation
-      return ols.tCrit * ols.residualSE * (ols.bandScale || 1) * Math.sqrt(1 / ols.n + Math.pow(x - ols.meanX, 2) / ols.sxx);
+    function half(x) {   // stats.js scales tCrit so the band is already adjusted for year-to-year memory
+      return ols.tCrit * ols.residualSE * Math.sqrt(1 / ols.n + Math.pow(x - ols.meanX, 2) / ols.sxx);
     }
     var a0 = yrs[0], a1 = yrs[yrs.length - 1];
     var FUT = view.future ? 10 : 0, f1 = a1 + FUT;
@@ -401,7 +401,7 @@
         narrow ? MONTH_SHORT[i].charAt(0) : MONTH_SHORT[i]));
       function showTip() {
         var html = '<strong>' + MONTHS[r.m] + '</strong>' + (r.st
-          ? '<span>' + esc(ratePhrase(r.st, vr)) + '</span><span>' + verdictLabel(r.st.verdict) + ', ' + esc(pEquals(r.st.mk.p)) + '</span>'
+          ? '<span>' + esc(ratePhrase(r.st, vr)) + '</span><span>' + verdictLabel(r.st.verdict) + ', ' + esc(pEquals(r.st.mk.pAdj)) + '</span>'
           : '<span>Not enough data</span>') + '<span><em>' + (on ? 'Click to go back to the whole year' : 'Click to investigate this month') + '</em></span>';
         tip.show(html, cx, barTop, svg, W);
       }

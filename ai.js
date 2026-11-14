@@ -59,14 +59,14 @@
       lat: r.lat, lon: r.lon, area: r.cells > 1 ? r.cells + ' grid cells averaged' : 'one grid cell',
       season: r.month ? TD.MONTHS[r.month] + ' only' : 'whole year',
       first_year: y0, last_year: y1, years_of_data: monthly ? perYear.length : n,
-      time_step: monthly ? 'monthly values with the seasonal cycle removed (each month minus its calendar-month mean); tests corrected for lag-1 autocorrelation' : 'one value per year',
-      effective_sample_size: st.adj ? Math.round(st.adj.nEff) : undefined,
+      time_step: monthly ? 'monthly values with the seasonal cycle removed (each month minus its calendar-month mean); both tests adjusted for lag-1 autocorrelation' : 'one value per year; both tests adjusted for lag-1 autocorrelation',
+      effective_sample_size: Math.round(st.ols.nEff),
       sen_slope_per_decade: +num(st.sen.slope * 10, 4),
       total_change_along_trend: +num(st.sen.slope * span, 4),
       ols_slope_per_decade: +num(st.ols.slope * 10, 4),
       ols_95ci_per_decade: [+num(st.ols.ciLow * 10, 4), +num(st.ols.ciHigh * 10, 4)],
-      mann_kendall_p: +st.mk.p.toPrecision(3), kendall_tau: +num(st.mk.tau, 3),
-      t_test_p: +st.ols.p.toPrecision(3), r_squared: +num(st.ols.r2, 3), lag1_autocorrelation: +num(st.ols.lag1, 3),
+      mann_kendall_p_memory_adjusted: +st.mk.pAdj.toPrecision(3), kendall_tau: +num(st.mk.tau, 3),
+      t_test_p_memory_adjusted: +st.ols.pAdj.toPrecision(3), r_squared: +num(st.ols.r2, 3), lag1_autocorrelation: +num(st.ols.lag1, 3),
       verdict: st.verdict, direction: st.direction,
       unusual_years: (r.spikes || []).map(function (s) { return s.year; }),
       yearly_values: perYear
@@ -96,7 +96,7 @@
           ' kira-kira ' + total + ' secara keseluruhan, iaitu lebih kurang ' + dec + ' setiap 10 tahun.') });
 
     // 2. is it real?
-    var p = st.mk.p, real;
+    var p = st.mk.pAdj, real;
     if (st.verdict === 'significant') {
       real = L('Very likely real. If nothing were actually changing, a pattern this steady would turn up by luck only ' + oneIn(p) + '. Scientists call anything rarer than 1 in 20 "statistically significant".',
         'Besar kemungkinan benar. Jika tiada apa-apa yang berubah, corak sekukuh ini hanya akan muncul secara kebetulan ' + oneIn(p) + '. Saintis menganggap apa-apa yang lebih jarang daripada 1 dalam 20 sebagai "signifikan secara statistik".');
@@ -119,10 +119,15 @@
     var warn = [];
     if (f.unusual_years.length) warn.push(L(f.unusual_years.join(', ') + (f.unusual_years.length > 1 ? ' stood out as unusual one-off years.' : ' stood out as an unusual one-off year.') + ' One extreme year is a spike, not a trend.',
       f.unusual_years.join(', ') + ' menonjol sebagai tahun luar biasa. Satu tahun ekstrem ialah lonjakan, bukan tren.'));
-    if (f.effective_sample_size) warn.push(L('Neighbouring months look alike, so the ' + f.yearly_values.length + ' years of monthly data count as about ' + f.effective_sample_size + ' independent values. The tests were corrected for this.',
-      'Bulan bersebelahan kelihatan serupa, jadi data bulanan ' + f.yearly_values.length + ' tahun dikira sebagai kira-kira ' + f.effective_sample_size + ' nilai bebas. Ujian telah dibetulkan untuk ini.'));
-    else if (Math.abs(f.lag1_autocorrelation) > 2 / Math.sqrt(f.years_of_data)) warn.push(L('Each year tends to look like the year before, which can make a trend look more certain than it is.',
-      'Setiap tahun cenderung menyerupai tahun sebelumnya, jadi tren mungkin kelihatan lebih pasti daripada sebenarnya.'));
+    // stats.js adjusts the tests for year-to-year memory; mention it when it mattered
+    var nPts = r.years.length;
+    if (f.effective_sample_size < nPts * 0.67) {
+      var mon = r.step === 'month';
+      warn.push(L((mon ? 'Neighbouring months look alike, so the ' + nPts + ' monthly values' : 'Each year looks a lot like the year before, so the ' + nPts + ' years') +
+        ' count as only about ' + f.effective_sample_size + ' independent values. The tests were adjusted for this.',
+        (mon ? 'Bulan bersebelahan kelihatan serupa, jadi ' + nPts + ' nilai bulanan' : 'Setiap tahun hampir sama dengan tahun sebelumnya, jadi ' + nPts + ' tahun') +
+        ' dikira sebagai kira-kira ' + f.effective_sample_size + ' nilai bebas sahaja. Ujian telah diselaraskan untuk ini.'));
+    }
     if (warn.length) out.push({ title: L('Be careful', 'Berhati-hati'), text: warn.join(' ') });
 
     // 5. what the tests are

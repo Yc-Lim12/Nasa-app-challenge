@@ -194,6 +194,11 @@
     'Scanning every variable works for areas up to 10° × 10°. A bigger area would need dozens of slow requests. Choose a smaller area, or test variables one at a time.':
       'Imbasan semua pemboleh ubah berfungsi untuk kawasan sehingga 10° × 10°. Kawasan lebih besar memerlukan berpuluh permintaan yang perlahan. Pilih kawasan lebih kecil, atau uji satu pemboleh ubah pada satu masa.',
     'Peninsular Malaysia': 'Semenanjung Malaysia', 'all of Malaysia (with the sea between)': 'seluruh Malaysia (termasuk laut di antaranya)', 'Malaysia': 'Malaysia',
+    'Adjusted for year-to-year memory.': 'Diselaraskan untuk ingatan dari tahun ke tahun.',
+    'Neighbouring months are alike (lag-1 autocorrelation {r}), so {n} monthly values carry about as much independent information as {e}. Both tests were adjusted for this.':
+      'Bulan-bulan bersebelahan adalah serupa (autokorelasi lag-1 {r}), jadi {n} nilai bulanan membawa maklumat bebas lebih kurang sama seperti {e}. Kedua-dua ujian telah diselaraskan untuk ini.',
+    'Each year here resembles the year before it (lag-1 autocorrelation {r}), so {n} years carry about as much independent information as {e}. Both tests were adjusted for this.':
+      'Setiap tahun di sini menyerupai tahun sebelumnya (autokorelasi lag-1 {r}), jadi {n} tahun membawa maklumat bebas lebih kurang sama seperti {e}. Kedua-dua ujian telah diselaraskan untuk ini.',
     'Grid cells': 'Sel grid', 'Smooth': 'Licin', 'Opacity': 'Kelegapan', 'How to draw the grid': 'Cara melukis grid',
     'Guided stories': 'Kisah berpandu', 'World story': 'Kisah dunia',
     'Wildfire smoke over Wisconsin': 'Asap kebakaran hutan di Wisconsin', 'Summer haze far from the fires': 'Jerebu musim panas jauh dari kebakaran',

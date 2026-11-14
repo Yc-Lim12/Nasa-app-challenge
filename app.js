@@ -398,9 +398,13 @@
   function seriesOf(table, st) {
     return st.step === 'month' ? monthlyAnomalies(table, st.y0, st.y1, st.month) : yearlySeries(table, st.y0, st.y1, st.month);
   }
-  /** The tests for a series; monthly data is corrected for autocorrelation. */
+  /**
+   * The tests for a series. stats.js (Ryan) adjusts both tests for year-to-year
+   * memory (lag-1 autocorrelation) for every series, yearly or monthly; the verdict
+   * uses the memory-adjusted Mann-Kendall p-value (mk.pAdj).
+   */
   function analyzeFor(st, years, values) {
-    return S.analyze(years, values, st.step === 'month' ? { ar1: true } : null);
+    return S.analyze(years, values);
   }
   /** Distinct calendar years in a series (months share a year). */
   function yearCount(ser) {
@@ -636,9 +640,10 @@
     tiles += tile(T('Total change'), esc(withUnit(signed(total, 2), vr.unit)),
       esc(monthly ? T('Along the trend line from {a} to {b} ({n} months of data).', { a: whenLabel(res.years[0]), b: whenLabel(res.years[n - 1]), n: n })
         : T('Along the trend line from {a} to {b} ({n} years of data).', { a: res.years[0], b: res.years[n - 1], n: n })), 1);
-    tiles += tile(T('Mann-Kendall test'), esc(pEquals(st.mk.p)),
-      esc(T('Checks whether later years are mostly higher or lower than earlier ones. Below 0.05 counts as significant. Kendall’s tau is {t} (1 is always rising, −1 always falling).', { t: st.mk.tau.toFixed(2) })), 2);
-    tiles += tile(T('t-test on the slope'), esc(pEquals(st.ols.p)),
+    tiles += tile(T('Mann-Kendall test'), esc(pEquals(st.mk.pAdj)),
+      esc(T('Checks whether later years are mostly higher or lower than earlier ones. Below 0.05 counts as significant. Kendall’s tau is {t} (1 is always rising, −1 always falling).', { t: st.mk.tau.toFixed(2) })) +
+      ' ' + esc(T('Adjusted for year-to-year memory.')), 2);
+    tiles += tile(T('t-test on the slope'), esc(pEquals(st.ols.pAdj)),
       esc(T('The chance of seeing a slope this steep if there were really no trend. The line explains {r}% of the year-to-year variation.', { r: Math.round(st.ols.r2 * 100) })), 3);
     tiles += tile(T('Sen’s slope'), esc(withUnit(signed(st.sen.slope * 10, 2), vr.unit)) + perDec,
       esc(T('The middle value of the slopes between every pair of years. One freak year barely moves it.')), 4);
@@ -649,15 +654,12 @@
     $('tiles').innerHTML = tiles;
     if (fresh) replay($('tiles')); else $('tiles').classList.remove('reveal');
 
-    var note = '';
-    if (st.adj) {
-      note = st.adj.f > 1
-        ? T('Neighbouring months are alike (lag-1 autocorrelation {r}), so {n} monthly values carry about as much independent information as {e}. Both tests were corrected for this.',
-          { r: st.adj.r1.toFixed(2), n: n, e: Math.round(st.adj.nEff) })
-        : T('Neighbouring months are not alike here, so no correction for autocorrelation was needed.');
-    } else if (Math.abs(st.ols.lag1) > 2 / Math.sqrt(n)) {
-      note = 'Heads up: each year here resembles the year before it (lag-1 autocorrelation ' + st.ols.lag1.toFixed(2) +
-        '). That can make a trend look more certain than it is, so treat the p-values with some caution.';
+    // stats.js adjusts both tests for memory; say so when it made a real difference
+    var note = '', o = st.ols;
+    if (o.nEff < n * 0.67) {   // only when memory is strong enough to matter
+      note = T(monthly ? 'Neighbouring months are alike (lag-1 autocorrelation {r}), so {n} monthly values carry about as much independent information as {e}. Both tests were adjusted for this.'
+        : 'Each year here resembles the year before it (lag-1 autocorrelation {r}), so {n} years carry about as much independent information as {e}. Both tests were adjusted for this.',
+        { r: o.lag1.toFixed(2), n: n, e: Math.max(2, Math.round(o.nEff)) });
     }
     $('caution').textContent = note;
     $('caution').hidden = !note;
@@ -812,7 +814,7 @@
       }
       note.hidden = false;
       note.innerHTML = '<strong>' + esc(p.short) + ':</strong> ' + dir + ' by about ' + esc(ratePhrase(b, vr)) + ' (' +
-        verdictLabel(b.verdict).toLowerCase() + ', ' + esc(pEquals(b.mk.p)) + ').' + esc(comp) +
+        verdictLabel(b.verdict).toLowerCase() + ', ' + esc(pEquals(b.mk.pAdj)) + ').' + esc(comp) +
         (view.anom ? '' : ' <button type="button" class="link" id="to-anom">Show both as difference from average</button>');
     }).catch(function (e) {
       if (myRun !== runId) return;
@@ -898,7 +900,7 @@
       if (myRun !== runId) return;
       btn.disabled = false;
       status.textContent = '';
-      var ok = results.filter(function (r) { return !r.skip; }).sort(function (a, b) { return a.stats.mk.p - b.stats.mk.p; });
+      var ok = results.filter(function (r) { return !r.skip; }).sort(function (a, b) { return a.stats.mk.pAdj - b.stats.mk.pAdj; });
       var skipped = results.filter(function (r) { return r.skip; });
       var nsig = ok.filter(function (r) { return r.stats.verdict === 'significant'; }).length;
       var html = '<p><strong>' + nsig + ' of ' + ok.length + '</strong> variables show a significant trend here. Click a name to open it.</p>' +
@@ -908,7 +910,7 @@
         var tau = r.stats.mk.tau, w = Math.min(50, Math.abs(tau) * 50).toFixed(1);
         html += '<tr><td><button type="button" class="link" data-v="' + r.vr.id + '">' + esc(r.vr.name) + '</button></td><td>' + dir +
           '</td><td><span class="taubar' + (r.stats.verdict === 'none' ? ' faint' : '') + '" title="tau ' + tau.toFixed(2) + '"><i class="' + (tau < 0 ? 'neg' : 'pos') +
-          '" style="width:' + w + '%"></i></span></td><td>' + esc(withUnit(signed(r.stats.sen.slope * 10, 2), r.vr.unit)) + '</td><td>' + esc(fmtP(r.stats.mk.p)) +
+          '" style="width:' + w + '%"></i></span></td><td>' + esc(withUnit(signed(r.stats.sen.slope * 10, 2), r.vr.unit)) + '</td><td>' + esc(fmtP(r.stats.mk.pAdj)) +
           '</td><td><span class="badge badge-small badge-' + verdictClass(r.stats.verdict) + '">' + verdictLabel(r.stats.verdict) + '</span></td></tr>';
       });
       html += '</tbody></table>';

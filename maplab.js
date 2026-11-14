@@ -22,6 +22,20 @@
       '<input type="range" id="lp-box" min="' + BOX_MIN + '" max="' + BOX_MAX + '" step="1" value="' + BOX + '" aria-label="' + esc(T('Map area')) + '">' +
       '<output id="lp-box-out">' + esc(boxLabel(BOX)) + '</output></label>';
   }
+  // How grid cells look: 'crisp' squares at the data's real resolution, or 'smooth'
+  // blending; and how see-through they are. Drawing only: the values never change.
+  var CELLS = { mode: 'crisp', alpha: 0.75 };
+  try {
+    if (localStorage.getItem('td-cellmode') === 'smooth') CELLS.mode = 'smooth';
+    var savedA = parseFloat(localStorage.getItem('td-cellalpha')); if (savedA >= 0.2 && savedA <= 1) CELLS.alpha = savedA;
+  } catch (err) { /* private mode */ }
+  function cellCtl() {
+    return '<div class="lp-cells"><div class="lp-seg" id="lp-cellmode" role="group" aria-label="' + esc(T('How to draw the grid')) + '">' +
+      '<button type="button" data-cm="crisp" aria-pressed="' + (CELLS.mode === 'crisp') + '">' + esc(T('Grid cells')) + '</button>' +
+      '<button type="button" data-cm="smooth" aria-pressed="' + (CELLS.mode === 'smooth') + '">' + esc(T('Smooth')) + '</button></div>' +
+      '<label class="lp-alpha"><span>' + esc(T('Opacity')) + '</span><input type="range" id="lp-alpha" min="20" max="100" step="5" value="' +
+      Math.round(CELLS.alpha * 100) + '" aria-label="' + esc(T('Opacity')) + '"></label></div>';
+  }
   var TD, panel, active = '', loadKey = '', token = 0;
   var grid = null;           // { key, cells, dlon, dlat, vr }
   var lapse = { timer: 0, i: 0, mode: 'anom', speed: 1 };
@@ -134,13 +148,14 @@
         b.dot = c.stats.mk.p < 0.05;
         return b;
       });
+      TD.globe.setCellStyle(CELLS.mode, CELLS.alpha);
       TD.globe.setCells(list);
 
       var up = ok.filter(function (c) { return c.stats.mk.p < 0.05 && c.stats.sen.slope > 0; });
       var dn = ok.filter(function (c) { return c.stats.mk.p < 0.05 && c.stats.sen.slope < 0; });
       var html = '<div class="lp-head"><strong>' + esc(T('Trend map')) + '</strong><span>' + esc(TD.vname(vr)) + ', ' +
         TD.state.y0 + '–' + TD.state.y1 + (TD.state.month ? ', ' + esc(T(TD.MONTHS[TD.state.month])) : '') + '</span></div>';
-      html += boxCtl();
+      html += boxCtl() + cellCtl();
       html += '<div class="lp-scale"><span>' + esc(TD.withUnit(TD.signed(-lim, 2), vr.unit)) + '</span><i class="lp-ramp lp-ramp-div"></i><span>' +
         esc(TD.withUnit(TD.signed(lim, 2), vr.unit)) + '</span></div>';
       html += '<p class="lp-key"><span class="lp-dot"></span>' + esc(T('Dot: statistically significant (p < 0.05). Red: going up, blue: going down, per decade.')) + '</p>';
@@ -209,6 +224,7 @@
       var vr = g.vr, wet = vr.topic === 'water' || vr.topic === 'soil';
       var seq = wet ? d3.interpolateYlGnBu : (vr.topic === 'heat' ? function (t) { return d3.interpolateRdYlBu(1 - t); } : d3.interpolateViridis);
 
+      TD.globe.setCellStyle(CELLS.mode, CELLS.alpha);
       TD.globe.setCells(g.cells.map(function (c) { var b = cellBounds(c); b.fill = 'transparent'; b.opacity = 0.85; return b; }));
 
       function paint(i) {
@@ -237,7 +253,7 @@
       }
       function draw() {
         panel.innerHTML = '<div class="lp-head"><strong>' + esc(T('Timelapse')) + '</strong><span>' + esc(TD.vname(vr)) + '</span></div>' +
-          boxCtl() +
+          boxCtl() + cellCtl() +
           '<div class="lp-player"><button type="button" class="lp-play" id="lp-play" aria-label="' + esc(T('Play')) + '">' + (lapse.timer ? '❚❚' : '▶') + '</button>' +
           '<input type="range" id="lp-slider" min="0" max="' + (frames.length - 1) + '" value="' + lapse.i + '" aria-label="' + esc(T('Month')) + '">' +
           '<output id="lp-when" class="lp-when"></output></div>' +
@@ -458,6 +474,21 @@
       TD.apply({ lat: pts[0].lat, lon: pts[0].lon, size: 0, keepYears: true, keepMonth: true,
         compare: 'pt:' + pts[1].lat.toFixed(2) + ',' + pts[1].lon.toFixed(2) });
     }, true);
+    // Grid look: crisp cells or smooth, and opacity. Redraws only; nothing is reloaded.
+    panel.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-cm]');
+      if (!b) return;
+      CELLS.mode = b.getAttribute('data-cm');
+      try { localStorage.setItem('td-cellmode', CELLS.mode); } catch (err) { /* private mode */ }
+      Array.prototype.forEach.call(panel.querySelectorAll('[data-cm]'), function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+      TD.globe.setCellStyle(CELLS.mode);
+    });
+    panel.addEventListener('input', function (e) {
+      if (e.target.id !== 'lp-alpha') return;
+      CELLS.alpha = +e.target.value / 100;
+      try { localStorage.setItem('td-cellalpha', String(CELLS.alpha)); } catch (err) { /* private mode */ }
+      TD.globe.setCellStyle(null, CELLS.alpha);
+    });
     // Map-area slider (trend map, timelapse, wind): label follows the thumb, reload on release
     panel.addEventListener('input', function (e) {
       if (e.target.id !== 'lp-box') return;

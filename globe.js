@@ -913,10 +913,10 @@
     // ---- data layers ---------------------------------------------------------
 
     // Grid cells (trend map, timelapse) are painted on the raster canvas. 'crisp' (the
-    // default) gives every pixel the colour of the NASA grid cell it falls in, so the
-    // map shows the data's real resolution; faint borders appear once cells are large
-    // on screen. 'smooth' blends between cell centres (bilinear) for a softer look.
-    // Either way only the drawing changes, never the values.
+    // default) draws every NASA grid cell as its own shape with exact boundaries (see
+    // drawCellShapes), so the map shows the data's real resolution; faint borders appear
+    // once cells are large on screen. 'smooth' blends between cell centres (bilinear) for a
+    // softer look. Either way only the drawing changes, never the values.
     var cellGrid = null, cellMode = 'crisp', cellAlpha = 0.75, cellPx = 0, lastCellDraw = 0, cellSettle = 0;
     function setCells(list) {
       gCells.selectAll('path').remove();
@@ -1057,7 +1057,62 @@
       rasterQueued = true;
       requestAnimationFrame(function () { rasterQueued = false; drawRaster(); });
     }
+    // Grid cells drawn as real shapes: every NASA cell is a small polygon on the sphere,
+    // with its exact boundaries. The browser draws these with smooth, anti-aliased edges
+    // in well under a millisecond, so there is no blocky look while the globe moves and
+    // no per-pixel work at rest. Cells are first painted fully opaque on a hidden canvas
+    // (so neighbours meet without seams) and then copied on top at the chosen opacity.
+    var cellPath = d3.geoPath(proj, rbctx), cellBox = null, lastDraw = '';
+    function drawCellShapes() {
+      var g = cellGrid, a = g.rgba, cw = Math.round(W * dpr), ch = Math.round(H * dpr);
+      // Resize the canvases only when the window size changes (resizing reallocates them,
+      // which is slow), and clear and copy only the part of the screen the cells cover.
+      if (rBuf.width !== cw || rBuf.height !== ch) { rBuf.width = cw; rBuf.height = ch; }
+      if (rCanvas.width !== cw || rCanvas.height !== ch) { rCanvas.width = cw; rCanvas.height = ch; }
+      var bb = path.bounds(areaShape(g.lonMin, g.lonMax, g.latMin, g.latMax));
+      var box = isFinite(bb[0][0]) ? {
+        x: Math.max(0, Math.floor(bb[0][0] * dpr) - 4), y: Math.max(0, Math.floor(bb[0][1] * dpr) - 4),
+        x1: Math.min(cw, Math.ceil(bb[1][0] * dpr) + 4), y1: Math.min(ch, Math.ceil(bb[1][1] * dpr) + 4) } : null;
+      rctx.setTransform(1, 0, 0, 1, 0, 0);
+      rbctx.setTransform(1, 0, 0, 1, 0, 0);
+      // after live rain or the smooth style, the whole canvas holds other pixels: wipe it once
+      if (lastDraw !== 'cells') { rctx.clearRect(0, 0, cw, ch); rbctx.clearRect(0, 0, cw, ch); cellBox = null; lastDraw = 'cells'; }
+      [cellBox, box].forEach(function (b) {          // wipe where the cells were and where they are now
+        if (b) { rctx.clearRect(b.x, b.y, b.x1 - b.x, b.y1 - b.y); rbctx.clearRect(b.x, b.y, b.x1 - b.x, b.y1 - b.y); }
+      });
+      cellBox = box;
+      if (!box || box.x1 <= box.x || box.y1 <= box.y) return;   // the area is on the far side of the globe
+      rbctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      rbctx.lineJoin = 'round';
+      var alpha = 0, shapes = [];
+      g.list.forEach(function (c, i) {
+        var o = g.idx[i] * 4, al = a[o + 3];
+        if (al < 0.02) return;                        // 'transparent' (no data this month)
+        alpha = Math.max(alpha, al);
+        var col = 'rgb(' + Math.round(a[o] / al) + ',' + Math.round(a[o + 1] / al) + ',' + Math.round(a[o + 2] / al) + ')';
+        var shape = areaShape(c.lon0, c.lon1, c.lat0, c.lat1);
+        rbctx.beginPath(); cellPath(shape);
+        rbctx.fillStyle = col; rbctx.fill();
+        rbctx.strokeStyle = col; rbctx.lineWidth = 0.8; rbctx.stroke();   // closes hairline gaps between neighbours
+        shapes.push(shape);
+      });
+      // thin borders between cells once they are big enough on screen to tell apart
+      var cellOnScreen = Math.min(g.dlon, g.dlat) * R * k * Math.PI / 180;
+      if (cellOnScreen >= 14) {
+        rbctx.beginPath();
+        shapes.forEach(function (s) { cellPath(s); });
+        rbctx.strokeStyle = 'rgba(0, 0, 0, 0.22)';
+        rbctx.lineWidth = cellOnScreen >= 40 ? 1 : 0.6;
+        rbctx.stroke();
+      }
+      rctx.globalAlpha = alpha * cellAlpha;            // the same opacity the old drawing used
+      rctx.drawImage(rBuf, box.x, box.y, box.x1 - box.x, box.y1 - box.y, box.x, box.y, box.x1 - box.x, box.y1 - box.y);
+      rctx.globalAlpha = 1;
+    }
+
     function drawRaster() {
+      if (!raster && cellGrid && cellMode === 'crisp') { drawCellShapes(); return; }
+      lastDraw = 'raster';
       var src = raster ? raster.sample : cellGrid ? sampleCells : null;
       if (!src) return;
       var moving = !!(drag || anim || spinning), crisp = !raster && cellMode === 'crisp';
@@ -1068,7 +1123,8 @@
       var now = performance.now(), rapid = crisp && !moving && now - lastCellDraw < 250;
       lastCellDraw = now;
       if (rapid) { clearTimeout(cellSettle); cellSettle = setTimeout(queueRaster, 260); }
-      var step = moving ? 4 : crisp ? (rapid ? 2 : 1) : Math.max(1, 2 / dpr), w = Math.ceil(W / step), h = Math.ceil(H / step);
+      // (the live-rain picture covers the whole globe, so it samples more coarsely while moving)
+      var step = moving ? (raster ? 4 : 2) : crisp ? (rapid ? 2 : 1) : Math.max(1, 2 / dpr), w = Math.ceil(W / step), h = Math.ceil(H / step);
       // screen pixels per degree near the centre; cell borders only once cells are big
       var ppd = R * k * Math.PI / 180;
       cellPx = crisp && !moving && cellGrid && Math.min(cellGrid.dlon, cellGrid.dlat) * ppd >= 14 ? ppd : 0;

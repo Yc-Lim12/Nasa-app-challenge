@@ -307,19 +307,69 @@
       '&longitude-min=' + b.lonMin.toFixed(2) + '&longitude-max=' + b.lonMax.toFixed(2) + tail;
   }
 
-  function fetchJson(url) {
-    if (cache[url]) return Promise.resolve(cache[url]);
+  // ---- NASA answers: kept in memory for this visit, and on disk for 7 days ----------
+  // NASA POWER sends no caching headers, so the browser would download the same
+  // answer again after every reload. Each answer is also saved in the browser's Cache
+  // Storage: going back to a place, a variable or a month already seen is instant,
+  // even after a reload. Answers older than DISK_DAYS are fetched fresh (NASA adds
+  // each new month), and the oldest are dropped beyond DISK_MAX answers.
+  var DISK = 'td-nasa-v1', DISK_DAYS = 7, DISK_MAX = 80, inflight = {};
+  function disk() {
+    try { return window.caches && window.isSecureContext ? window.caches.open(DISK) : null; } catch (e) { return null; }
+  }
+  function diskGet(url) {
+    var c = disk();
+    if (!c) return Promise.resolve(null);
+    return c.then(function (store) {
+      return store.match(url).then(function (r) {
+        if (!r) return null;
+        var age = Date.now() - (+r.headers.get('x-td-saved') || 0);
+        if (age > DISK_DAYS * 864e5) { store.delete(url); return null; }
+        return r.json();
+      });
+    }).catch(function () { return null; });
+  }
+  function diskPut(url, j) {
+    var c = disk();
+    if (!c) return;
+    c.then(function (store) {
+      return store.put(url, new Response(JSON.stringify(j), {
+        headers: { 'content-type': 'application/json', 'x-td-saved': String(Date.now()) }
+      })).then(function () { return store.keys(); }).then(function (keys) {
+        if (keys.length <= DISK_MAX) return;
+        // drop the oldest answers
+        return Promise.all(keys.map(function (k) {
+          return store.match(k).then(function (r) { return { k: k, t: r ? +r.headers.get('x-td-saved') || 0 : 0 }; });
+        })).then(function (list) {
+          list.sort(function (a, b) { return a.t - b.t; });
+          list.slice(0, list.length - DISK_MAX).forEach(function (e) { store.delete(e.k); });
+        });
+      });
+    }).catch(function () { /* storage full or blocked: the memory copy still works */ });
+  }
+  function fromNasa(url) {
     return fetch(url).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (j) {
         if (!r.ok) {
           throw new Error(T('NASA POWER answered with error {status}.', { status: r.status }));
         }
-        cache[url] = j;
+        if (j && (j.features || j.properties)) diskPut(url, j);   // only real data, never an error message
         return j;
       });
     }, function () {
       throw new Error(T('Could not reach NASA POWER. Check your internet connection and try again.'));
     });
+  }
+  function fetchJson(url) {
+    if (cache[url]) return Promise.resolve(cache[url]);
+    // the same answer already on its way (e.g. clicked twice quickly): wait for it
+    if (inflight[url]) return inflight[url];
+    var p = diskGet(url).then(function (j) { return j || fromNasa(url); }).then(function (j) {
+      cache[url] = j; delete inflight[url];
+      return j;
+    }, function (e) { delete inflight[url]; throw e; });
+    inflight[url] = p;
+    return p;
   }
 
   /**
@@ -838,6 +888,7 @@
     $('result').classList.toggle('is-loading', on);
   }
 
+  var loadTimer = 0;
   function investigate(opts) {
     opts = opts || {};
     clearTimeout(liveTimer);
@@ -846,13 +897,21 @@
     var vr = variable(state.v);
     var snap = JSON.parse(JSON.stringify(state));
     var btn = $('run');
-    btn.disabled = true; btn.textContent = T('Asking NASA…');
-    setLoading(true);
-    if (globe) globe.setBadge({ title: vname(vr), text: T('Asking NASA'), cls: 'loading' });
+    btn.disabled = true;
     document.dispatchEvent(new CustomEvent('td:investigate', { detail: snap }));
-    if (!isCached(prm(vr), snap)) setStatus(T('Fetching {what} for {where} from NASA POWER…', {
-      what: T(vr.name).toLowerCase(), where: T(state.placeName)
-    }));
+    // Answers already kept (memory or disk) come back at once: only show "Asking NASA"
+    // when the data really has to come from NASA, so switching back and forth does
+    // not flash a loading state.
+    clearTimeout(loadTimer);
+    loadTimer = setTimeout(function () {
+      if (id !== runId) return;
+      btn.textContent = T('Asking NASA…');
+      setLoading(true);
+      if (globe) globe.setBadge({ title: vname(vr), text: T('Asking NASA'), cls: 'loading' });
+      if (!isCached(prm(vr), snap)) setStatus(T('Fetching {what} for {where} from NASA POWER…', {
+        what: T(vr.name).toLowerCase(), where: T(state.placeName)
+      }));
+    }, 200);
     loadSeries(vr.id, snap, function (a, b) {
       if (id === runId) setStatus(T('Fetching a big area in {b} parts from NASA POWER: {a} of {b} done…', { a: a, b: b }));
     }).then(function (ser) {
@@ -894,6 +953,7 @@
       document.dispatchEvent(new CustomEvent('td:clear'));
     }).then(function () {
       if (id !== runId) return;
+      clearTimeout(loadTimer);
       btn.disabled = false; btn.textContent = T('Investigate');
       setLoading(false);
     });
@@ -904,7 +964,7 @@
   function scheduleLive(delay) {
     if (!current && !failedCase) return;
     clearTimeout(liveTimer);
-    liveTimer = setTimeout(function () { investigate({ scroll: false }); }, delay || 450);
+    liveTimer = setTimeout(function () { investigate({ scroll: false }); }, delay || 150);
   }
 
   // ---- compare -------------------------------------------------------------

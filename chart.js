@@ -689,7 +689,7 @@
         narrow ? T(MONTH_SHORT[i]).charAt(0) : T(MONTH_SHORT[i])));
       function showTip() {
         var html = '<strong>' + esc(T(MONTHS[r.m])) + '</strong>' + (r.st
-          ? '<span>' + esc(ratePhrase(r.st, vr)) + '</span><span>' + esc(verdictLabel(r.st.verdict)) + ', ' + esc(pEquals(r.st.mk.pAdj)) + '</span>'
+          ? '<span>' + esc(ratePhrase(r.st, vr)) + '</span><span>' + esc(T(verdictLabel(r.st.verdict))) + ', ' + esc(pEquals(r.st.mk.pAdj)) + '</span>'
           : '<span>' + esc(T('Not enough data')) + '</span>') +
           '<span><em>' + esc(T(on ? 'Click to go back to the whole year' : 'Click to investigate this month')) + '</em></span>';
         tip.show(html, cx, barTop, svg, W);

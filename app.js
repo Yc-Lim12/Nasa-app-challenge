@@ -1610,7 +1610,8 @@
     variable: variable, place: place, prm: prm, vname: vname, box: box, urlFor: urlFor, fetchJson: fetchJson,
     monthlyTable: monthlyTable, trimSpliced: trimSpliced, yearlySeries: yearlySeries, loadSeries: loadSeries, partMonths: partMonths,
     seriesOf: seriesOf, monthlyAnomalies: monthlyAnomalies, isOceanFill: isOceanFill,
-    raw: function (url) { return cache[url]; },   // debugging: the raw NASA answer behind a URL regionOf: regionOf, splitArea: splitArea, whenLabel: whenLabel,
+    regionOf: regionOf, splitArea: splitArea, whenLabel: whenLabel,
+    raw: function (url) { return cache[url]; },   // debugging: the raw NASA answer behind a URL
     esc: esc, withUnit: withUnit, signed: signed, sig: sig, fmtP: fmtP, pEquals: pEquals, coordLabel: coordLabel, capFirst: capFirst,
     toast: toast, apply: apply, investigate: investigate, openStep: openStep,
     get globe() { return globe; }, get current() { return current; },

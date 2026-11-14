@@ -24,3 +24,4 @@ python check_area.py recorded.json  # the live "This area" map (see the script's
 
 - `check_global.py` downloads 12 areas (4 fixed, 8 random) straight from NASA POWER, recomputes their trends with SciPy and pymannkendall, checks random timelapse months, and recomputes all 2,592 significance flags with statsmodels.
 - `check_area.py` takes what the website showed for a "This area" map (the NASA request it made and the panel text), downloads the same box from NASA, recomputes every cell and the false discovery rate correction, and compares the counts and colour scale.
+- `check_maps.py` takes what the website drew (every cell's place, colour and dot, and for the timelapse every cell's colour in one month), works out from NASA data what each cell should look like, and compares them cell by cell.

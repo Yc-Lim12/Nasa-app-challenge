@@ -1502,3 +1502,7 @@ button, summary { -webkit-user-select: none; user-select: none; }
 .st-links button { text-align: left; padding: 8px 2px; border: 0; background: none; cursor: pointer; font: inherit; font-size: 14px; color: var(--brand); }
 .st-links button:hover { text-decoration: underline; }
 @media (prefers-reduced-motion: reduce) { .st-pop { animation: none; } }
+
+/* whole-world layer: link to NASA Worldview */
+.lp-link { color: #64d2ff; text-decoration: none; font-weight: 600; }
+.lp-link:hover { text-decoration: underline; }

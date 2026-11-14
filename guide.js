@@ -24,7 +24,7 @@
     { target: '#stage-foot', title: 'Guided stories',
       text: 'Step-by-step examples with real data: city heat, haze, monsoon rain, a warming sea and wildfire smoke. A good place to start.' },
     { target: '#layers', title: 'Map layers',
-      text: 'Trend map: the trend in every grid cell around the place (a dot means significant). Timelapse: every month, one after another. Rain now and Wind: current conditions.' },
+      text: 'Trend map: the trend in every grid cell around the place (a dot means significant). Timelapse: every month, one after another. Rain now and Wind: current conditions. Whole world: NASA’s global monthly maps, one per year since 1980.' },
     { target: '#verdict', prep: 'case', title: 'The answer',
       text: 'The verdict in one sentence: is it really changing, and how fast? The badge says whether the change is statistically significant or could be chance.' },
     { target: '#chart', prep: 'case', title: 'The chart',

@@ -268,6 +268,14 @@
     '{name} around {where} is {value} in every year, so there is no change to test.': '{name} di sekitar {where} ialah {value} setiap tahun, jadi tiada perubahan untuk diuji.',
     'No change': 'Tiada perubahan',
     'Every year {period} has exactly the same value. For snow depth this simply means there is no snow here.': 'Setiap tahun {period} mempunyai nilai yang sama. Bagi kedalaman salji, ini bermaksud tiada salji di sini.',
+    'Whole world': 'Seluruh dunia',
+    'Loading one NASA picture per year: {a} of {b}…': 'Memuatkan satu gambar NASA setahun: {a} daripada {b}…',
+    'Could not load the world pictures from NASA GIBS. Try again later.': 'Tidak dapat memuatkan gambar dunia daripada NASA GIBS. Cuba lagi nanti.',
+    'One global NASA picture for every {month} since {y}. For viewing only: the trend tests use NASA POWER numbers for one place.':
+      'Satu gambar global NASA bagi setiap {month} sejak {y}. Untuk tontonan sahaja: ujian tren menggunakan nombor NASA POWER bagi satu tempat.',
+    'Explore more on NASA Worldview': 'Teroka lagi di NASA Worldview',
+    'Trend map: the trend in every grid cell around the place (a dot means significant). Timelapse: every month, one after another. Rain now and Wind: current conditions. Whole world: NASA’s global monthly maps, one per year since 1980.':
+      'Peta tren: tren dalam setiap sel grid di sekitar tempat itu (titik bermaksud signifikan). Selang masa: setiap bulan, satu demi satu. Hujan kini dan Angin: keadaan semasa. Seluruh dunia: peta bulanan global NASA, satu setahun sejak 1980.',
     'Grid cells': 'Sel grid', 'Smooth': 'Licin', 'Opacity': 'Kelegapan', 'How to draw the grid': 'Cara melukis grid',
     'Guided stories': 'Kisah berpandu', 'World story': 'Kisah dunia',
     'Wildfire smoke over Wisconsin': 'Asap kebakaran hutan di Wisconsin', 'Summer haze far from the fires': 'Jerebu musim panas jauh dari kebakaran',

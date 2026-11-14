@@ -1106,6 +1106,17 @@
       rctx.imageSmoothingEnabled = !crisp || moving || rapid;
       rctx.imageSmoothingQuality = 'high';
       rctx.drawImage(rBuf, 0, 0, rCanvas.width, rCanvas.height);
+      // a full-cover picture (the whole-world layer) hides the map: draw the coastlines on top
+      var coastShape = raster && raster.coast ? (moving ? landLo || land : land || landLo) : null;
+      if (coastShape) {
+        rctx.save();
+        rctx.setTransform(rCanvas.width / W, 0, 0, rCanvas.height / H, 0, 0);
+        rctx.beginPath();
+        d3.geoPath(proj, rctx)(coastShape);
+        rctx.lineWidth = 0.9; rctx.strokeStyle = 'rgba(15, 18, 28, 0.6)';
+        rctx.stroke();
+        rctx.restore();
+      }
     }
 
     // Particles: a wind field sample(lon, lat) -> [u, v] in m/s, inside bounds.

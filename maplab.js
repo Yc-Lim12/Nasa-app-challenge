@@ -70,8 +70,9 @@
     var g = TD.globe;
     if (!g) return;
     token++;
-    clearInterval(lapse.timer); clearInterval(rain.timer);
+    clearInterval(lapse.timer); clearInterval(rain.timer); clearInterval(world.timer); world.timer = 0;
     g.setCells(null); g.setMarks(null); g.setRaster(null); g.setField(null);
+    panel.onclick = null; panel.oninput = null;     // handlers of the previous layer's panel
     active = id || '';
     loadKey = '';
     Array.prototype.forEach.call(document.querySelectorAll('#layers button'), function (b) {
@@ -85,6 +86,7 @@
     else if (active === 'lapse') showLapse(opts.frame);
     else if (active === 'rain') showRain();
     else if (active === 'wind') { if (opts.month !== undefined) windMonth = opts.month; showWind(); }
+    else if (active === 'world') showWorld();
   }
 
   function busy(title, msg) {
@@ -394,6 +396,142 @@
       panel.oninput = function (e) { if (e.target.id === 'lp-slider') { play(false); paint(+e.target.value); } };
       if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) play(true); else $('lp-play').textContent = '▶';
     }).catch(function (e) { if (my === token) fail(T('Rain now'), e.message); });
+  }
+
+  // ---- whole world: NASA GIBS monthly maps, one picture per year ------------------
+  // Ready-made global MERRA-2 pictures from NASA GIBS (the same model behind most of
+  // the app's variables), fetched at the model's own resolution (720 x 360) and
+  // painted on the globe. For viewing only: the trend tests use NASA POWER numbers.
+  var WORLD = {
+    T2M: { layer: 'MERRA2_2m_Air_Temperature_Assimilated_Monthly', name: 'Air temperature', lo: '−53 °C', hi: '+37 °C',
+      stops: ['#5e4fa2', '#66c2a5', '#abdda4', '#e7f599', '#fefdbc', '#fddb87', '#fba55c', '#ef6644', '#9e0142'] },
+    PRECTOTCORR: { layer: 'MERRA2_Precipitation_Bias_Corrected_Monthly', name: 'Rain and snowfall', lo: '0', hi: '18+ mm/day',
+      stops: ['#f7fcfd', '#d3eeeb', '#b3e2d7', '#8dd2c0', '#64c1a2', '#49b280', '#319c5c', '#19823d', '#00441b'] }
+  };
+  var WW = 720, WH = 360, WORLD_FIRST = 1980;
+  var GIBS_WORLD = 'https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&CRS=EPSG:4326' +
+    '&BBOX=-90,-180,90,180&WIDTH=' + WW + '&HEIGHT=' + WH + '&FORMAT=image/png&STYLES=';
+  var world = { v: 'T2M', month: 7, key: '', frames: null, timer: 0, i: 0 };
+
+  /** Colour of the world picture at (lon, lat), blended between pixels. */
+  function worldAt(data, lon, lat) {
+    var fx = (lon + 180) / 360 * WW - 0.5, fy = (90 - lat) / 180 * WH - 0.5;
+    var x0 = Math.floor(fx), y0 = Math.max(0, Math.min(WH - 1, Math.floor(fy))), tx = fx - x0, ty = fy - y0;
+    var x1 = (x0 + 1 + WW) % WW, y1 = Math.min(WH - 1, y0 + 1);
+    x0 = (x0 + WW) % WW;
+    var o = [(y0 * WW + x0) * 4, (y0 * WW + x1) * 4, (y1 * WW + x0) * 4, (y1 * WW + x1) * 4];
+    var w = [(1 - tx) * (1 - ty), tx * (1 - ty), (1 - tx) * ty, tx * ty];
+    var r = 0, g = 0, b = 0, a = 0;
+    for (var i = 0; i < 4; i++) {
+      var al = data[o[i] + 3] * w[i];
+      r += data[o[i]] * al; g += data[o[i] + 1] * al; b += data[o[i] + 2] * al; a += al;
+    }
+    if (a < 6) return null;
+    return [r / a, g / a, b / a, Math.min(235, a)];
+  }
+  function worldUrl(v, year, month) {
+    return GIBS_WORLD + '&LAYERS=' + WORLD[v].layer + '&TIME=' + year + '-' + (month < 10 ? '0' : '') + month + '-01';
+  }
+  function loadWorldFrame(v, year, month) {
+    return new Promise(function (resolve) {
+      var img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = function () {
+        try {
+          var c = document.createElement('canvas'); c.width = WW; c.height = WH;
+          var x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0, WW, WH);
+          resolve({ year: year, data: x.getImageData(0, 0, WW, WH).data });
+        } catch (err) { resolve(null); }
+      };
+      img.onerror = function () { resolve(null); };
+      img.src = worldUrl(v, year, month);
+    });
+  }
+  function worviewUrl(v, year, month) {
+    return 'https://worldview.earthdata.nasa.gov/?l=' + WORLD[v].layer + ',Coastlines_15m&t=' + year + '-' + (month < 10 ? '0' : '') + month + '-01';
+  }
+
+  function showWorld() {
+    var my = token, v = world.v, month = world.month, key = v + '|' + month;
+    var last = TD.LAST_YEAR, years = [];
+    for (var y = WORLD_FIRST; y <= last; y++) years.push(y);
+    TD.globe.flyTo(TD.state.lat, TD.state.lon, 10, 1200, 1);
+    function controls() {
+      return '<div class="lp-row"><div class="lp-seg" id="lp-wv">' + Object.keys(WORLD).map(function (k) {
+        return '<button type="button" data-wv="' + k + '" aria-pressed="' + (k === world.v) + '">' + esc(T(WORLD[k].name)) + '</button>';
+      }).join('') + '</div></div>' +
+        '<div class="lp-row"><div class="lp-seg lp-months" id="lp-wmo">' + [1, 4, 7, 10].map(function (m) {
+          return '<button type="button" data-wmo="' + m + '" aria-pressed="' + (m === world.month) + '">' + esc(T(TD.MONTHS[m])) + '</button>';
+        }).join('') + '</div></div>';
+    }
+    var head = '<div class="lp-head"><strong>' + esc(T('Whole world')) + '</strong><span>NASA MERRA-2 · GIBS</span></div>';
+    var done = 0;
+    function progress() {
+      panel.innerHTML = head + controls() + '<p class="lp-busy"><i class="spinner"></i>' +
+        esc(T('Loading one NASA picture per year: {a} of {b}…', { a: done, b: years.length })) + '</p>';
+    }
+    var ready = world.key === key && world.frames ? Promise.resolve(world.frames) : new Promise(function (resolve) {
+      world.frames = null; world.key = '';
+      var out = new Array(years.length), next = 0, left = years.length;
+      progress();
+      function launch() {
+        if (next >= years.length || my !== token) return;
+        var i = next++;
+        loadWorldFrame(v, years[i], month).then(function (f) {
+          out[i] = f; done++; left--;
+          if (my === token) { var b = panel.querySelector('.lp-busy'); if (b) b.lastChild.textContent = T('Loading one NASA picture per year: {a} of {b}…', { a: done, b: years.length }); }
+          if (left === 0) resolve(out.filter(Boolean)); else launch();
+        });
+      }
+      for (var k = 0; k < 6; k++) launch();
+    });
+    ready.then(function (frames) {
+      if (my !== token) return;
+      if (!frames.length) { fail(T('Whole world'), T('Could not load the world pictures from NASA GIBS. Try again later.')); return; }
+      world.frames = frames; world.key = key;
+      var g = TD.globe, info = WORLD[v];
+      function paint(i) {
+        world.i = i;
+        var f = frames[i];
+        g.setRaster({ sample: function (lon, lat) { return worldAt(f.data, lon, lat); }, coast: true });
+        var el = $('lp-when'); if (el) el.textContent = T(TD.MONTHS[month]) + ' ' + f.year;
+        var sl = $('lp-slider'); if (sl && +sl.value !== i) sl.value = i;
+        var a = $('lp-wlink'); if (a) a.href = worviewUrl(v, f.year, month);
+      }
+      panel.innerHTML = head + controls() +
+        '<div class="lp-player"><button type="button" class="lp-play" id="lp-play">❚❚</button>' +
+        '<input type="range" id="lp-slider" min="0" max="' + (frames.length - 1) + '" value="0" aria-label="' + esc(T('Year')) + '">' +
+        '<output id="lp-when" class="lp-when"></output></div>' +
+        '<div class="lp-scale"><span>' + esc(info.lo) + '</span><i class="lp-ramp" style="background:linear-gradient(90deg,' + info.stops.join(',') + ')"></i><span>' + esc(info.hi) + '</span></div>' +
+        '<p class="lp-key">' + esc(T('One global NASA picture for every {month} since {y}. For viewing only: the trend tests use NASA POWER numbers for one place.', { month: T(TD.MONTHS[month]), y: WORLD_FIRST })) + '</p>' +
+        '<p class="lp-key"><a id="lp-wlink" class="lp-link" target="_blank" rel="noopener">' + esc(T('Explore more on NASA Worldview')) + ' ↗</a></p>';
+      function play(on) {
+        clearInterval(world.timer); world.timer = 0;
+        if (on) world.timer = setInterval(function () {
+          if (my !== token) { clearInterval(world.timer); return; }
+          paint((world.i + 1) % frames.length);
+        }, 420);
+        var b = $('lp-play'); if (b) { b.textContent = on ? '❚❚' : '▶'; b.setAttribute('aria-label', T(on ? 'Pause' : 'Play')); }
+      }
+      paint(0);
+      if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) play(true); else play(false);
+      panel.onclick = function (e) {
+        var t = e.target.closest('button');
+        if (!t) return;
+        if (t.id === 'lp-play') { play(!world.timer); return; }
+        var nv = t.getAttribute('data-wv'), nm = t.getAttribute('data-wmo');
+        if (nv && nv !== world.v) { world.v = nv; setLayer('world'); }
+        else if (nm && +nm !== world.month) { world.month = +nm; setLayer('world'); }
+      };
+      panel.oninput = function (e) { if (e.target.id === 'lp-slider') { play(false); paint(+e.target.value); } };
+    });
+    // switching variable or month while loading
+    panel.onclick = function (e) {
+      var t = e.target.closest('button'); if (!t) return;
+      var nv = t.getAttribute('data-wv'), nm = t.getAttribute('data-wmo');
+      if (nv && nv !== world.v) { world.v = nv; setLayer('world'); }
+      else if (nm && +nm !== world.month) { world.month = +nm; setLayer('world'); }
+    };
   }
 
   // ---- wind particles -------------------------------------------------------------

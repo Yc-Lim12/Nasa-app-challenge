@@ -523,6 +523,17 @@
     // ---- units ----
     'mm/day': 'mm/hari', 'MJ/m²/day': 'MJ/m²/hari',
 
+    // ---- stories: compare with published research ----
+    'Compare with published research. Saimi et al. (2020) found significant warming at four airport stations in Peninsular Malaysia, between 0.014 and 0.059 °C per year (1970–2016). That is 0.14 to 0.59 °C per decade. Is the rate on this chart in that range?':
+      'Bandingkan dengan kajian yang diterbitkan. Saimi et al. (2020) mendapati pemanasan yang signifikan di empat stesen lapangan terbang di Semenanjung Malaysia, antara 0.014 dan 0.059 °C setahun (1970–2016). Itu bersamaan 0.14 hingga 0.59 °C sedekad. Adakah kadar pada carta ini berada dalam julat itu?',
+    'Compare with published research. Cohen, Lecoeur and Ng (2017) studied satellite data from 2001 to 2013 and found one haze peak a year in southern Southeast Asia, usually from August to October, driven by fires. They did not report a long-term trend. Does the September chart show the same spikes?':
+      'Bandingkan dengan kajian yang diterbitkan. Cohen, Lecoeur dan Ng (2017) mengkaji data satelit dari 2001 hingga 2013 dan mendapati satu puncak jerebu setiap tahun di selatan Asia Tenggara, biasanya dari Ogos hingga Oktober, akibat kebakaran. Mereka tidak melaporkan tren jangka panjang. Adakah carta September menunjukkan lonjakan yang sama?',
+    'Compare with published research. Suhaila et al. (2010) studied rain gauges from 1975 to 2004. In the southwest monsoon, total rain and wet days fell at most stations while rain intensity rose. In the northeast monsoon, several stations grew wetter. Do the two coasts on this chart agree?':
+      'Bandingkan dengan kajian yang diterbitkan. Suhaila et al. (2010) mengkaji tolok hujan dari 1975 hingga 2004. Semasa monsun barat daya, jumlah hujan dan bilangan hari hujan menurun di kebanyakan stesen manakala keamatan hujan meningkat. Semasa monsun timur laut, beberapa stesen menjadi lebih basah. Adakah kedua-dua pantai pada carta ini selari dengan dapatan itu?',
+    'Pick the years and the answer can change. Jiang et al. (2021) found the South China Sea warmed by about 0.15 °C per decade from 1970 to 1997, then hardly at all from 1999 to 2010. This step tests only 1999 to 2010. Is the trend still significant?':
+      'Pilih tahun yang berbeza dan jawapannya boleh berubah. Jiang et al. (2021) mendapati Laut China Selatan memanas kira-kira 0.15 °C sedekad dari 1970 hingga 1997, kemudian hampir tidak berubah dari 1999 hingga 2010. Langkah ini hanya menguji 1999 hingga 2010. Adakah tren itu masih signifikan?',
+    'Source:': 'Sumber:', 'Data: NASA POWER, {src}': 'Data: NASA POWER, {src}',
+
     // ---- months ----
     'Whole year': 'Sepanjang tahun', 'January': 'Januari', 'February': 'Februari', 'March': 'Mac', 'May': 'Mei', 'June': 'Jun',
     'July': 'Julai', 'August': 'Ogos', 'October': 'Oktober', 'December': 'Disember',

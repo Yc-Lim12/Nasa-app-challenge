@@ -177,6 +177,7 @@
     'Finding the latest NASA GPM rain image…': 'Mencari imej hujan NASA GPM terkini…',
     'No recent rain images are available right now. Try again later.': 'Tiada imej hujan terkini buat masa ini. Cuba lagi nanti.',
     'Loading the last 12 hours…': 'Memuatkan 12 jam terakhir…', 'Hour': 'Jam', 'Light': 'Renyai', 'Heavy': 'Lebat',
+    'Playback speed': 'Kelajuan main balik',
     'Satellite rain estimates for the last 12 hours, one frame per hour. Images: NASA GIBS. For viewing only, not used in the trend tests.':
       'Anggaran hujan satelit bagi 12 jam terakhir, satu bingkai sejam. Imej: NASA GIBS. Untuk tontonan sahaja, tidak digunakan dalam ujian tren.',
     'Loading 10 m wind for a {b}° box around this place…': 'Memuatkan angin 10 m bagi kotak {b}° di sekitar tempat ini…',

@@ -25,7 +25,7 @@
   var TD, panel, active = '', loadKey = '', token = 0;
   var grid = null;           // { key, cells, dlon, dlat, vr }
   var lapse = { timer: 0, i: 0, mode: 'anom', speed: 1 };
-  var rain = { timer: 0, i: 0, frames: null };
+  var rain = { timer: 0, i: 0, frames: null, speed: 1 };
   var windMonth = null;
 
   function $(id) { return document.getElementById(id); }
@@ -63,6 +63,7 @@
       b.setAttribute('aria-pressed', b.getAttribute('data-layer') === active ? 'true' : 'false');
     });
     document.querySelector('.stage').classList.toggle('layer-on', !!active);
+    panel.classList.toggle('is-rain', active === 'rain');
     panel.hidden = !active;
     if (!active) { panel.innerHTML = ''; return; }
     g.spin(false);
@@ -273,25 +274,42 @@
 
   // ---- rain now (NASA GPM IMERG via GIBS) ----------------------------------------
 
+  var RW = 3600, RH = 1800; // Match the 0.1° IMERG grid.
+  var RAIN_FRAME_MS = 800;
   var GIBS = 'https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0' +
-    '&LAYERS=IMERG_Precipitation_Rate_30min&CRS=EPSG:4326&BBOX=-90,-180,90,180&WIDTH=1440&HEIGHT=720&FORMAT=image/png&TRANSPARENT=true&TIME=';
+    '&LAYERS=IMERG_Precipitation_Rate_30min&CRS=EPSG:4326&BBOX=-90,-180,90,180&WIDTH=' + RW + '&HEIGHT=' + RH +
+    '&FORMAT=image/png&TRANSPARENT=true&TIME=';
 
-  var RW = 1440, RH = 720;
-  // smooth lookup in an equirectangular RGBA image (premultiplied, so rain edges fade softly)
-  function rainAt(data, lon, lat) {
-    var fx = (lon + 180) / 360 * RW - 0.5, fy = (90 - lat) / 180 * RH - 0.5;
-    var x0 = Math.floor(fx), y0 = Math.floor(fy), tx = fx - x0, ty = fy - y0;
-    x0 = ((x0 % RW) + RW) % RW; var x1 = (x0 + 1) % RW;
-    y0 = Math.max(0, Math.min(RH - 1, y0)); var y1 = Math.min(RH - 1, y0 + 1);
-    var o = [(y0 * RW + x0) * 4, (y0 * RW + x1) * 4, (y1 * RW + x0) * 4, (y1 * RW + x1) * 4];
-    var w = [(1 - tx) * (1 - ty), tx * (1 - ty), (1 - tx) * ty, tx * ty];
-    var r = 0, g = 0, b = 0, a = 0;
-    for (var i = 0; i < 4; i++) {
-      var al = data[o[i] + 3] * w[i];
-      r += data[o[i]] * al; g += data[o[i] + 1] * al; b += data[o[i] + 2] * al; a += al;
+  // Store color indices for these palette-based images to keep the 12-frame cache small.
+  function packRain(data) {
+    var rgba = new Uint32Array(data.buffer, data.byteOffset, data.length / 4);
+    var palette = new Uint32Array(256);
+    var indices = new Uint8Array(rgba.length);
+    var byColor = new Map([[0, 0]]);
+    for (var i = 0; i < rgba.length; i++) {
+      if (data[i * 4 + 3] < 6) continue;
+      var color = rgba[i], index = byColor.get(color);
+      if (index === undefined) {
+        index = byColor.size;
+        if (index === palette.length) return { pixels: data, palette: null };
+        palette[index] = color;
+        byColor.set(color, index);
+      }
+      indices[i] = index;
     }
+    return { pixels: indices, palette: new Uint8Array(palette.buffer) };
+  }
+
+  // Use the source pixel under the cursor to keep adjoining rain cells distinct.
+  function rainAt(frame, lon, lat) {
+    var x = Math.floor((lon + 180) * RW / 360);
+    var y = Math.max(0, Math.min(RH - 1, Math.floor((90 - lat) * RH / 180)));
+    var pixel = y * RW + ((x % RW + RW) % RW);
+    var colors = frame.palette || frame.pixels;
+    var offset = (frame.palette ? frame.pixels[pixel] : pixel) * 4;
+    var a = colors[offset + 3];
     if (a < 6) return null;
-    return [r / a, g / a, b / a, Math.min(225, a)];
+    return [colors[offset], colors[offset + 1], colors[offset + 2], Math.min(245, a)];
   }
   function iso(d) { return d.toISOString().slice(0, 17) + '00Z'; }
   function loadFrame(d) {
@@ -299,11 +317,20 @@
       var img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = function () {
-        var c = document.createElement('canvas'); c.width = RW; c.height = RH;
-        var x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0, RW, RH);
-        var data = x.getImageData(0, 0, RW, RH).data, n = 0;
-        for (var i = 3; i < data.length; i += 64) if (data[i]) n++;
-        resolve({ time: d, data: data, filled: n });
+        try {
+          var c = document.createElement('canvas'); c.width = RW; c.height = RH;
+          var x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0, RW, RH);
+          var data = x.getImageData(0, 0, RW, RH).data, n = 0;
+          for (var i = 3; i < data.length; i += 64) if (data[i]) n++;
+          var frame = n > 20 ? packRain(data) : { pixels: null };
+          frame.width = RW;
+          frame.height = RH;
+          frame.time = d;
+          frame.filled = n;
+          resolve(frame);
+        } catch (e) {
+          reject(new Error(T('Could not load rain images from NASA GIBS.')));
+        }
       };
       img.onerror = function () { reject(new Error(T('Could not load rain images from NASA GIBS.'))); };
       img.src = GIBS + iso(d);
@@ -319,6 +346,7 @@
     var tries = 0;
     function probe(d) {
       return loadFrame(d).then(function (f) {
+        if (my !== token) return null;
         if (f.filled > 20) return f;
         if (++tries > 14) throw new Error(T('No recent rain images are available right now. Try again later.'));
         return probe(new Date(d.getTime() - 1800e3));
@@ -326,12 +354,19 @@
     }
     (rain.frames && rain.frames.length && Date.now() - rain.loaded < 20 * 60e3 ? Promise.resolve(rain.frames) :
       probe(start).then(function (latest) {
-        if (my !== token) return null;
+        if (!latest || my !== token) return null;
         panel.querySelector('.lp-busy').lastChild.textContent = T('Loading the last 12 hours…');
-        var jobs = [];
-        for (var h = 11; h >= 1; h--) jobs.push(loadFrame(new Date(latest.time.getTime() - h * 3600e3)).catch(function () { return null; }));
-        return Promise.all(jobs).then(function (fs) {
-          rain.frames = fs.filter(Boolean).concat([latest]);
+        // Decode at most three of the larger images at once, keeping frames in time order.
+        var fs = new Array(11), next = 0;
+        function loadNext() {
+          if (my !== token || next >= fs.length) return;
+          var i = next++;
+          var time = new Date(latest.time.getTime() - (fs.length - i) * 3600e3);
+          return loadFrame(time).then(function (f) { fs[i] = f; }, function () { fs[i] = null; }).then(loadNext);
+        }
+        return Promise.all([loadNext(), loadNext(), loadNext()]).then(function () {
+          if (my !== token) return null;
+          rain.frames = fs.filter(function (frame) { return frame && frame.pixels; }).concat([latest]);
           rain.loaded = Date.now();
           return rain.frames;
         });
@@ -339,33 +374,57 @@
     ).then(function (frames) {
       if (!frames || my !== token) return;
       var g = TD.globe;
+      var formatTime = new Intl.DateTimeFormat(document.documentElement.lang || undefined, {
+        weekday: 'short', hour: '2-digit', minute: '2-digit'
+      });
+      var canPlay = frames.length > 1;
+      panel.innerHTML = '<div class="lp-head"><strong>' + esc(T('Rain now')) + '</strong><span>NASA GPM IMERG</span></div>' +
+        '<div class="lp-rain-controls"><div class="lp-rain-time"><time id="lp-when"></time><span id="lp-rain-utc"></span></div>' +
+        '<label class="lp-rain-speed">' + esc(T('Playback speed')) + '<select id="lp-rain-speed">' +
+        [0.25, 0.5, 1, 2].map(function (speed) {
+          return '<option value="' + speed + '"' + (rain.speed === speed ? ' selected' : '') + '>' + speed + '×</option>';
+        }).join('') + '</select></label></div>' +
+        '<div class="lp-player"><button type="button" class="lp-play" id="lp-play"></button>' +
+        '<input type="range" id="lp-slider" min="0" max="' + (frames.length - 1) + '" aria-label="' + esc(T('Hour')) + '"></div>' +
+        '<div class="lp-scale"><span>' + esc(T('Light')) + '</span><i class="lp-ramp lp-ramp-rain"></i><span>' + esc(T('Heavy')) + '</span></div>' +
+        '<p class="lp-key">' + esc(T('Satellite rain estimates for the last 12 hours, one frame per hour. Images: NASA GIBS. For viewing only, not used in the trend tests.')) + '</p>';
+
+      var playButton = $('lp-play'), slider = $('lp-slider'), speedSelect = $('lp-rain-speed');
+      var localTime = $('lp-when'), utcTime = $('lp-rain-utc');
+      playButton.disabled = slider.disabled = speedSelect.disabled = !canPlay;
       function paint(i) {
         rain.i = i;
         var f = frames[i];
         g.setRaster({
-          sample: function (lon, lat) { return rainAt(f.data, lon, lat); }
+          crisp: true,
+          grid: f,
+          sample: function (lon, lat) { return rainAt(f, lon, lat); }
         });
-        var t = f.time;
-        var el = $('lp-when');
-        if (el) el.textContent = t.toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' }) + ' · ' +
-          t.toISOString().slice(11, 16) + ' UTC';
-        var sl = $('lp-slider'); if (sl) sl.value = i;
+        localTime.dateTime = f.time.toISOString();
+        localTime.textContent = formatTime.format(f.time);
+        utcTime.textContent = localTime.dateTime.slice(11, 16) + ' UTC';
+        slider.value = i;
+        slider.setAttribute('aria-valuetext', localTime.textContent + ' · ' + utcTime.textContent);
       }
-      panel.innerHTML = '<div class="lp-head"><strong>' + esc(T('Rain now')) + '</strong><span>NASA GPM IMERG</span></div>' +
-        '<div class="lp-player"><button type="button" class="lp-play" id="lp-play">❚❚</button>' +
-        '<input type="range" id="lp-slider" min="0" max="' + (frames.length - 1) + '" value="' + (frames.length - 1) + '" aria-label="' + esc(T('Hour')) + '">' +
-        '<output id="lp-when" class="lp-when"></output></div>' +
-        '<div class="lp-scale"><span>' + esc(T('Light')) + '</span><i class="lp-ramp lp-ramp-rain"></i><span>' + esc(T('Heavy')) + '</span></div>' +
-        '<p class="lp-key">' + esc(T('Satellite rain estimates for the last 12 hours, one frame per hour. Images: NASA GIBS. For viewing only, not used in the trend tests.')) + '</p>';
       function play(on) {
         clearInterval(rain.timer); rain.timer = 0;
-        if (on) rain.timer = setInterval(function () { if (my !== token) { clearInterval(rain.timer); return; } paint((rain.i + 1) % frames.length); }, 650);
-        $('lp-play').textContent = on ? '❚❚' : '▶';
+        on = on && canPlay;
+        if (on) {
+          rain.timer = setInterval(function () {
+            paint((rain.i + 1) % frames.length);
+          }, RAIN_FRAME_MS / rain.speed);
+        }
+        playButton.textContent = on ? '❚❚' : '▶';
+        playButton.setAttribute('aria-label', T(on ? 'Pause' : 'Play'));
       }
       paint(frames.length - 1);
       panel.onclick = function (e) { if (e.target.id === 'lp-play') play(!rain.timer); };
       panel.oninput = function (e) { if (e.target.id === 'lp-slider') { play(false); paint(+e.target.value); } };
-      if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) play(true); else $('lp-play').textContent = '▶';
+      speedSelect.addEventListener('change', function () {
+        rain.speed = +speedSelect.value;
+        play(Boolean(rain.timer));
+      });
+      play(!window.matchMedia('(prefers-reduced-motion: reduce)').matches);
     }).catch(function (e) { if (my === token) fail(T('Rain now'), e.message); });
   }
 

@@ -99,8 +99,9 @@
     document.querySelector('.stage').classList.toggle('layer-on', !!active);
     panel.classList.toggle('is-rain', active === 'rain');
     panel.hidden = !active;
-    if (!active) { panel.innerHTML = ''; return; }
+    if (!active) { panel.innerHTML = ''; g.render(); return; }
     g.spin(false);
+    g.render();
     if (active === 'trend') showTrend();
     else if (active === 'lapse') showLapse(opts.frame);
     else if (active === 'rain') showRain();

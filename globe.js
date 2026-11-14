@@ -10,6 +10,7 @@
   var WORLD_FINE = 'https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-50m.json';
   var REDUCED = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   var K_MIN = 0.9, K_MAX = 24;
+  var CLOUD_FADE_START = 1.3, CLOUD_FADE_END = 2.6;
 
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
   function wrapLon(x) { return ((x + 540) % 360 + 360) % 360 - 180; }
@@ -53,10 +54,9 @@
     // made the globe look less sharp than the flat map.
     radial('shade', [['72%', '#000', 0], ['100%', '#000', 0.35]]);
     radial('shine', [['0%', '#cfe0ff', 0.05], ['55%', '#cfe0ff', 0]], '34%', '26%', '55%');
-    // The glow is a ring just outside the Earth's edge (at 1 / 1.16 = 86% of this circle).
-    // Inside it must be transparent: a gradient fills everything before its first stop with
-    // that stop's colour, which used to lay a 34% blue haze over the whole satellite picture.
-    radial('halo', [['0%', '#8fb8ff', 0], ['84%', '#8fb8ff', 0], ['86.5%', '#8fb8ff', 0.34], ['91%', '#8fb8ff', 0.12], ['100%', '#8fb8ff', 0]]);
+    // The glow is a ring just outside the Earth's edge (1 / 1.16 = 86% of this circle);
+    // transparent inside, so it never lays a haze over the satellite picture.
+    radial('halo', [['0%', '#75b9ff', 0], ['85%', '#75b9ff', 0], ['86.5%', '#75b9ff', 0.42], ['89%', '#3f91ed', 0.14], ['95%', '#346fc4', 0.025], ['100%', '#346fc4', 0]]);
 
     // star field behind the globe (canvas, drawn with a little parallax)
     var canvas = document.createElement('canvas');
@@ -78,8 +78,8 @@
     var gNights = NIGHT_RADII.map(function () {
       return svg.append('path').attr('class', 'g-night').attr('fill-opacity', 0.025);
     });
-    var gShade = svg.append('path').attr('class', 'g-overlay').attr('fill', 'url(#' + uid + 'shade)');
-    var gShine = svg.append('path').attr('class', 'g-overlay').attr('fill', 'url(#' + uid + 'shine)');
+    var gShade = svg.append('path').attr('class', 'g-overlay g-map-light').attr('fill', 'url(#' + uid + 'shade)');
+    var gShine = svg.append('path').attr('class', 'g-overlay g-map-light').attr('fill', 'url(#' + uid + 'shine)');
     var gRim = svg.append('path').attr('class', 'g-rim');
     var gCells = svg.append('g').attr('class', 'g-cells');
     var gDots = svg.append('g').attr('class', 'g-dots');
@@ -214,19 +214,29 @@
     }
 
     // where the Sun is overhead right now, so the night side can be shaded
-    var nights = [];
+    var nights = [], sunLon = 0, sunLat = 0;
     function updateSun() {
       var d = new Date();
       var day = (d - Date.UTC(d.getUTCFullYear(), 0, 0)) / 864e5;
       var decl = -23.44 * Math.cos(2 * Math.PI * (day + 10) / 365);
       var hrs = d.getUTCHours() + d.getUTCMinutes() / 60;
-      var anti = [wrapLon((12 - hrs) * 15 + 180), -decl];
+      sunLon = (12 - hrs) * 15;
+      sunLat = decl;
+      var anti = [wrapLon(sunLon + 180), -sunLat];
       nights = NIGHT_RADII.map(function (r) { return d3.geoCircle().center(anti).radius(r)(); });
       var hh = String(d.getUTCHours()).padStart(2, '0'), mm = String(d.getUTCMinutes()).padStart(2, '0');
       sunEl.text(trG('Daylight now · {t} UTC').replace('{t}', hh + ':' + mm));
     }
     updateSun();
     setInterval(function () { updateSun(); render(); }, 60000);
+
+    function sunInView() {
+      var rad = Math.PI / 180, phi = -rot[1] * rad;
+      var delta = (sunLon + rot[0]) * rad, decl = sunLat * rad;
+      var x = Math.cos(decl) * Math.cos(delta), z = Math.sin(decl);
+      return [Math.cos(decl) * Math.sin(delta), z * Math.cos(phi) - x * Math.sin(phi),
+        z * Math.sin(phi) + x * Math.cos(phi)];
+    }
 
     function centre() { return [-rot[0], -rot[1]]; }
     function visible(p) { return flat ? Math.abs(p[1]) <= 90 : d3.geoDistance(p, centre()) < Math.PI / 2 - 0.01; }
@@ -254,9 +264,9 @@
         var wide = We >= 600, big = We >= 1000;
         // With the whole screen to itself the globe is larger; otherwise it leaves
         // room for the title above and the stories below.
-        CX = We * (wide ? 0.54 : 0.5);
-        CY = H * (big ? 0.57 : wide ? 0.6 : 0.58);
-        R = big ? Math.min(We * 0.36, H * 0.4) : Math.min(We * (wide ? 0.38 : 0.44), H * (wide ? 0.33 : 0.3));
+        CX = We * (big ? 0.62 : wide ? 0.54 : 0.5);
+        CY = H * (big ? 0.54 : wide ? 0.6 : 0.58);
+        R = big ? Math.min(We * 0.36, H * 0.43) : Math.min(We * (wide ? 0.38 : 0.44), H * (wide ? 0.33 : 0.3));
       } else {
         R = Math.min(W, H) / 2 - 14;
         CX = W / 2; CY = H / 2;
@@ -459,9 +469,22 @@
     }
     var sctx = gl ? null : sCanvas.getContext('2d'), sBuf = document.createElement('canvas'), sbctx = sBuf.getContext('2d');
     var basemap = 'dark', sat = null, satToken = 0, satTimer = 0, refineTimer = 0, refineKey = '', satFine = '';
+    var cloudMap = null, cloudRequested = false;
+    function cloudFadeProgress() {
+      return clamp((k - CLOUD_FADE_START) / (CLOUD_FADE_END - CLOUD_FADE_START), 0, 1);
+    }
+    function cloudOpacity() {
+      if (!sat || sat.style !== 'sat' || !cloudMap || host.closest('.layer-on')) return 0;
+      return 0.85 * (1 - cloudFadeProgress());
+    }
+    function analysisLightAmount() {
+      if (host.closest('.layer-on')) return 1;
+      return sat && sat.style === 'sat' ? cloudFadeProgress() : 0;
+    }
     function satKey() {
       return [flat ? 'f' : 'g', rot[0].toFixed(4), rot[1].toFixed(4), k.toFixed(5), CX.toFixed(1), CY.toFixed(1), R.toFixed(1), W, H,
-        sat ? sat.base.w : 0, sat && sat.region ? sat.region.lon0 + ',' + sat.region.lat0 + ',' + sat.region.w : ''].join('|');
+        sat ? sat.base.w : 0, sat && sat.region ? sat.region.lon0 + ',' + sat.region.lat0 + ',' + sat.region.w : '',
+        sunLon, sunLat, cloudOpacity(), analysisLightAmount()].join('|');
     }
 
     function initGL() {
@@ -470,13 +493,17 @@
         '#version 300 es',
         'precision highp float;',
         'uniform vec2 uC; uniform float uR, uLam, uSp, uCp, uHasReg, uMid, uFlat, uLat0;',
+        'uniform vec3 uSun;',
+        'uniform vec2 uSunLL;',
+        'uniform float uCloudOpacity;',
+        'uniform float uAnalysisLight;',
         'uniform vec4 uBox;',
-        'uniform sampler2D uBase, uReg;',
+        'uniform sampler2D uBase, uReg, uCloud;',
         'out vec4 o;',
         'const float PI = 3.141592653589793;',
         'void main() {',
         '  vec2 q = (gl_FragCoord.xy - uC) / uR;',
-        '  float a = 1.0, lat, lon;',
+        '  float a = 1.0, lat, lon, cz = 1.0;',
         '  if (uFlat > 0.5) {',
         // flat map: x is longitude and y latitude, in radians from the centre
         '    lat = uLat0 + q.y; lon = uLam + q.x;',
@@ -485,7 +512,7 @@
         '    float r2 = dot(q, q);',
         '    if (r2 > 1.0) discard;',
         '    a = clamp((1.0 - sqrt(r2)) * uR + 0.5, 0.0, 1.0);',
-        '    float cz = sqrt(max(0.0, 1.0 - r2));',
+        '    cz = sqrt(max(0.0, 1.0 - r2));',
         '    lat = asin(clamp(cz * uSp + q.y * uCp, -1.0, 1.0));',
         '    lon = uLam + atan(q.x, cz * uCp - q.y * uSp);',
         '  }',
@@ -499,7 +526,24 @@
         '  vec3 rc = texture(uReg, clamp(rs, 0.0, 1.0)).rgb;',
         '  vec2 e = min(rs, 1.0 - rs);',
         '  float f = uHasReg * smoothstep(0.0, 0.03, min(e.x, e.y));',
-        '  o = vec4(mix(c, rc, f) * a, a);',
+        '  c = mix(c, rc, f);',
+        '  if (uCloudOpacity > 0.0) {',
+        '    float cloud = texture(uCloud, vec2(uu, 0.5 - lat / PI)).r;',
+        '    c = mix(c, vec3(0.96, 0.98, 1.0), cloud * uCloudOpacity);',
+        '  }',
+        // sunlight: the sphere's surface direction on the globe; on the flat map the same
+        // cosine of the sun's angle from latitude and longitude (uSunLL = sun lat, lon)
+        '  float sun = uFlat > 0.5 ? sin(lat) * sin(uSunLL.x) + cos(lat) * cos(uSunLL.x) * cos(lon - uSunLL.y)',
+        '    : dot(vec3(q, cz), uSun);',
+        '  float day = smoothstep(-0.16, 0.20, sun);',
+        '  float light = 0.42 + 0.52 * day + 0.14 * max(0.0, sun);',
+        '  light = mix(light, max(light, 0.84), uAnalysisLight);',
+        '  float limb = 1.0 - cz;',
+        '  float haze = limb * limb * limb * (0.07 + 0.29 * day);',
+        '  c *= light;',
+        '  c = mix(c, vec3(0.29, 0.43, 0.54), 0.23 * uAnalysisLight);',
+        '  c = mix(c, vec3(0.26, 0.60, 0.94), haze);',
+        '  o = vec4(c * a, a);',
         '}'].join('\n');
       function sh(type, src) {
         var s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
@@ -511,7 +555,8 @@
       glProg = gl.createProgram(); gl.attachShader(glProg, vs); gl.attachShader(glProg, fs);
       gl.bindAttribLocation(glProg, 0, 'p'); gl.linkProgram(glProg);
       if (!gl.getProgramParameter(glProg, gl.LINK_STATUS)) return false;
-      ['uC', 'uR', 'uLam', 'uSp', 'uCp', 'uHasReg', 'uMid', 'uBox', 'uBase', 'uReg', 'uFlat', 'uLat0'].forEach(function (n) { glU[n] = gl.getUniformLocation(glProg, n); });
+      ['uC', 'uR', 'uLam', 'uSp', 'uCp', 'uHasReg', 'uMid', 'uBox', 'uBase', 'uReg', 'uFlat', 'uLat0',
+        'uSun', 'uSunLL', 'uCloudOpacity', 'uCloud', 'uAnalysisLight'].forEach(function (n) { glU[n] = gl.getUniformLocation(glProg, n); });
       var buf = gl.createBuffer();
       gl.bindBuffer(gl.ARRAY_BUFFER, buf);
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);   // one big triangle
@@ -830,8 +875,8 @@
       fillUsed = false; showFillNote();
       var my = ++satToken, st = STYLES[style];
       clearTimeout(refineTimer); refineKey = '';
-      if (sat) { freeTex(sat.base); freeTex(sat.region); }
       if (!st.layer) {
+        if (sat) { freeTex(sat.base); freeTex(sat.region); }
         sat = null;
         host.classList.remove('has-sat');
         clearSat();
@@ -861,11 +906,19 @@
             if (!sat) setBasemap('dark');
             return;
           }
-          if (!sat) sat = { base: px, region: null };
-          else { freeTex(sat.base); sat.base = px; }
+          if (sat) { freeTex(sat.base); freeTex(sat.region); }
+          sat = { base: px, region: null, style: style };
           host.classList.add('has-sat');
           satFine = '';
           render();
+          if (style === 'sat' && !cloudRequested) {
+            cloudRequested = true;
+            loadSurface('assets/earth-clouds.jpg', true, function (cloud) {
+              if (!cloud) return;
+              cloudMap = cloud;
+              if (sat && sat.style === 'sat') render();
+            });
+          }
           step(list, i + 1, isFallback);
         });
       }
@@ -905,6 +958,14 @@
       gl.uniform1f(glU.uHasReg, g ? 1 : 0);
       gl.uniform1f(glU.uMid, g ? g.lonMid : 0);
       gl.uniform4f(glU.uBox, g ? g.lon0 : 0, g ? g.lon1 : 1, g ? g.lat0 : 0, g ? g.lat1 : 1);
+      gl.uniform3fv(glU.uSun, sunInView());
+      gl.uniform2f(glU.uSunLL, sunLat * RAD, sunLon * RAD);
+      var clouds = cloudOpacity();
+      gl.activeTexture(gl.TEXTURE2);
+      gl.bindTexture(gl.TEXTURE_2D, clouds ? cloudMap.tex : sat.base.tex);
+      gl.uniform1i(glU.uCloud, 2);
+      gl.uniform1f(glU.uCloudOpacity, clouds);
+      gl.uniform1f(glU.uAnalysisLight, analysisLightAmount());
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     }
 
@@ -922,34 +983,53 @@
       var RAD = Math.PI / 180, lam0 = -rot[0] * RAD, phi0 = -rot[1] * RAD, sp = Math.sin(phi0), cp = Math.cos(phi0);
       var b = sat.base, bd = b.data, bw = b.w, bh = b.h, TWO = 2 * Math.PI;
       var g = sat.region, gd = g && g.data;
+      var sun = sunInView(), opacity = cloudOpacity(), clouds = opacity ? cloudMap : null;
+      var analysisLight = analysisLightAmount(), tint = 0.23 * analysisLight;
+      var sunSin = Math.sin(sunLat * RAD), sunCos = Math.cos(sunLat * RAD), sunRad = sunLon * RAD;
       for (var j = 0; j < h; j++) {
         var yy = (CY - (y0 + (j + 0.5) / dens)) / rr;
         for (var i = 0; i < w; i++) {
-          var xx = (x0 + (i + 0.5) / dens - CX) / rr, lat, lon;
+          var xx = (x0 + (i + 0.5) / dens - CX) / rr, lat, lon, cz;
           if (flat) {
-            lat = phi0 + yy; lon = lam0 + xx;
+            lat = phi0 + yy; lon = lam0 + xx; cz = 1;      // flat map: no curved edge, so no edge haze
             if (Math.abs(lat) > Math.PI / 2 || Math.abs(xx) > Math.PI) continue;
           } else {
             var r2 = xx * xx + yy * yy;
             if (r2 >= 1) continue;
-            var cz = Math.sqrt(1 - r2);
-            lat = Math.asin(cz * sp + yy * cp);
+            cz = Math.sqrt(1 - r2);
+            lat = Math.asin(clamp(cz * sp + yy * cp, -1, 1));
             lon = lam0 + Math.atan2(xx, cz * cp - yy * sp);
           }
-          var o = (j * w + i) * 4, s;
+          var u = lon / TWO + 0.5; u -= Math.floor(u);
+          var v = 0.5 - lat / Math.PI;
+          var source = bd, s = (Math.min(bh - 1, Math.floor(v * bh)) * bw + Math.floor(u * bw)) * 4;
           if (g) {
             var gx = lon / RAD; gx = gx - 360 * Math.round((gx - g.lonMid) / 360);
             var gt = lat / RAD;
             if (gx >= g.lon0 && gx < g.lon1 && gt > g.lat0 && gt <= g.lat1) {
               s = (Math.min(g.h - 1, Math.floor((g.lat1 - gt) / (g.lat1 - g.lat0) * g.h)) * g.w +
                 Math.min(g.w - 1, Math.floor((gx - g.lon0) / (g.lon1 - g.lon0) * g.w))) * 4;
-              d[o] = gd[s]; d[o + 1] = gd[s + 1]; d[o + 2] = gd[s + 2]; d[o + 3] = 255;
-              continue;
+              source = gd;
             }
           }
-          var u = lon / TWO + 0.5; u -= Math.floor(u);
-          s = (Math.min(bh - 1, Math.floor((0.5 - lat / Math.PI) * bh)) * bw + Math.min(bw - 1, Math.floor(u * bw))) * 4;
-          d[o] = bd[s]; d[o + 1] = bd[s + 1]; d[o + 2] = bd[s + 2]; d[o + 3] = 255;
+          var cloud = clouds ? clouds.data[(Math.min(clouds.h - 1, Math.floor(v * clouds.h)) * clouds.w +
+            Math.floor(u * clouds.w)) * 4] / 255 * opacity : 0;
+          // sunlight: on the globe from the sphere's surface direction; on the flat map the same
+          // cosine of the sun's angle, from latitude and longitude
+          var solar = flat ? Math.sin(lat) * sunSin + Math.cos(lat) * sunCos * Math.cos(lon - sunRad)
+            : xx * sun[0] + yy * sun[1] + cz * sun[2];
+          var day = clamp((solar + 0.16) / 0.36, 0, 1);
+          day *= day * (3 - 2 * day);
+          var light = 0.42 + 0.52 * day + 0.14 * Math.max(0, solar);
+          light += (Math.max(light, 0.84) - light) * analysisLight;
+          var limb = 1 - cz, haze = limb * limb * limb * (0.07 + 0.29 * day);
+          var visibleLight = light * (1 - tint) * (1 - haze), fill = tint * (1 - haze);
+          var surface = (1 - cloud) * visibleLight, cloudLight = cloud * visibleLight;
+          var o = (j * w + i) * 4;
+          d[o] = source[s] * surface + 245 * cloudLight + 74 * fill + 66 * haze;
+          d[o + 1] = source[s + 1] * surface + 250 * cloudLight + 110 * fill + 153 * haze;
+          d[o + 2] = source[s + 2] * surface + 255 * cloudLight + 138 * fill + 240 * haze;
+          d[o + 3] = 255;
         }
       }
       sbctx.putImageData(img, 0, 0);
@@ -977,7 +1057,7 @@
       render();
     }
     function refineSat() {
-      if (!sat || drag || anim || spinning) return;
+      if (!sat || sat.style !== basemap || drag || anim || spinning) return;
       // zoomed out, the world picture is enough
       if (k < 1.3) { dropRegion(); return; }
       // lon/lat of a grid of screen points that land on the Earth (the edge of the disc

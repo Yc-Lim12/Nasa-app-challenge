@@ -212,7 +212,7 @@
         { y: sy(trendAt(f1)), t: T(FUT ? 'Trend, extended' : 'Trend line'), c: 'endlabel' }
       ];
       if (smooth) {
-        for (var s = smooth.length - 1; s >= 0; s--) if (smooth[s] !== null) { labels.push({ y: sy(smooth[s]), t: '5-year average', c: 'endlabel' }); break; }
+        for (var s = smooth.length - 1; s >= 0; s--) if (smooth[s] !== null) { labels.push({ y: sy(smooth[s]), t: T('5-year average'), c: 'endlabel' }); break; }
       }
       if (cmp) labels.push({ y: sy(cvals[cvals.length - 1]), t: cmp.short, c: 'endlabel l-cmp' });
       spread(labels, 15, m.t + 4, m.t + ih);
@@ -261,10 +261,10 @@
       dot.setAttribute('cx', cx); dot.setAttribute('cy', cy); dot.setAttribute('visibility', 'visible');
       var html = '<strong>' + esc(whenLabel(yy)) + '</strong><span><i class="key key-series"></i>' +
         (cmp ? esc(res.short) + ': ' : '') +
-        esc(view.anom ? fmtAnom(vals[k], vr) + ' vs average' : fmtValue(vals[k], vr)) +
+        esc(view.anom ? T('{x} vs average', { x: fmtAnom(vals[k], vr) }) : fmtValue(vals[k], vr)) +
         (view.anom ? ' <em>(' + esc(fmtValue(res.values[k], vr)) + ')</em>' : '') + '</span>';
-      html += '<span><i class="key key-trend"></i>' + esc(view.anom ? fmtAnom(trendAt(yy), vr) : fmtValue(trendAt(yy), vr)) + ' on the trend line</span>';
-      if (smooth && smooth[k] !== null) html += '<span><i class="key key-smooth"></i>' + esc(view.anom ? fmtAnom(smooth[k], vr) : fmtValue(smooth[k], vr)) + ' 5-year average</span>';
+      html += '<span><i class="key key-trend"></i>' + esc(T('{x} on the trend line', { x: view.anom ? fmtAnom(trendAt(yy), vr) : fmtValue(trendAt(yy), vr) })) + '</span>';
+      if (smooth && smooth[k] !== null) html += '<span><i class="key key-smooth"></i>' + esc(view.anom ? fmtAnom(smooth[k], vr) : fmtValue(smooth[k], vr)) + ' ' + esc(T('5-year average')) + '</span>';
       var ci = cmp ? cmp.years.indexOf(yy) : -1;
       if (ci >= 0) {
         cdot.setAttribute('cx', cx); cdot.setAttribute('cy', sy(cvals[ci])); cdot.setAttribute('visibility', 'visible');
@@ -329,13 +329,13 @@
 
     // legend and hint
     var lg = '<span><i class="key key-series"></i>' + esc(cmp ? res.short : T(monthly ? 'Each month minus its normal' : 'Yearly value')) + '</span>' +
-      '<span><i class="key key-trend"></i>Trend line</span><span><i class="key key-band"></i>95% confidence band</span>';
+      '<span><i class="key key-trend"></i>' + esc(T('Trend line')) + '</span><span><i class="key key-band"></i>' + esc(T('95% confidence band')) + '</span>';
     if (smooth) lg += '<span><i class="key key-smooth"></i>' + T('5-year average') + '</span>';
     if (FUT) lg += '<span><i class="key key-future"></i>' + T('If the trend continues') + '</span>';
     if (cmp) lg += '<span><i class="key key-cmp"></i>' + esc(cmp.short) + '</span>';
     $('legend').innerHTML = lg;
-    $('chart-hint').textContent = 'Drag across the chart to test only those years. Stripes: ' + sc.loName +
-      ' years were below the average, ' + sc.hiName + ' years above.';
+    $('chart-hint').textContent = T('Drag across the chart to test only those years. Stripes: {lo} years were below the average, {hi} years above.',
+      { lo: T(sc.loName), hi: T(sc.hiName) });
   }
 
   // ---- months panel --------------------------------------------------------

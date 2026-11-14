@@ -200,8 +200,9 @@
   function fmtP(p) { return p < 0.001 ? '< 0.001' : p.toFixed(3); }
   function pEquals(p) { return p < 0.001 ? 'p < 0.001' : 'p = ' + p.toFixed(3); }
   function coordLabel(lat, lon) {
-    return Math.abs(lat).toFixed(1) + '°' + (lat >= 0 ? 'N' : 'S') + ', ' +
-      Math.abs(lon).toFixed(1) + '°' + (lon >= 0 ? 'E' : 'W');
+    var bm = !!(window.TDi18n && window.TDi18n.lang === 'bm');   // Malay: U(tara), S(elatan), T(imur), B(arat)
+    return Math.abs(lat).toFixed(1) + '°' + (lat >= 0 ? (bm ? 'U' : 'N') : 'S') + ', ' +
+      Math.abs(lon).toFixed(1) + '°' + (lon >= 0 ? (bm ? 'T' : 'E') : (bm ? 'B' : 'W'));
   }
   function capFirst(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
   function verdictLabel(v) { return v === 'significant' ? 'Significant' : (v === 'borderline' ? 'Borderline' : 'No clear trend'); }
@@ -649,7 +650,8 @@
 
     $('chart-title').textContent = vname(vr) + (vr.unit ? ' (' + vr.unit + ')' : '') + ', ' +
       (monthly ? T('each month minus its normal') + (res.month ? ' (' + T(MONTHS[res.month]) + ')' : '')
-        : T(res.month ? '{month} average' : 'yearly average', { month: T(MONTHS[res.month]) })) + ', ' + T(res.placeName);
+        : T(res.month ? '{month} average' : 'yearly average', { month: T(MONTHS[res.month]) })) + ', ' +
+      (res.placeId === 'custom' ? coordLabel(res.lat, res.lon) : T(res.placeName));
     $('empty').hidden = true;
     $('result').hidden = false;
     $('live-hint').hidden = false;

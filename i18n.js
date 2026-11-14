@@ -444,6 +444,13 @@
     'I can only answer questions about this result. Try: "Is the change real?", "How fast is it changing?" or "Why might it be changing?"': 'Saya hanya boleh menjawab soalan tentang keputusan ini. Cuba: "Adakah perubahan ini benar?", "Berapa cepat ia berubah?" atau "Kenapa ia mungkin berubah?"',
     'Sorry, something went wrong while answering. Please try another question.': 'Maaf, berlaku masalah semasa menjawab. Sila cuba soalan lain.',
 
+    // ---- chart card: legend, hint, tooltip, table ----
+    '95% confidence band': 'Jalur keyakinan 95%', 'Value': 'Nilai',
+    'Drag across the chart to test only those years. Stripes: {lo} years were below the average, {hi} years above.':
+      'Seret merentasi carta untuk menguji tahun-tahun itu sahaja. Jalur warna: tahun {lo} berada di bawah purata, tahun {hi} di atas purata.',
+    'blue': 'biru', 'red': 'merah', 'brown': 'coklat', 'teal': 'hijau kebiruan',
+    '{x} vs average': '{x} berbanding purata', '{x} on the trend line': '{x} pada garis tren',
+
     // ---- months ----
     'Whole year': 'Sepanjang tahun', 'January': 'Januari', 'February': 'Februari', 'March': 'Mac', 'May': 'Mei', 'June': 'Jun',
     'July': 'Julai', 'August': 'Ogos', 'October': 'Oktober', 'December': 'Disember',

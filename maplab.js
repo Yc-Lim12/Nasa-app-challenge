@@ -469,13 +469,30 @@
     var cosw = new Float32Array(AH);
     for (i = 0; i < AH; i++) cosw[i] = Math.cos((90 - (i + 0.5) * 180 / AH) * Math.PI / 180);
     var global = [];
+    var tmp = new Float32Array(N);
     vals.forEach(function (a) {
       var s = 0, w = 0;
       for (k = 0; k < N; k++) {
         if (cnt[k] >= 20 && a[k] === a[k]) { a[k] -= sum[k] / cnt[k]; s += a[k] * cosw[(k / AW) | 0]; w += cosw[(k / AW) | 0]; }
         else a[k] = NaN;
       }
-      global.push(w ? s / w : NaN);
+      global.push(w ? s / w : NaN);   // the global number uses the unsmoothed values
+      // NASA's colour steps (~0.5 °C) leave stripes in the differences: average each cell
+      // with its eight neighbours (missing ones skipped) for the map only
+      for (var y = 0; y < AH; y++) {
+        for (var x = 0; x < AW; x++) {
+          var t = 0, c = 0;
+          for (var dy = -1; dy <= 1; dy++) {
+            var yy = y + dy; if (yy < 0 || yy >= AH) continue;
+            for (var dx = -1; dx <= 1; dx++) {
+              var v = a[yy * AW + (x + dx + AW) % AW];
+              if (v === v) { t += v; c++; }
+            }
+          }
+          tmp[y * AW + x] = a[y * AW + x] === a[y * AW + x] && c ? t / c : NaN;
+        }
+      }
+      a.set(tmp);
     });
     return { vals: vals, global: global };
   }

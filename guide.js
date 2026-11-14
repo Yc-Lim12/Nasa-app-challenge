@@ -36,7 +36,7 @@
     { target: '.ai-bar', prep: 'case', title: 'Ask AI',
       text: '“Explain this simply” puts the result in plain words. “Ask AI a question” opens a chat about it. It works without an account; an OpenAI key in Settings gives longer answers.' },
     { target: '#st-open', title: 'Settings',
-      text: 'Light or dark, English or Bahasa Malaysia, the map style, and this tour again.' }
+      text: 'Light or dark, English or Bahasa Malaysia, a round globe or a flat map, the map style, the Methods, and this tour again.' }
   ];
 
   var i = 0, box, ring, bubble, lastFocus = null, running = false;

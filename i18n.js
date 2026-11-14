@@ -282,6 +282,8 @@
     'Worked out from NASA’s pictures, so values are rounded to NASA’s colour steps. For viewing only: the trend tests use NASA POWER numbers.': 'Dikira daripada gambar NASA, jadi nilai dibundarkan mengikut langkah warna NASA. Untuk tontonan sahaja: ujian tren menggunakan nombor NASA POWER.',
     'No colour: above 18 mm/day, beyond NASA’s colour scale, so the exact value is unknown.': 'Tiada warna: melebihi 18 mm/hari, di luar skala warna NASA, jadi nilai tepat tidak diketahui.',
     'No colour: hotter than 37 °C or colder than −53 °C, beyond NASA’s colour scale, so the exact value is unknown.': 'Tiada warna: lebih panas daripada 37 °C atau lebih sejuk daripada −53 °C, di luar skala warna NASA, jadi nilai tepat tidak diketahui.',
+    'Map view': 'Paparan peta', 'Flat map': 'Peta rata',
+    'Light or dark, English or Bahasa Malaysia, a round globe or a flat map, the map style, the Methods, and this tour again.': 'Cerah atau gelap, Bahasa Inggeris atau Bahasa Malaysia, glob bulat atau peta rata, gaya peta, Kaedah, dan lawatan ini semula.',
     'Grid cells': 'Sel grid', 'Smooth': 'Licin', 'Opacity': 'Kelegapan', 'How to draw the grid': 'Cara melukis grid',
     'Guided stories': 'Kisah berpandu', 'World story': 'Kisah dunia',
     'Wildfire smoke over Wisconsin': 'Asap kebakaran hutan di Wisconsin', 'Summer haze far from the fires': 'Jerebu musim panas jauh dari kebakaran',

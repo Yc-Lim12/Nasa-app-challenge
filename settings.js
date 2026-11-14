@@ -25,6 +25,11 @@
     else { document.documentElement.setAttribute('data-theme', v); store('td-theme', v); }
     TD.rerender();          // the theme button in the case file follows
   }
+  function mapView() { return TD.globe && TD.globe.flat ? 'flat' : 'globe'; }
+  function setMapView(v) {
+    store('td-view', v === 'flat' ? 'flat' : null);
+    if (TD.globe && TD.globe.setFlat) TD.globe.setFlat(v === 'flat');
+  }
   function mapStyle() { return store('td-globe') || 'sat'; }
   function setMapStyle(v) {
     store('td-globe', v);
@@ -43,6 +48,7 @@
         '<button type="button" class="ai-icon" data-act="close" aria-label="' + esc(T('Close')) + '">✕</button></header>' +
       '<section><h3>' + esc(T('Appearance')) + '</h3>' + seg('theme', theme(), [['light', 'Light'], ['dark', 'Dark'], ['auto', 'Auto']]) + '</section>' +
       '<section><h3>' + esc(T('Language')) + '</h3>' + seg('lang', lang, [['en', 'English'], ['bm', 'Bahasa Malaysia']]) + '</section>' +
+      '<section><h3>' + esc(T('Map view')) + '</h3>' + seg('view', mapView(), [['globe', 'Globe'], ['flat', 'Flat map']]) + '</section>' +
       '<section><h3>' + esc(T('Map style')) + '</h3>' + seg('map', mapStyle(), [['sat', 'Satellite'], ['live', 'Latest satellite pass'], ['dark', 'Dark map']]) +
         '<p class="st-hint">' + esc(T('Satellite is a cloud-free NASA picture. Latest satellite pass is yesterday’s real view, clouds included.')) + '</p></section>' +
       '<section class="st-links"><h3>' + esc(T('Help')) + '</h3>' +
@@ -93,6 +99,7 @@
       if (set === 'theme') setTheme(v);
       else if (set === 'lang') { if (window.TDi18n) window.TDi18n.set(v); }
       else if (set === 'map') setMapStyle(v);
+      else if (set === 'view') setMapView(v);
       else if (act === 'close') { close(); return; }
       else if (act === 'tour') { close(); if (window.TDGuide) window.TDGuide.start(); return; }
       else if (act === 'methods') {

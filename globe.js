@@ -115,7 +115,13 @@
     }
     document.addEventListener('td:lang', showFillNote);
 
-    var proj = d3.geoOrthographic().clipAngle(90).precision(0.3);
+    // Two views of the same data: the round globe (orthographic) and a flat world map
+    // (equirectangular: longitude and latitude as straight x and y, the same layout as
+    // NASA's pictures). Everything is drawn through `proj`, so switching it switches all.
+    var projGlobe = d3.geoOrthographic().clipAngle(90).precision(0.3);
+    var projFlat = d3.geoEquirectangular().precision(0.1);
+    var flat = false;
+    var proj = projGlobe;
     var path = d3.geoPath(proj);
     var grat = d3.geoGraticule10();
     var land = null, borders = null, landLo = null, bordLo = null, restTimer = 0;
@@ -207,12 +213,26 @@
     setInterval(function () { updateSun(); render(); }, 60000);
 
     function centre() { return [-rot[0], -rot[1]]; }
-    function visible(p) { return d3.geoDistance(p, centre()) < Math.PI / 2 - 0.01; }
+    function visible(p) { return flat ? Math.abs(p[1]) <= 90 : d3.geoDistance(p, centre()) < Math.PI / 2 - 0.01; }
+    // the flat map: zoomed fully out it shows the whole world; it never scrolls past a pole
+    function kMin() { return flat ? Math.min(Math.max(240, W - inset) / (2 * Math.PI * R), H / (Math.PI * R)) * 0.98 : K_MIN; }
+    function clampFlat() {
+      if (!flat) return;
+      if (k < kMin()) k = kMin();
+      var S = R * k, half = H / 2 / S * 180 / Math.PI, lim = Math.max(0, 90 - half);
+      rot[1] = clamp(rot[1], -lim, lim);
+    }
 
     // `inset` is the width covered by the case-file sheet on the right. The globe
     // centres itself in what is left, so it stays in view while the sheet is out.
     var inset = 0, insetRaf = 0;
     function layout() {
+      if (flat) {
+        var Wf = Math.max(240, W - inset);
+        CX = Wf / 2; CY = H / 2;
+        R = opts.fill ? Math.min(Wf * 0.36, H * 0.4) : Math.min(W, H) / 2 - 14;   // same scale as the globe
+        return;
+      }
       if (opts.fill) {
         var We = Math.max(240, W - inset);
         var wide = We >= 600, big = We >= 1000;
@@ -259,10 +279,14 @@
     }
 
     function render() {
-      proj.translate([CX, CY]).scale(R * k).rotate([rot[0], rot[1], 0]);
+      if (flat) {
+        clampFlat();
+        var S = R * k;
+        proj.scale(S).rotate([rot[0], 0, 0]).translate([CX, CY - rot[1] * Math.PI / 180 * S]);
+      } else proj.translate([CX, CY]).scale(R * k).rotate([rot[0], rot[1], 0]);
       var ds = path({ type: 'Sphere' });
-      gOcean.attr('d', ds); gShade.attr('d', ds); gShine.attr('d', ds); gRim.attr('d', ds);
-      gHalo.attr('cx', CX).attr('cy', CY).attr('r', R * k * 1.16);
+      gOcean.attr('d', ds); gShade.attr('d', flat ? null : ds); gShine.attr('d', flat ? null : ds); gRim.attr('d', flat ? null : ds);
+      gHalo.attr('cx', CX).attr('cy', CY).attr('r', flat ? 0 : R * k * 1.16);
       gNight1.attr('d', night1 ? path(night1) : null);
       gNight2.attr('d', night2 ? path(night2) : null);
       if (REDUCED) drawStars(0);
@@ -383,7 +407,7 @@
       spinRaf = requestAnimationFrame(spinFrame);
     }
     function spin(on) {
-      spinning = !!on && !REDUCED;
+      spinning = !!on && !REDUCED && !flat;
       cancelAnimationFrame(spinRaf);
       spinLast = null;
       host.classList.toggle('spinning', spinning);
@@ -421,7 +445,7 @@
     var sctx = gl ? null : sCanvas.getContext('2d'), sBuf = document.createElement('canvas'), sbctx = sBuf.getContext('2d');
     var basemap = 'dark', sat = null, satToken = 0, satTimer = 0, refineTimer = 0, refineKey = '', satFine = '';
     function satKey() {
-      return [rot[0].toFixed(4), rot[1].toFixed(4), k.toFixed(5), CX.toFixed(1), CY.toFixed(1), R.toFixed(1), W, H,
+      return [flat ? 'f' : 'g', rot[0].toFixed(4), rot[1].toFixed(4), k.toFixed(5), CX.toFixed(1), CY.toFixed(1), R.toFixed(1), W, H,
         sat ? sat.base.w : 0, sat && sat.region ? sat.region.lon0 + ',' + sat.region.lat0 + ',' + sat.region.w : ''].join('|');
     }
 
@@ -430,19 +454,26 @@
       var FS = [
         '#version 300 es',
         'precision highp float;',
-        'uniform vec2 uC; uniform float uR, uLam, uSp, uCp, uHasReg, uMid;',
+        'uniform vec2 uC; uniform float uR, uLam, uSp, uCp, uHasReg, uMid, uFlat, uLat0;',
         'uniform vec4 uBox;',
         'uniform sampler2D uBase, uReg;',
         'out vec4 o;',
         'const float PI = 3.141592653589793;',
         'void main() {',
         '  vec2 q = (gl_FragCoord.xy - uC) / uR;',
-        '  float r2 = dot(q, q);',
-        '  if (r2 > 1.0) discard;',
-        '  float a = clamp((1.0 - sqrt(r2)) * uR + 0.5, 0.0, 1.0);',
-        '  float cz = sqrt(max(0.0, 1.0 - r2));',
-        '  float lat = asin(clamp(cz * uSp + q.y * uCp, -1.0, 1.0));',
-        '  float lon = uLam + atan(q.x, cz * uCp - q.y * uSp);',
+        '  float a = 1.0, lat, lon;',
+        '  if (uFlat > 0.5) {',
+        // flat map: x is longitude and y latitude, in radians from the centre
+        '    lat = uLat0 + q.y; lon = uLam + q.x;',
+        '    if (abs(lat) > PI / 2.0 || abs(q.x) > PI) discard;',
+        '  } else {',
+        '    float r2 = dot(q, q);',
+        '    if (r2 > 1.0) discard;',
+        '    a = clamp((1.0 - sqrt(r2)) * uR + 0.5, 0.0, 1.0);',
+        '    float cz = sqrt(max(0.0, 1.0 - r2));',
+        '    lat = asin(clamp(cz * uSp + q.y * uCp, -1.0, 1.0));',
+        '    lon = uLam + atan(q.x, cz * uCp - q.y * uSp);',
+        '  }',
         // two copies of u that wrap at different places; use the smooth one so no seam line
         '  float u = lon / (2.0 * PI) + 0.5;',
         '  float ua = fract(u), ub = fract(u + 0.5) - 0.5;',
@@ -465,7 +496,7 @@
       glProg = gl.createProgram(); gl.attachShader(glProg, vs); gl.attachShader(glProg, fs);
       gl.bindAttribLocation(glProg, 0, 'p'); gl.linkProgram(glProg);
       if (!gl.getProgramParameter(glProg, gl.LINK_STATUS)) return false;
-      ['uC', 'uR', 'uLam', 'uSp', 'uCp', 'uHasReg', 'uMid', 'uBox', 'uBase', 'uReg'].forEach(function (n) { glU[n] = gl.getUniformLocation(glProg, n); });
+      ['uC', 'uR', 'uLam', 'uSp', 'uCp', 'uHasReg', 'uMid', 'uBox', 'uBase', 'uReg', 'uFlat', 'uLat0'].forEach(function (n) { glU[n] = gl.getUniformLocation(glProg, n); });
       var buf = gl.createBuffer();
       gl.bindBuffer(gl.ARRAY_BUFFER, buf);
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);   // one big triangle
@@ -780,6 +811,8 @@
       gl.uniform1f(glU.uLam, -rot[0] * RAD);
       gl.uniform1f(glU.uSp, Math.sin(-rot[1] * RAD));
       gl.uniform1f(glU.uCp, Math.cos(-rot[1] * RAD));
+      gl.uniform1f(glU.uFlat, flat ? 1 : 0);
+      gl.uniform1f(glU.uLat0, -rot[1] * RAD);
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, sat.base.tex); gl.uniform1i(glU.uBase, 0);
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, g ? g.tex : sat.base.tex); gl.uniform1i(glU.uReg, 1);
       gl.uniform1f(glU.uHasReg, g ? 1 : 0);
@@ -793,6 +826,7 @@
       var rr = R * k;
       var x0 = Math.max(0, Math.floor(CX - rr)), x1 = Math.min(W, Math.ceil(CX + rr));
       var y0 = Math.max(0, Math.floor(CY - rr)), y1 = Math.min(H, Math.ceil(CY + rr));
+      if (flat) { x0 = 0; x1 = W; y0 = 0; y1 = H; }
       if (x1 <= x0 || y1 <= y0) return;
       var dens = fine ? Math.min(dpr, 1.5) : (k > 2.5 ? 0.34 : 0.5);
       var w = Math.ceil((x1 - x0) * dens), h = Math.ceil((y1 - y0) * dens);
@@ -804,11 +838,17 @@
       for (var j = 0; j < h; j++) {
         var yy = (CY - (y0 + (j + 0.5) / dens)) / rr;
         for (var i = 0; i < w; i++) {
-          var xx = (x0 + (i + 0.5) / dens - CX) / rr, r2 = xx * xx + yy * yy;
-          if (r2 >= 1) continue;
-          var cz = Math.sqrt(1 - r2);
-          var lat = Math.asin(cz * sp + yy * cp);
-          var lon = lam0 + Math.atan2(xx, cz * cp - yy * sp);
+          var xx = (x0 + (i + 0.5) / dens - CX) / rr, lat, lon;
+          if (flat) {
+            lat = phi0 + yy; lon = lam0 + xx;
+            if (Math.abs(lat) > Math.PI / 2 || Math.abs(xx) > Math.PI) continue;
+          } else {
+            var r2 = xx * xx + yy * yy;
+            if (r2 >= 1) continue;
+            var cz = Math.sqrt(1 - r2);
+            lat = Math.asin(cz * sp + yy * cp);
+            lon = lam0 + Math.atan2(xx, cz * cp - yy * sp);
+          }
           var o = (j * w + i) * 4, s;
           if (g) {
             var gx = lon / RAD; gx = gx - 360 * Math.round((gx - g.lonMid) / 360);
@@ -1073,19 +1113,27 @@
       // screen pixels per degree near the centre; cell borders only once cells are big
       var ppd = R * k * Math.PI / 180;
       cellPx = crisp && !moving && cellGrid && Math.min(cellGrid.dlon, cellGrid.dlat) * ppd >= 14 ? ppd : 0;
-      var key = [rot[0].toFixed(3), rot[1].toFixed(3), k.toFixed(4), W, H, step].join('|');
+      var key = [flat ? 'flat' : 'globe', rot[0].toFixed(3), rot[1].toFixed(3), k.toFixed(4), W, H, step].join('|');
       if (!rasterCache || rasterCache.key !== key) {
         // cache the lon/lat under every sample pixel, so a new frame is just lookups
         var lon = new Float32Array(w * h).fill(NaN), lat = new Float32Array(w * h), rr = R * k;
         var RAD = Math.PI / 180, lam0 = -rot[0], sp = Math.sin(-rot[1] * RAD), cp = Math.cos(-rot[1] * RAD);
         var ya = Math.max(0, Math.floor((CY - rr) / step)), yb = Math.min(h, Math.ceil((CY + rr) / step));
         var xa = Math.max(0, Math.floor((CX - rr) / step)), xb = Math.min(w, Math.ceil((CX + rr) / step));
+        if (flat) { ya = 0; yb = h; xa = 0; xb = w; }
         for (var y = ya; y < yb; y++) {
           var yy = (CY - (y + 0.5) * step) / rr;
           for (var x = xa; x < xb; x++) {
-            var xx = ((x + 0.5) * step - CX) / rr, r2 = xx * xx + yy * yy;
+            var xx = ((x + 0.5) * step - CX) / rr, i = y * w + x;
+            if (flat) {
+              var la = -rot[1] + yy / RAD;
+              if (Math.abs(la) > 90 || Math.abs(xx) > Math.PI) continue;
+              lat[i] = la; lon[i] = wrapLon(lam0 + xx / RAD);
+              continue;
+            }
+            var r2 = xx * xx + yy * yy;
             if (r2 >= 1) continue;
-            var cz = Math.sqrt(1 - r2), i = y * w + x;
+            var cz = Math.sqrt(1 - r2);
             lat[i] = Math.asin(cz * sp + yy * cp) / RAD;
             lon[i] = wrapLon(lam0 + Math.atan2(xx, cz * cp - yy * sp) / RAD);
           }
@@ -1214,11 +1262,12 @@
       spin(false);
       var k1 = zoom ? zoom : opts.fill ? (sz >= 6 ? 1.0 : 1.08)
         : (sz >= 10 ? 1.1 : (sz >= 6 ? 1.25 : 1.4));   // keep the round edge in view
+      if (flat && k1 <= 1.1) k1 = kMin();
       if (first) { first = false; if (dur === undefined) dur = 2200; }
       animateTo([-lon, -lat], k1, dur === undefined ? 1100 : dur);
     }
 
-    function zoomBy(f) { spin(false); animateTo(rot, clamp(k * f, K_MIN, K_MAX), 350); }
+    function zoomBy(f) { spin(false); animateTo(rot, clamp(k * f, kMin(), K_MAX), 350); }
 
     // Momentum: after a flick the globe carries on at the finger's speed and slows
     // down like a scroll view. It runs in the same slot as other animations, so a
@@ -1317,7 +1366,7 @@
       e.preventDefault(); spin(false);
       var dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;   // lines -> pixels
       var from = anim && anim.zoomTo ? anim.zoomTo : k;
-      glideZoom(clamp(from * Math.exp(-dy * (e.ctrlKey ? 0.01 : 0.0022)), K_MIN, K_MAX));
+      glideZoom(clamp(from * Math.exp(-dy * (e.ctrlKey ? 0.01 : 0.0022)), kMin(), K_MAX));
     }, { passive: false });
     // Ease the zoom towards its target over a few frames instead of jumping per wheel tick.
     function glideZoom(target) {
@@ -1390,7 +1439,27 @@
       });
     }
 
+    /** Round globe or flat world map. Remembers nothing itself; Settings stores the choice. */
+    function setFlat(on) {
+      on = !!on;
+      if (on === flat) return;
+      stopAnim(); spin(false);
+      flat = on;
+      proj = on ? projFlat : projGlobe;
+      path = d3.geoPath(proj);
+      host.classList.toggle('flat', on);
+      layout();
+      k = on ? kMin() : Math.max(K_MIN, Math.min(k, 1.2));
+      if (!on) rot[1] = clamp(rot[1], -89, 89);
+      rasterCache = null; satFine = ''; refineKey = '';
+      if (sat && sat.region) { freeTex(sat.region); sat.region = null; }
+      render();
+    }
+    try { if (opts.fill && localStorage.getItem('td-view') === 'flat') setFlat(true); } catch (err) { /* private mode */ }
+
     return {
+      setFlat: setFlat,
+      get flat() { return flat; },
       setSelection: function (s) { sel = s; render(); },
       setCompare: function (s) { cmp = s; render(); },
       flyTo: flyTo,

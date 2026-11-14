@@ -182,8 +182,9 @@
       if (my !== token) return;
       loadKey = g.key;
       var s = TD.state, frames = [];
+      var keep = TD.partMonths(s.month);
       for (var y = s.y0; y <= s.y1; y++) for (var m = 1; m <= 12; m++) {
-        if (s.month && m !== s.month) continue;
+        if (keep.indexOf(m) < 0) continue;
         frames.push(y + (m < 10 ? '0' : '') + m);
       }
       // each cell's normal for every calendar month
@@ -372,7 +373,8 @@
 
   function showWind() {
     var my = token, s = TD.state;
-    if (windMonth === null) windMonth = s.month;
+    // a season shows its middle month, which matches one of the panel buttons
+    if (windMonth === null) windMonth = s.month > 12 ? { 13: 7, 14: 10, 15: 1, 16: 4 }[s.month] : s.month;
     busy(T('Wind'), T('Loading 10 m wind for a {b}° box around this place…', { b: BOX }));
     TD.globe.flyTo(s.lat, s.lon, BOX, 1300, zoomFor());
     Promise.all(['U10M', 'V10M'].map(function (pm) { return TD.fetchJson(TD.urlFor(pm, s.lat, s.lon, BOX)); })).then(function (js) {

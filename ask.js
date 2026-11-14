@@ -13,17 +13,18 @@
     ['T2M_MAX', /\b(daytime|day-time|afternoons?|highs?|siang|tengah hari)\b/],
     ['SST', /\b(sea|ocean|seas|laut|lautan)\b/],
     ['TS', /\b(ground|land surface|surface temperature|permukaan tanah)\b/],
-    ['AOD_55', /\b(haze|hazy|hazier|smoke|smoky|smog|dust|dusty|aerosols?|air quality|pollution|polluted|jerebu|asap|debu|pencemaran)\b/],
+    ['AOD_55', /\b(haze|hazy|hazier|smoke|smoky|smog|wildfires?|dust|dusty|aerosols?|air quality|pollution|polluted|jerebu|asap|debu|pencemaran)\b/],
     ['GWETTOP', /\b(topsoil|top soil)\b/],
     ['GWETROOT', /\b(drought|droughts|dry|drier|drying|soil|soils|kemarau|kering|tanah)\b/],
     ['PRECTOTCORR', /\b(rain|rains|rainy|rainier|rainfall|wetter|precipitation|monsoon|floods?|flooding|storms?|hujan|banjir|ribut|basah)\b/],
-    ['SNODP', /\b(snow|snowy|snowfall|salji)\b/],
+    ['SNODP', /\b(snow|snowy|snowier|snowfall|snowpack|salji)\b/],
     ['EVLAND', /\b(evaporation|evaporate|evaporating|penyejatan)\b/],
     ['TQV', /\b(water vapou?r|vapou?r|wap air)\b/],
     ['RH2M', /\b(humid|humidity|muggy|sticky|lembap|kelembapan)\b/],
     ['CLOUD_AMT', /\b(cloud|clouds|cloudy|cloudier|overcast|awan|mendung)\b/],
     ['ALLSKY_SFC_SW_DWN', /\b(sun|sunny|sunnier|sunlight|sunshine|solar|matahari|cerah)\b/],
     ['WS10M', /\b(wind|winds|windy|windier|breeze|breezy|angin)\b/],
+    ['PS', /\b(pressure|barometer|tekanan udara)\b/],
     ['TO3', /\b(ozone|ozon|uv|ultraviolet)\b/],
     ['T2M', /\b(hot|hotter|warm|warmer|warming|heat|heatwaves?|temperature|temperatures|cold|colder|cool|cooler|cooling|suhu|panas|sejuk)\b/]
   ];
@@ -52,7 +53,8 @@
     ['los angeles', 34.05, -118.24, 2], ['mexico city', 19.43, -99.13, 2], ['sao paulo', -23.55, -46.63, 2], ['sydney', -33.87, 151.21, 2], ['melbourne', -37.81, 144.96, 2],
     ['sahel', 14.0, 8.0, 6, 'sahel'], ['amazon', -3.5, -60.0, 6, 'amazon'], ['aral sea', 45.0, 60.0, 4, 'aral'], ['murray-darling', -34.0, 145.0, 6, 'murray'],
     ['murray darling', -34.0, 145.0, 6, 'murray'], ['central valley', 36.7, -119.8, 4, 'california'], ['california', 36.7, -119.8, 4, 'california'],
-    ['alaska', 70.5, -156.8, 4, 'utqiagvik'], ['arctic', 70.5, -156.8, 4, 'utqiagvik'], ['greenland', 72.0, -40.0, 6, 'greenland']
+    ['alaska', 70.5, -156.8, 4, 'utqiagvik'], ['arctic', 70.5, -156.8, 4, 'utqiagvik'], ['greenland', 72.0, -40.0, 6, 'greenland'],
+    ['wisconsin', 44.5, -89.5, 4, 'wisconsin'], ['chicago', 41.88, -87.63, 2], ['toronto', 43.65, -79.38, 2]
   ].sort(function (a, b) { return b[0].length - a[0].length; });
 
   var MONTHS = [
@@ -96,6 +98,14 @@
     for (var k = 0; k < MONTHS.length; k++) {
       if (MONTHS[k][0] === 5 && /\bmay (be|have|get|it)\b/.test(s)) continue;
       if (MONTHS[k][1].test(s)) { month = MONTHS[k][0]; break; }
+    }
+    // Seasons. "Summer" and "winter" follow the hemisphere of the place.
+    if (!month) {
+      var south = (p ? p[1] : TD.state.lat) < 0;
+      if (/\b(summer|musim panas)\b/.test(s)) month = south ? 15 : 13;
+      else if (/\b(winter|musim sejuk)\b/.test(s)) month = south ? 13 : 15;
+      else if (/\b(spring|musim bunga)\b/.test(s)) month = south ? 14 : 16;
+      else if (/\b(autumn|musim luruh)\b/.test(s)) month = south ? 16 : 14;
     }
     out.cfg.month = month;
 

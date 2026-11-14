@@ -55,6 +55,20 @@
           cfg: { v: 'SST', lat: 4.0, lon: 104.0, size: 2, compare: '' }, layer: 'trend' }
       ]
     }
+    ,
+    {
+      id: 'smoke', kicker: 'World story', title: 'Wildfire smoke over Wisconsin', sub: 'Summer haze far from the fires',
+      steps: [
+        { text: 'Haze, smoke and dust over Wisconsin, USA, in summer (June to August), one value per year since 2001. Look at 2021 and 2023, when smoke from wildfires in Canada drifted hundreds of kilometres south.',
+          cfg: { v: 'AOD_55', place: 'wisconsin', y0: 2001, month: 13 } },
+        { text: 'Is summer haze rising, or do a few smoke years only make it look that way? The “Spike, not trend” note flags years far from the trend line and runs the test again without them.',
+          cfg: { v: 'AOD_55', place: 'wisconsin', y0: 2001, month: 13 } },
+        { text: 'If the verdict is “no clear trend”, that does not mean nothing is happening. A short or noisy record may simply need more years. “Years needed to tell” says how long a record a change this size needs before a test can detect it.',
+          cfg: { v: 'AOD_55', place: 'wisconsin', y0: 2001, month: 13 } },
+        { text: 'Every summer month on the map, one after another. The slider is set to June 2023. Press play to compare it with other summers.',
+          cfg: { v: 'AOD_55', place: 'wisconsin', y0: 2001, month: 13 }, layer: 'lapse', layerOpts: { frame: '202306' } }
+      ]
+    }
   ];
 
   var TD, cur = null, step = 0;
@@ -74,7 +88,7 @@
     if (!cur) { box.hidden = true; box.innerHTML = ''; return; }
     var s = cur, st = s.steps[step];
     box.hidden = false;
-    box.innerHTML = '<div class="story-top"><span class="story-kicker">' + esc(T('Malaysia story')) + ' · ' +
+    box.innerHTML = '<div class="story-top"><span class="story-kicker">' + esc(T(s.kicker || 'Malaysia story')) + ' · ' +
       esc(T('Step {a} of {b}', { a: step + 1, b: s.steps.length })) + '</span>' +
       '<button type="button" class="story-x" data-act="exit" aria-label="' + esc(T('Close story')) + '">✕</button></div>' +
       '<h2>' + esc(T(s.title)) + '</h2><p>' + esc(T(st.text)) + '</p>' +

@@ -67,6 +67,8 @@
       def: 'Average wind speed 10 metres above the ground.' },
     { id: 'TO3', topic: 'air', name: 'Ozone layer thickness', unit: 'DU', dp: 1, source: MERRA,
       def: 'Total ozone in the air column above you, in Dobson units. Ozone blocks harmful ultraviolet light.' },
+    { id: 'PS', topic: 'air', name: 'Surface air pressure', unit: 'kPa', dp: 3, source: MERRA,
+      def: 'The weight of all the air above, pressing on the ground. It is lower on high ground and falls when storms pass.' },
     { id: 'AOD_55', topic: 'air', name: 'Haze, smoke and dust', unit: '', dp: 3, source: CERES,
       def: 'Aerosol optical depth: how much tiny particles in the air dim the light. Higher means hazier. Starts in 2001.' }
   ];
@@ -82,6 +84,7 @@
     { id: 'murray', name: 'the Murray-Darling basin, Australia', short: 'Murray-Darling', lat: -34.0, lon: 145.0, size: 6 },
     { id: 'california', name: 'the Central Valley, California', short: 'Central Valley', lat: 36.7, lon: -119.8, size: 4 },
     { id: 'utqiagvik', name: 'the Arctic coast of Alaska', short: 'Arctic Alaska', lat: 70.5, lon: -156.8, size: 4 },
+    { id: 'wisconsin', name: 'Wisconsin, USA', short: 'Wisconsin', lat: 44.5, lon: -89.5, size: 4 },
     { id: 'greenland', name: 'central Greenland', short: 'Greenland', lat: 72.0, lon: -40.0, size: 6 }
   ];
 
@@ -95,7 +98,15 @@
   function showSize() { var o = $('size-out'); if (o) o.textContent = sizeLabel(state.size); }
 
   var MONTHS = ['Whole year', 'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'];
+    'July', 'August', 'September', 'October', 'November', 'December',
+    'June to August', 'September to November', 'December to February', 'March to May'];
+  // 13–16 are three-month seasons. December to February takes December from the year before.
+  var SEASONS = { 13: [6, 7, 8], 14: [9, 10, 11], 15: [-12, 1, 2], 16: [3, 4, 5] };
+  /** Calendar months (1–12) that belong to a choice in the "Part of the year" list. */
+  function partMonths(month) {
+    if (!month) return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    return SEASONS[month] ? SEASONS[month].map(Math.abs) : [month];
+  }
   var MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
   var STARTERS = [
@@ -238,25 +249,23 @@
     return { table: out, cells: feats.length };
   }
 
-  /** One value per year: the mean of all twelve months, or one chosen month. */
+  /**
+   * One value per year: the mean of all twelve months, one chosen month, or a
+   * three-month season (a negative month means that month of the year before).
+   */
   function yearlySeries(table, y0, y1, month) {
     var years = [], values = [];
+    var ms = !month ? partMonths(0) : SEASONS[month] || [month];
     for (var y = y0; y <= y1; y++) {
-      var v;
-      if (month) {
-        v = table[y + (month < 10 ? '0' : '') + month];
-        if (v === undefined || v === null || v < FILL) continue;
-      } else {
-        var s = 0, ok = true;
-        for (var m = 1; m <= 12; m++) {
-          var x = table[y + (m < 10 ? '0' : '') + m];
-          if (x === undefined || x === null || x < FILL) { ok = false; break; }
-          s += x;
-        }
-        if (!ok) continue;
-        v = s / 12;
+      var s = 0, ok = true;
+      for (var i = 0; i < ms.length; i++) {
+        var m = Math.abs(ms[i]), yy = ms[i] < 0 ? y - 1 : y;
+        var x = table[yy + (m < 10 ? '0' : '') + m];
+        if (x === undefined || x === null || x < FILL) { ok = false; break; }
+        s += x;
       }
-      years.push(y); values.push(v);
+      if (!ok) continue;
+      years.push(y); values.push(s / ms.length);
     }
     return { years: years, values: values };
   }
@@ -1199,7 +1208,10 @@
     var ys = '';
     for (var y = FIRST_YEAR; y <= LAST_YEAR; y++) ys += '<option>' + y + '</option>';
     $('y0').innerHTML = ys; $('y1').innerHTML = ys;
-    $('month').innerHTML = MONTHS.map(function (mm, i) { return '<option value="' + i + '">' + esc(T(mm)) + '</option>'; }).join('');
+    var opt = function (mm, i) { return '<option value="' + i + '">' + esc(T(mm)) + '</option>'; };
+    $('month').innerHTML = opt(MONTHS[0], 0) +
+      '<optgroup label="' + esc(T('Seasons')) + '">' + [13, 14, 15, 16].map(function (i) { return opt(MONTHS[i], i); }).join('') + '</optgroup>' +
+      '<optgroup label="' + esc(T('One month')) + '">' + MONTHS.slice(1, 13).map(function (mm, i) { return opt(mm, i + 1); }).join('') + '</optgroup>';
     $('starters').innerHTML = STARTERS.map(function (s, i) {
       return '<li><button type="button" class="starter" data-i="' + i + '"><span class="starter-no">' +
         (i < 9 ? '0' : '') + (i + 1) + '</span><span class="starter-q">' + esc(s.q) +
@@ -1347,7 +1359,7 @@
     state.size = qs === 0 || (qs >= 2 && qs <= SIZE_MAX) ? qs : 2;
     state.y0 = clamp(parseInt(q.y0, 10) || FIRST_YEAR, FIRST_YEAR, LAST_YEAR);
     state.y1 = clamp(parseInt(q.y1, 10) || LAST_YEAR, FIRST_YEAR, LAST_YEAR);
-    state.month = clamp(parseInt(q.m, 10) || 0, 0, 12);
+    state.month = clamp(parseInt(q.m, 10) || 0, 0, 16);
     state.compare = place(q.c) || (q.c && q.c.indexOf('pt:') === 0) ? q.c : '';
     view.future = q.f === '1';
     view.anom = q.a === '1';
@@ -1562,7 +1574,7 @@
     T: T, S: S, state: state, view: view, VARIABLES: VARIABLES, PLACES: PLACES, MONTHS: MONTHS, TOPICS: TOPICS,
     FIRST_YEAR: FIRST_YEAR, LAST_YEAR: LAST_YEAR, MIN_YEARS: MIN_YEARS,
     variable: variable, place: place, prm: prm, vname: vname, box: box, urlFor: urlFor, fetchJson: fetchJson,
-    monthlyTable: monthlyTable, yearlySeries: yearlySeries, loadSeries: loadSeries,
+    monthlyTable: monthlyTable, yearlySeries: yearlySeries, loadSeries: loadSeries, partMonths: partMonths,
     esc: esc, withUnit: withUnit, signed: signed, sig: sig, fmtP: fmtP, pEquals: pEquals, coordLabel: coordLabel, capFirst: capFirst,
     toast: toast, apply: apply, investigate: investigate, openStep: openStep,
     get globe() { return globe; }, get current() { return current; },

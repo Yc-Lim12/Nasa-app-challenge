@@ -379,6 +379,12 @@
     }).finally(function () { busy = false; $('ai-send').disabled = false; });
   }
 
+  // Other parts of the page (the question wizard) can open the chat with a question.
+  window.TDAI = {
+    hasKey: function () { return !!apiKey(); },
+    ask: function (q) { openChat(); if (!busy) send(q); }
+  };
+
   // ---- wiring ------------------------------------------------------------------------
 
   function init() {

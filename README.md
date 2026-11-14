@@ -63,8 +63,10 @@ Then set `REPO_URL` at the top of `app.js` so the footer links to the repository
 | `stats.js` | Linear regression with t-test, Mann-Kendall test, Sen's slope (no dependencies) |
 | `globe.js` | Interactive 3D globe (drag to spin, zoom, click to choose a place) |
 | `maplab.js` | Trend map, significance dots, opposite trends, timelapse, live rain, wind |
-| `stories.js` | Malaysia story mode |
+| `stories.js` | Guided stories (Malaysia, plus wildfire smoke over Wisconsin) |
 | `ask.js` | Plain-English question box (rule-based, runs in the browser) |
+| `wizard.js` | "Help me choose" question wizard: kind of place, interest, where, then suggested variables |
+| `ai.js` | Plain-language explanation of results and an Ask AI chat (built-in, or OpenAI with the user's own key) |
 | `i18n.js` | English / Bahasa Malaysia |
 | `app.js` | Variable catalogue, NASA data fetching, chart, verdict, scan |
 | `polish.js` | Pull-out case file sheet and sliding segmented controls |

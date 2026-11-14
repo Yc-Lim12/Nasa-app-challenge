@@ -170,6 +170,16 @@
       'Setiap jalur mengikut angin purata. Jalur yang lebih terang lebih laju. Kelajuan purata dalam kotak ini: {s} m/s.',
 
     // ---- stories ----
+    'Guided stories': 'Kisah berpandu', 'World story': 'Kisah dunia',
+    'Wildfire smoke over Wisconsin': 'Asap kebakaran hutan di Wisconsin', 'Summer haze far from the fires': 'Jerebu musim panas jauh dari kebakaran',
+    'Haze, smoke and dust over Wisconsin, USA, in summer (June to August), one value per year since 2001. Look at 2021 and 2023, when smoke from wildfires in Canada drifted hundreds of kilometres south.':
+      'Jerebu, asap dan debu di Wisconsin, Amerika Syarikat, pada musim panas (Jun hingga Ogos), satu nilai setahun sejak 2001. Lihat 2021 dan 2023, apabila asap kebakaran hutan di Kanada hanyut ratusan kilometer ke selatan.',
+    'Is summer haze rising, or do a few smoke years only make it look that way? The “Spike, not trend” note flags years far from the trend line and runs the test again without them.':
+      'Adakah jerebu musim panas meningkat, atau beberapa tahun berasap sahaja yang membuatnya kelihatan begitu? Nota “Lonjakan, bukan tren” menandakan tahun yang jauh dari garis tren dan menjalankan ujian semula tanpanya.',
+    'If the verdict is “no clear trend”, that does not mean nothing is happening. A short or noisy record may simply need more years. “Years needed to tell” says how long a record a change this size needs before a test can detect it.':
+      'Jika keputusannya “tiada tren jelas”, itu tidak bermaksud tiada apa-apa berlaku. Rekod yang pendek atau bising mungkin cuma memerlukan lebih banyak tahun. “Tahun diperlukan untuk pasti” menunjukkan berapa panjang rekod yang diperlukan sebelum ujian dapat mengesan perubahan sebesar ini.',
+    'Every summer month on the map, one after another. The slider is set to June 2023. Press play to compare it with other summers.':
+      'Setiap bulan musim panas pada peta, satu demi satu. Peluncur ditetapkan pada Jun 2023. Tekan main untuk membandingkannya dengan musim panas lain.',
     'Malaysia story': 'Kisah Malaysia', 'Step {a} of {b}': 'Langkah {a} daripada {b}', 'Close story': 'Tutup kisah',
     'Back': 'Kembali', 'Next': 'Seterusnya', 'Finish': 'Selesai',
     'Is KL getting hotter?': 'Adakah KL semakin panas?',
@@ -264,10 +274,17 @@
     'Penang, Malaysia': 'Pulau Pinang, Malaysia', 'the Sahel in Niger': 'Sahel di Niger', 'the central Amazon, Brazil': 'Amazon tengah, Brazil',
     'the Aral Sea region': 'kawasan Laut Aral', 'the Murray-Darling basin, Australia': 'lembangan Murray-Darling, Australia',
     'the Arctic coast of Alaska': 'pantai Artik Alaska', 'central Greenland': 'Greenland tengah',
+    'Wisconsin, USA': 'Wisconsin, Amerika Syarikat',
+    'Surface air pressure': 'Tekanan udara permukaan',
+    'The weight of all the air above, pressing on the ground. It is lower on high ground and falls when storms pass.':
+      'Berat semua udara di atas yang menekan tanah. Ia lebih rendah di tanah tinggi dan jatuh apabila ribut melintas.',
 
     // ---- months ----
     'Whole year': 'Sepanjang tahun', 'January': 'Januari', 'February': 'Februari', 'March': 'Mac', 'May': 'Mei', 'June': 'Jun',
-    'July': 'Julai', 'August': 'Ogos', 'October': 'Oktober', 'December': 'Disember'
+    'July': 'Julai', 'August': 'Ogos', 'October': 'Oktober', 'December': 'Disember',
+    'Seasons': 'Musim', 'One month': 'Satu bulan',
+    'June to August': 'Jun hingga Ogos', 'September to November': 'September hingga November',
+    'December to February': 'Disember hingga Februari', 'March to May': 'Mac hingga Mei'
   };
 
   var lang = 'en';

@@ -562,6 +562,82 @@
     'September': 'September',
     'November': 'November',
 
+    // ---- methods dialog ----
+    'What the app measures':
+      'Apa yang diukur oleh aplikasi ini',
+    'For a chosen place, variable and period, Trend Detective turns NASA’s monthly data into one value per year (the mean of the twelve months, one chosen month, or a three-month season; December to February takes December from the year before) and asks: is there a steady rise or fall, how fast is it, and could it be chance?':
+      'Bagi tempat, pemboleh ubah dan tempoh yang dipilih, Trend Detective menukar data bulanan NASA kepada satu nilai setahun (purata dua belas bulan, satu bulan yang dipilih, atau satu musim tiga bulan; Disember hingga Februari mengambil Disember daripada tahun sebelumnya) dan bertanya: adakah terdapat kenaikan atau penurunan yang konsisten, berapa cepat ia berlaku, dan mungkinkah ia hanya kebetulan?',
+    'Data sources':
+      'Sumber data',
+    '<strong>NASA POWER</strong> (Prediction Of Worldwide Energy Resources), NASA Langley Research Center, monthly API, 1981 onwards. <a href="https://power.larc.nasa.gov/" target="_blank" rel="noopener">power.larc.nasa.gov</a>':
+      '<strong>NASA POWER</strong> (Prediction Of Worldwide Energy Resources), NASA Langley Research Center, API bulanan, dari 1981 dan seterusnya. <a href="https://power.larc.nasa.gov/" target="_blank" rel="noopener">power.larc.nasa.gov</a>',
+    '<strong>MERRA-2 reanalysis</strong> for temperature, rain, soil wetness, evaporation, humidity, water vapour, snow, wind and ozone. Gelaro, R., et al. (2017). The Modern-Era Retrospective Analysis for Research and Applications, Version 2 (MERRA-2). <em>Journal of Climate</em>, 30(14), 5419–5454.':
+      '<strong>Analisis semula MERRA-2</strong> untuk suhu, hujan, kelembapan tanah, penyejatan, kelembapan udara, wap air, salji, angin dan ozon. Gelaro, R., et al. (2017). The Modern-Era Retrospective Analysis for Research and Applications, Version 2 (MERRA-2). <em>Journal of Climate</em>, 30(14), 5419–5454.',
+    '<strong>CERES SYN1deg</strong> (from 2001) and <strong>GEWEX SRB</strong> (before 2001) for sunlight, cloud and aerosol. Doelling, D. R., et al. (2013). Geostationary enhanced temporal interpolation for CERES flux products. <em>Journal of Atmospheric and Oceanic Technology</em>, 30(6), 1072–1090.':
+      '<strong>CERES SYN1deg</strong> (dari 2001) dan <strong>GEWEX SRB</strong> (sebelum 2001) untuk cahaya matahari, awan dan aerosol. Doelling, D. R., et al. (2013). Geostationary enhanced temporal interpolation for CERES flux products. <em>Journal of Atmospheric and Oceanic Technology</em>, 30(6), 1072–1090.',
+    '<strong>Satellite pictures on the globe</strong>: NASA Blue Marble (shaded relief and bathymetry, NASA Earth Observatory) and the daily true-colour image from the VIIRS instrument on NOAA-20, both delivered by NASA GIBS. They are pictures for viewing, not data for trend tests. The layers button on the globe switches between them and the plain dark map.':
+      '<strong>Gambar satelit pada glob</strong>: NASA Blue Marble (relief berlorek dan batimetri, NASA Earth Observatory) dan imej warna sebenar harian daripada instrumen VIIRS pada NOAA-20, kedua-duanya disampaikan oleh NASA GIBS. Ia gambar untuk tontonan, bukan data untuk ujian tren. Butang lapisan pada glob menukar antara gambar-gambar ini dan peta gelap biasa.',
+    '<strong>GPM IMERG</strong> half-hourly precipitation rate, shown in “Rain now”, delivered as images by NASA GIBS (Global Imagery Browse Services). These are pictures for viewing, not data for trend tests.':
+      '<strong>GPM IMERG</strong>: kadar kerpasan setiap setengah jam, dipaparkan dalam “Hujan kini”, disampaikan sebagai imej oleh NASA GIBS (Global Imagery Browse Services). Ini gambar untuk tontonan, bukan data untuk ujian tren.',
+    'Sea surface temperature is MERRA-2 surface skin temperature over water, which MERRA-2 takes from observed sea temperatures.':
+      'Suhu permukaan laut ialah suhu kulit permukaan MERRA-2 di atas air, yang diambil oleh MERRA-2 daripada suhu laut yang dicerap.',
+    'Statistics':
+      'Statistik',
+    '<strong>Mann-Kendall test</strong> for a monotonic trend, with tie correction and continuity correction. The verdict uses it: p &lt; 0.05 is “significant”, p &lt; 0.10 “borderline”. Mann, H. B. (1945). Nonparametric tests against trend. <em>Econometrica</em>, 13, 245–259. Kendall, M. G. (1975). <em>Rank Correlation Methods</em>. Griffin.':
+      '<strong>Ujian Mann-Kendall</strong> untuk tren monotonik, dengan pembetulan nilai seri dan pembetulan keselanjaran. Keputusan menggunakannya: p &lt; 0.05 ialah “signifikan”, p &lt; 0.10 “hampir signifikan”. Mann, H. B. (1945). Nonparametric tests against trend. <em>Econometrica</em>, 13, 245–259. Kendall, M. G. (1975). <em>Rank Correlation Methods</em>. Griffin.',
+    '<strong>Sen’s slope</strong>, the median of all pairwise slopes, for the headline rate. Sen, P. K. (1968). Estimates of the regression coefficient based on Kendall’s tau. <em>Journal of the American Statistical Association</em>, 63, 1379–1389.':
+      '<strong>Kecerunan Sen</strong>, iaitu median bagi semua kecerunan berpasangan, untuk kadar utama. Sen, P. K. (1968). Estimates of the regression coefficient based on Kendall’s tau. <em>Journal of the American Statistical Association</em>, 63, 1379–1389.',
+    '<strong>Least-squares line</strong> with a two-sided t-test and a 95% confidence band, shown beside Mann-Kendall.':
+      '<strong>Garis kuasa dua terkecil</strong> dengan ujian-t dua hujung dan jalur keyakinan 95%, dipaparkan di sebelah Mann-Kendall.',
+    '<strong>Year-to-year memory.</strong> Neighbouring years (or months) are often alike, which makes plain tests overconfident. Both tests are adjusted for it: from the lag-1 autocorrelation r of the residuals, with the small-sample bias correction r + (1 + 4r)/n (between 0 and 0.95), the effective number of independent values is n* = n(1 − r)/(1 + r). The Mann-Kendall variance is multiplied by n/n*, the slope’s standard error is rescaled to n* − 2 degrees of freedom, and the 95% range of the line uses the adjusted numbers. The verdict uses the memory-adjusted Mann-Kendall p-value. In our simulation of trend-free monthly series with r = 0.6, plain tests called about 30% significant; the adjusted tests about 5%.':
+      '<strong>Ingatan dari tahun ke tahun.</strong> Tahun (atau bulan) yang berjiran selalunya hampir sama, dan ini membuatkan ujian biasa terlalu yakin. Kedua-dua ujian diselaraskan untuknya: daripada autokorelasi lag-1 r bagi baki, dengan pembetulan bias sampel kecil r + (1 + 4r)/n (antara 0 dan 0.95), bilangan berkesan nilai bebas ialah n* = n(1 − r)/(1 + r). Varians Mann-Kendall didarab dengan n/n*, ralat piawai kecerunan diskalakan semula kepada n* − 2 darjah kebebasan, dan julat 95% bagi garis menggunakan nombor yang telah diselaraskan. Keputusan menggunakan nilai-p Mann-Kendall yang diselaraskan untuk ingatan. Dalam simulasi kami bagi siri bulanan tanpa tren dengan r = 0.6, ujian biasa menganggap kira-kira 30% sebagai signifikan; ujian yang diselaraskan kira-kira 5%.',
+    '<strong>Removing the seasonal cycle.</strong> The yearly average already removes it, because each year covers one full cycle. With “Every month, seasonal cycle removed”, each month instead becomes its difference from the average of the same calendar month over the chosen years, giving twelve points a year, tested with the same memory adjustment.':
+      '<strong>Membuang kitaran musim.</strong> Purata tahunan sudah membuangnya, kerana setiap tahun meliputi satu kitaran penuh. Dengan “Setiap bulan, kitaran musim dibuang”, setiap bulan sebaliknya menjadi bezanya daripada purata bulan kalendar yang sama sepanjang tahun-tahun yang dipilih, memberikan dua belas titik setahun, yang diuji dengan pelarasan ingatan yang sama.',
+    '<strong>Bigger areas.</strong> NASA POWER answers at most 10° × 10° per request. Areas up to 20° × 20°, and whole regions such as Borneo, are fetched as equal tiles of at most 10°, their grid cells merged (a cell on a shared edge is counted once) and averaged with the same area weighting. A whole-world average is not offered: it would need about 650 requests of 20–45 seconds each.':
+      '<strong>Kawasan yang lebih besar.</strong> NASA POWER menjawab paling besar 10° × 10° bagi setiap permintaan. Kawasan sehingga 20° × 20°, dan seluruh rantau seperti Borneo, diambil sebagai jubin sama saiz yang paling besar 10°, sel grid mereka digabungkan (sel di tepi yang dikongsi dikira sekali) dan dipuratakan dengan pemberat keluasan yang sama. Purata seluruh dunia tidak ditawarkan: ia memerlukan kira-kira 650 permintaan yang setiap satunya mengambil 20–45 saat.',
+    '<strong>Soil over the ocean.</strong> Over open ocean NASA POWER gives topsoil wetness as exactly 1 in every month (the other land-only variables give no data there). Such grid cells are treated as no data: left out of area averages and the trend map, and a spot that is all ocean gets a message instead of a result.':
+      '<strong>Tanah di atas lautan.</strong> Di atas lautan terbuka, NASA POWER memberikan kelembapan tanah atas tepat 1 pada setiap bulan (pemboleh ubah darat yang lain tidak memberi data di sana). Sel grid seperti itu dianggap tiada data: tidak dimasukkan dalam purata kawasan dan peta tren, dan titik yang seluruhnya lautan mendapat mesej dan bukannya keputusan.',
+    '<strong>Data quality.</strong> A year with any month missing is left out of the yearly series, and the page says which years were left out and why.':
+      '<strong>Kualiti data.</strong> Tahun yang kehilangan mana-mana bulan tidak dimasukkan dalam siri tahunan, dan halaman ini menyatakan tahun mana yang tidak dimasukkan dan sebabnya.',
+    '<strong>Years needed to tell</strong> uses the formula of Weatherhead, E. C., et al. (1998). Factors affecting the detection of trends: statistical considerations and applications to environmental data. <em>Journal of Geophysical Research</em>, 103(D14), 17149–17161. It assumes the present trend and year-to-year noise carry on.':
+      '<strong>Tahun diperlukan untuk pasti</strong> menggunakan formula Weatherhead, E. C., et al. (1998). Factors affecting the detection of trends: statistical considerations and applications to environmental data. <em>Journal of Geophysical Research</em>, 103(D14), 17149–17161. Ia menganggap tren dan turun naik tahunan semasa akan berterusan.',
+    '<strong>Spike, not trend</strong> flags years whose distance from the Sen trend line is more than 3.5 robust standard deviations (1.4826 × median absolute deviation), then re-runs the test without them.':
+      '<strong>Lonjakan, bukan tren</strong> menandakan tahun yang jaraknya dari garis tren Sen melebihi 3.5 sisihan piawai teguh (1.4826 × sisihan mutlak median), kemudian menjalankan ujian semula tanpanya.',
+    'The code was checked against SciPy (<code>linregress</code>, <code>theilslopes</code>) and a reference Mann-Kendall implementation.':
+      'Kod ini telah disemak dengan SciPy (<code>linregress</code>, <code>theilslopes</code>) dan pelaksanaan rujukan Mann-Kendall.',
+    'Maps':
+      'Peta',
+    '<strong>Trend map</strong>: every NASA POWER grid cell (0.5° × 0.625°) in a box of your choice (2° to 10° a side, 10° by default) gets its own Sen’s slope and Mann-Kendall test. Red means rising, blue falling. A dot marks cells where p &lt; 0.05.':
+      '<strong>Peta tren</strong>: setiap sel grid NASA POWER (0.5° × 0.625°) dalam kotak pilihan anda (2° hingga 10° setiap sisi, 10° secara lalai) mendapat kecerunan Sen dan ujian Mann-Kendall tersendiri. Merah bermaksud meningkat, biru menurun. Titik menandakan sel dengan p &lt; 0.05.',
+    '<strong>Opposite trends</strong> are reported when at least three significant cells rise and at least three fall in the same box.':
+      '<strong>Tren bertentangan</strong> dilaporkan apabila sekurang-kurangnya tiga sel signifikan meningkat dan sekurang-kurangnya tiga menurun dalam kotak yang sama.',
+    '<strong>Timelapse</strong> plays every month in the period. “Difference from normal” subtracts each cell’s own average for that calendar month, so the seasons do not swamp the change.':
+      '<strong>Selang masa</strong> memainkan setiap bulan dalam tempoh itu. “Beza daripada normal” menolak purata setiap sel sendiri bagi bulan kalendar itu, supaya musim tidak menenggelamkan perubahan.',
+    '<strong>Wind</strong> particles follow the average 10-metre wind (MERRA-2 eastward and northward components) for the chosen period and month.':
+      '<strong>Angin</strong>: zarah-zarah mengikut purata angin 10 meter (komponen arah timur dan arah utara MERRA-2) bagi tempoh dan bulan yang dipilih.',
+    'Limits':
+      'Batasan',
+    'Only straight-line (monotonic) trends are tested. A rise then fall can look like no trend.':
+      'Hanya tren garis lurus (monotonik) yang diuji. Kenaikan yang diikuti penurunan boleh kelihatan seperti tiada tren.',
+    'The memory adjustment uses lag-1 autocorrelation only; longer cycles such as El Niño are not modelled.':
+      'Pelarasan ingatan hanya menggunakan autokorelasi lag-1; kitaran yang lebih panjang seperti El Niño tidak dimodelkan.',
+    'Reanalysis data is a model constrained by observations, not a direct measurement, and is coarse (about 50 km). Small towns, hills and coasts are smoothed out.':
+      'Data analisis semula ialah model yang dikekang oleh cerapan, bukan ukuran langsung, dan resolusinya kasar (kira-kira 50 km). Bandar kecil, bukit dan pantai menjadi kabur.',
+    '“If the trend continues” only extends the straight line. It is not a forecast or a climate projection.':
+      '“Jika tren berterusan” hanya memanjangkan garis lurus. Ia bukan ramalan atau unjuran iklim.',
+    'Testing many variables or many map cells at the 0.05 level gives about one false alarm in twenty.':
+      'Menguji banyak pemboleh ubah atau banyak sel peta pada aras 0.05 memberikan kira-kira satu amaran palsu dalam dua puluh.',
+    'Not included, and why':
+      'Tidak dimasukkan, dan sebabnya',
+    '<strong>Greenness (NDVI)</strong>: NASA’s MODIS NDVI is reachable from a browser only through the ORNL subset service, which returns 10 dates per request (about 17 seconds each). A full 2003–2025 record for one place would take about 15 minutes.':
+      '<strong>Kehijauan (NDVI)</strong>: MODIS NDVI NASA hanya boleh dicapai dari pelayar melalui perkhidmatan subset ORNL, yang memulangkan 10 tarikh bagi setiap permintaan (kira-kira 17 saat setiap satu). Rekod penuh 2003–2025 bagi satu tempat akan mengambil masa kira-kira 15 minit.',
+    '<strong>Water storage (GRACE)</strong> and <strong>NASA climate projections (NEX-GDDP-CMIP6)</strong>: these come as large NetCDF files with no browser API. They need a small processing step on a computer first, which can then save results for the app to load.':
+      '<strong>Simpanan air (GRACE)</strong> dan <strong>unjuran iklim NASA (NEX-GDDP-CMIP6)</strong>: ini datang sebagai fail NetCDF yang besar tanpa API pelayar. Ia memerlukan langkah pemprosesan kecil pada komputer terlebih dahulu, yang kemudian boleh menyimpan keputusan untuk dimuatkan oleh aplikasi.',
+    'Questions in plain English':
+      'Soalan dalam bahasa biasa',
+    'The question box does not use an AI service. A small set of rules in your browser looks for words such as “rain”, “haze”, “nights” or “hotter”, and for place names, months and years, then sets up the case. Nothing you type leaves your device.':
+      'Kotak soalan tidak menggunakan perkhidmatan AI. Satu set peraturan kecil dalam pelayar anda mencari perkataan seperti “rain”, “haze”, “nights” atau “hotter”, serta nama tempat, bulan dan tahun, kemudian menyediakan kes. Tiada apa yang anda taip meninggalkan peranti anda.',
+
     // ---- months ----
     'Whole year': 'Sepanjang tahun', 'January': 'Januari', 'February': 'Februari', 'March': 'Mac', 'May': 'Mei', 'June': 'Jun',
     'July': 'Julai', 'August': 'Ogos', 'October': 'Oktober', 'December': 'Disember',
@@ -595,8 +671,6 @@
       if (el.dataset.enPh === undefined) el.dataset.enPh = el.placeholder;
       el.placeholder = tr(el.dataset.enPh);
     });
-    var mn = document.getElementById('methods-lang-note');   // methods page stays English; say so in BM
-    if (mn) mn.hidden = lang !== 'bm';
     var b = document.getElementById('lang');
     if (b) {
       b.textContent = lang === 'bm' ? 'EN' : 'BM';

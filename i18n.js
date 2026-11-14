@@ -451,6 +451,70 @@
     'blue': 'biru', 'red': 'merah', 'brown': 'coklat', 'teal': 'hijau kebiruan',
     '{x} vs average': '{x} berbanding purata', '{x} on the trend line': '{x} pada garis tren',
 
+    // ---- months panel, how to read this, footer ----
+    'There is not enough monthly data here to test each month.':
+      'Tidak cukup data bulanan di sini untuk menguji setiap bulan.',
+    '<strong>{n} of {m}</strong> months show a significant trend. The biggest is <strong>{month}</strong>, rising by about {rate}.':
+      '<strong>{n} daripada {m}</strong> bulan menunjukkan tren yang signifikan. Yang terbesar ialah <strong>{month}</strong>, meningkat kira-kira {rate}.',
+    '<strong>{n} of {m}</strong> months show a significant trend. The biggest is <strong>{month}</strong>, falling by about {rate}.':
+      '<strong>{n} daripada {m}</strong> bulan menunjukkan tren yang signifikan. Yang terbesar ialah <strong>{month}</strong>, menurun kira-kira {rate}.',
+    'No single month shows a statistically significant trend here.':
+      'Tiada satu bulan pun yang menunjukkan tren signifikan secara statistik di sini.',
+    'Trend per decade for each month of the year':
+      'Tren sedekad bagi setiap bulan dalam setahun',
+    'not enough data':
+      'data tidak mencukupi',
+    'Mar':
+      'Mac',
+    'Aug':
+      'Ogo',
+    'Oct':
+      'Okt',
+    'Dec':
+      'Dis',
+    'Each bar is the trend for one month on its own, per decade. Solid bars are statistically significant, pale bars are not. Click a bar to investigate that month; click it again for the whole year.':
+      'Setiap bar ialah tren bagi satu bulan secara berasingan, sedekad. Bar pekat signifikan secara statistik, bar pudar tidak. Klik bar untuk menyiasat bulan itu; klik sekali lagi untuk sepanjang tahun.',
+    '<strong>Trend.</strong> A trend is a change that keeps going in one direction over many years. One hot year is weather. Thirty years that keep getting hotter is a trend.':
+      '<strong>Tren.</strong> Tren ialah perubahan yang berterusan ke satu arah selama bertahun-tahun. Satu tahun yang panas ialah cuaca. Tiga puluh tahun yang terus semakin panas ialah tren.',
+    '<strong>Significant.</strong> Every measurement wobbles from year to year, so a line through the points almost always tilts a little. A test asks: if nothing were really changing, how often would random wobble alone produce a tilt this clear? That chance is the p-value. When it is below 0.05 (1 in 20), scientists call the trend statistically significant.':
+      '<strong>Signifikan.</strong> Setiap ukuran turun naik dari tahun ke tahun, jadi garis yang melalui titik-titik hampir sentiasa condong sedikit. Ujian bertanya: jika sebenarnya tiada apa-apa yang berubah, berapa kerap turun naik rawak sahaja akan menghasilkan kecondongan sejelas ini? Peluang itu ialah nilai-p. Apabila ia di bawah 0.05 (1 dalam 20), saintis menyebut tren itu signifikan secara statistik.',
+    '<strong>Two tests.</strong> The t-test assumes the wobble follows a bell curve. The Mann-Kendall test only compares which years are higher than which, so odd years and skewed data do not fool it. This page uses Mann-Kendall for the verdict and shows the t-test beside it.':
+      '<strong>Dua ujian.</strong> Ujian-t menganggap turun naik itu mengikut lengkung loceng. Ujian Mann-Kendall hanya membandingkan tahun mana yang lebih tinggi daripada yang lain, jadi tahun luar biasa dan data yang pencong tidak mengelirukannya. Halaman ini menggunakan Mann-Kendall untuk keputusan dan menunjukkan ujian-t di sebelahnya.',
+    '<strong>Stripes.</strong> The coloured strip under the chart has one stripe per year, coloured by how far that year was above or below the average of the whole period.':
+      '<strong>Jalur warna.</strong> Jalur berwarna di bawah carta mempunyai satu jalur bagi setiap tahun, diwarnakan mengikut sejauh mana tahun itu berada di atas atau di bawah purata keseluruhan tempoh.',
+    '<strong>Not significant does not mean no change.</strong> It means the record is too short or too noisy to be sure yet.':
+      '<strong>Tidak signifikan tidak bermaksud tiada perubahan.</strong> Ia bermaksud rekod itu masih terlalu pendek atau terlalu bising untuk dipastikan.',
+    'Method':
+      'Kaedah',
+    'Privacy':
+      'Privasi',
+    'Third-party services':
+      'Perkhidmatan pihak ketiga',
+    'Accessibility':
+      'Kebolehcapaian',
+    'Licence and credits':
+      'Lesen dan penghargaan',
+    'NASA Prediction Of Worldwide Energy Resources (POWER) monthly API, NASA Langley Research Center. Temperature, rain, soil, wind, humidity and ozone come from the MERRA-2 reanalysis (NASA Global Modeling and Assimilation Office). Sunlight, cloud and aerosol values come from CERES SYN1deg and GEWEX SRB.':
+      'API bulanan NASA Prediction Of Worldwide Energy Resources (POWER), NASA Langley Research Center. Suhu, hujan, tanah, angin, kelembapan dan ozon datang daripada analisis semula MERRA-2 (NASA Global Modeling and Assimilation Office). Nilai cahaya matahari, awan dan aerosol datang daripada CERES SYN1deg dan GEWEX SRB.',
+    'Read the full methods, sources and limits':
+      'Baca kaedah, sumber dan batasan penuh',
+    'Monthly values are averaged into one value per year, and over the grid cells in the chosen area weighted by area. Trend: least-squares line with a t-test, Mann-Kendall test and Sen’s slope. Linear trends only.':
+      'Nilai bulanan dipuratakan menjadi satu nilai setahun, dan merentasi sel grid dalam kawasan yang dipilih mengikut pemberat keluasan. Tren: garis kuasa dua terkecil dengan ujian-t, ujian Mann-Kendall dan kecerunan Sen. Tren linear sahaja.',
+    'No accounts, no analytics and no cookies. Your choices live only in the page address. The light or dark theme you pick is remembered in your own browser’s storage and never leaves your device. The coordinates of the place you investigate are sent to NASA POWER to fetch the data; if you press “use my location”, that position is used the same way and is not stored by this app. The app handles no personal data under Malaysia’s Personal Data Protection Act 2010.':
+      'Tiada akaun, tiada analitik dan tiada kuki. Pilihan anda hanya disimpan dalam alamat halaman. Tema cerah atau gelap yang anda pilih diingati dalam storan pelayar anda sendiri dan tidak pernah meninggalkan peranti anda. Koordinat tempat yang anda siasat dihantar kepada NASA POWER untuk mendapatkan data; jika anda menekan “gunakan lokasi saya”, kedudukan itu digunakan dengan cara yang sama dan tidak disimpan oleh aplikasi ini. Aplikasi ini tidak mengendalikan sebarang data peribadi di bawah Akta Perlindungan Data Peribadi 2010 Malaysia.',
+    'Your browser connects to five outside services: NASA POWER (climate data), NASA GIBS (the satellite pictures on the globe and the live rain images), Google Fonts (typefaces, which means Google receives your IP address), cdnjs (the D3 charting library) and jsDelivr (the topojson-client library and Natural Earth map outlines from the world-atlas package). Each has its own privacy policy. The question box works entirely in your browser; nothing you type is sent anywhere. The AI helper’s plain-language summaries are also built in. Only if you paste your own OpenAI API key into the AI settings are your chat questions and the numbers of the current case sent to OpenAI; the key is stored only in your browser.':
+      'Pelayar anda bersambung kepada lima perkhidmatan luar: NASA POWER (data iklim), NASA GIBS (gambar satelit pada glob dan imej hujan langsung), Google Fonts (fon, yang bermaksud Google menerima alamat IP anda), cdnjs (pustaka carta D3) dan jsDelivr (pustaka topojson-client dan garis peta Natural Earth daripada pakej world-atlas). Setiap satunya mempunyai dasar privasi sendiri. Kotak soalan berfungsi sepenuhnya dalam pelayar anda; tiada apa yang anda taip dihantar ke mana-mana. Ringkasan bahasa mudah oleh pembantu AI juga terbina dalam. Hanya jika anda menampal kunci API OpenAI anda sendiri ke dalam tetapan AI, barulah soalan sembang anda dan nombor kes semasa dihantar kepada OpenAI; kunci itu disimpan hanya dalam pelayar anda.',
+    'Light and dark themes, a phone layout, a table view of every chart and keyboard control throughout. The globe spins with the arrow keys and Enter chooses the place in the centre; the latitude and longitude boxes do the same job.':
+      'Tema cerah dan gelap, susun atur telefon, paparan jadual bagi setiap carta dan kawalan papan kekunci di seluruh halaman. Glob berputar dengan kekunci anak panah dan Enter memilih tempat di tengah; kotak latitud dan longitud melakukan tugas yang sama.',
+    'Code under the Apache License 2.0. Map outlines from Natural Earth (public domain). Type: SF Pro, the system font on Apple devices, with Inter (SIL Open Font License) on other devices. No NASA logo or insignia is used.':
+      'Kod di bawah Lesen Apache 2.0. Garis peta daripada Natural Earth (domain awam). Fon: SF Pro, fon sistem pada peranti Apple, dengan Inter (SIL Open Font License) pada peranti lain. Tiada logo atau lambang NASA digunakan.',
+    'Contact:':
+      'Hubungi:',
+    'through the':
+      'melalui',
+    'project repository':
+      'repositori projek',
+
     // ---- months ----
     'Whole year': 'Sepanjang tahun', 'January': 'Januari', 'February': 'Februari', 'March': 'Mac', 'May': 'Mei', 'June': 'Jun',
     'July': 'Julai', 'August': 'Ogos', 'October': 'Oktober', 'December': 'Disember',

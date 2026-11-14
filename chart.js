@@ -352,17 +352,19 @@
     }
     var valid = rows.filter(function (r) { return r.st; });
     if (!valid.length) {
-      $('season-note').textContent = 'There is not enough monthly data here to test each month.';
+      $('season-note').textContent = T('There is not enough monthly data here to test each month.');
       return;
     }
     var sigs = valid.filter(function (r) { return r.st.verdict === 'significant'; });
     if (sigs.length) {
       sigs.sort(function (a, b) { return Math.abs(b.st.sen.slope) - Math.abs(a.st.sen.slope); });
       var top = sigs[0];
-      $('season-note').innerHTML = '<strong>' + sigs.length + ' of ' + valid.length + '</strong> months show a significant trend. The biggest is <strong>' +
-        MONTHS[top.m] + '</strong>, ' + (top.st.direction === 'up' ? 'rising' : 'falling') + ' by about ' + esc(ratePhrase(top.st, vr)) + '.';
+      $('season-note').innerHTML = T(top.st.direction === 'up'
+        ? '<strong>{n} of {m}</strong> months show a significant trend. The biggest is <strong>{month}</strong>, rising by about {rate}.'
+        : '<strong>{n} of {m}</strong> months show a significant trend. The biggest is <strong>{month}</strong>, falling by about {rate}.',
+        { n: sigs.length, m: valid.length, month: esc(T(MONTHS[top.m])), rate: esc(ratePhrase(top.st, vr)) });
     } else {
-      $('season-note').textContent = 'No single month shows a statistically significant trend here.';
+      $('season-note').textContent = T('No single month shows a statistically significant trend here.');
     }
 
     if (!maxAbs) maxAbs = 1;
@@ -373,7 +375,7 @@
     function sy(v) { return mg.t + (lim - v) / (2 * lim) * ih; }
 
     var svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, width: W, height: H,
-      'aria-label': 'Trend per decade for each month of the year' });
+      'aria-label': T('Trend per decade for each month of the year') });
     yt.ticks.forEach(function (t) {
       if (Math.abs(t) > lim) return;
       svg.appendChild(svgEl('line', { x1: mg.l, x2: mg.l + iw, y1: sy(t), y2: sy(t), class: 'grid' }));
@@ -387,7 +389,7 @@
     var tip = makeTip(host);
     rows.forEach(function (r, i) {
       var cx = mg.l + bw * (i + 0.5), on = res.month === r.m;
-      var label = MONTHS[r.m] + ': ' + (r.st ? ratePhrase(r.st, vr) + ', ' + verdictLabel(r.st.verdict).toLowerCase() : 'not enough data');
+      var label = T(MONTHS[r.m]) + ': ' + (r.st ? ratePhrase(r.st, vr) + ', ' + verdictLabel(r.st.verdict).toLowerCase() : T('not enough data'));
       var g = svgEl('g', { class: 'mgroup' + (on ? ' on' : ''), tabindex: 0, role: 'button', 'aria-label': label, 'aria-pressed': on ? 'true' : 'false' });
       g.appendChild(svgEl('rect', { x: mg.l + bw * i + 1, y: mg.t, width: bw - 2, height: ih, rx: 6, class: 'mcol' }));
       var barTop = mg.t + ih / 2;
@@ -398,7 +400,7 @@
           class: 'mbar mbar-' + r.st.verdict + (v < 0 ? ' mbar-neg' : ''), style: '--i:' + i }));
       }
       g.appendChild(svgEl('text', { x: cx, y: H - 8, 'text-anchor': 'middle', class: 'tick' + (on ? ' tick-on' : '') },
-        narrow ? MONTH_SHORT[i].charAt(0) : MONTH_SHORT[i]));
+        narrow ? T(MONTH_SHORT[i]).charAt(0) : T(MONTH_SHORT[i])));
       function showTip() {
         var html = '<strong>' + MONTHS[r.m] + '</strong>' + (r.st
           ? '<span>' + esc(ratePhrase(r.st, vr)) + '</span><span>' + verdictLabel(r.st.verdict) + ', ' + esc(pEquals(r.st.mk.pAdj)) + '</span>'

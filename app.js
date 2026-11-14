@@ -205,9 +205,9 @@
       Math.abs(lon).toFixed(1) + '°' + (lon >= 0 ? (bm ? 'T' : 'E') : (bm ? 'B' : 'W'));
   }
   function capFirst(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
-  function verdictLabel(v) { return v === 'significant' ? 'Significant' : (v === 'borderline' ? 'Borderline' : 'No clear trend'); }
+  function verdictLabel(v) { return T(v === 'significant' ? 'Significant' : (v === 'borderline' ? 'Borderline' : 'No clear trend')); }
   function verdictClass(v) { return v === 'significant' ? 'sig' : (v === 'borderline' ? 'border' : 'none'); }
-  function ratePhrase(st, vr) { return withUnit(signed(st.sen.slope * 10, 2), vr.unit) + ' per decade'; }
+  function ratePhrase(st, vr) { return T('{x} per decade', { x: withUnit(signed(st.sen.slope * 10, 2), vr.unit) }); }
 
   // ---- data ----------------------------------------------------------------
 

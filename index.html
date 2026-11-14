@@ -206,7 +206,7 @@
           <h3 data-i18n>Which months are changing most?</h3>
           <p id="season-note"></p>
           <div id="season" class="chart season"></div>
-          <p class="muted">Each bar is the trend for one month on its own, per decade. Solid bars are statistically significant, pale bars are not. Click a bar to investigate that month; click it again for the whole year.</p>
+          <p class="muted" data-i18n>Each bar is the trend for one month on its own, per decade. Solid bars are statistically significant, pale bars are not. Click a bar to investigate that month; click it again for the whole year.</p>
         </section>
 
         <section class="block var2-card">
@@ -220,11 +220,11 @@
 
         <details class="explain">
           <summary data-i18n>How to read this</summary>
-          <p><strong>Trend.</strong> A trend is a change that keeps going in one direction over many years. One hot year is weather. Thirty years that keep getting hotter is a trend.</p>
-          <p><strong>Significant.</strong> Every measurement wobbles from year to year, so a line through the points almost always tilts a little. A test asks: if nothing were really changing, how often would random wobble alone produce a tilt this clear? That chance is the p-value. When it is below 0.05 (1 in 20), scientists call the trend statistically significant.</p>
-          <p><strong>Two tests.</strong> The t-test assumes the wobble follows a bell curve. The Mann-Kendall test only compares which years are higher than which, so odd years and skewed data do not fool it. This page uses Mann-Kendall for the verdict and shows the t-test beside it.</p>
-          <p><strong>Stripes.</strong> The coloured strip under the chart has one stripe per year, coloured by how far that year was above or below the average of the whole period.</p>
-          <p><strong>Not significant does not mean no change.</strong> It means the record is too short or too noisy to be sure yet.</p>
+          <p data-i18n><strong>Trend.</strong> A trend is a change that keeps going in one direction over many years. One hot year is weather. Thirty years that keep getting hotter is a trend.</p>
+          <p data-i18n><strong>Significant.</strong> Every measurement wobbles from year to year, so a line through the points almost always tilts a little. A test asks: if nothing were really changing, how often would random wobble alone produce a tilt this clear? That chance is the p-value. When it is below 0.05 (1 in 20), scientists call the trend statistically significant.</p>
+          <p data-i18n><strong>Two tests.</strong> The t-test assumes the wobble follows a bell curve. The Mann-Kendall test only compares which years are higher than which, so odd years and skewed data do not fool it. This page uses Mann-Kendall for the verdict and shows the t-test beside it.</p>
+          <p data-i18n><strong>Stripes.</strong> The coloured strip under the chart has one stripe per year, coloured by how far that year was above or below the average of the whole period.</p>
+          <p data-i18n><strong>Not significant does not mean no change.</strong> It means the record is too short or too noisy to be sure yet.</p>
         </details>
 
         <section class="block scan">
@@ -243,30 +243,30 @@
 
     <div class="foot-grid">
       <div>
-        <h4>Data</h4>
-        <p>NASA Prediction Of Worldwide Energy Resources (POWER) monthly API, NASA Langley Research Center. Temperature, rain, soil, wind, humidity and ozone come from the MERRA-2 reanalysis (NASA Global Modeling and Assimilation Office). Sunlight, cloud and aerosol values come from CERES SYN1deg and GEWEX SRB.</p>
+        <h4 data-i18n>Data</h4>
+        <p data-i18n>NASA Prediction Of Worldwide Energy Resources (POWER) monthly API, NASA Langley Research Center. Temperature, rain, soil, wind, humidity and ozone come from the MERRA-2 reanalysis (NASA Global Modeling and Assimilation Office). Sunlight, cloud and aerosol values come from CERES SYN1deg and GEWEX SRB.</p>
       </div>
       <div>
-        <h4>Method</h4>
-        <p><button type="button" class="link" data-open-methods>Read the full methods, sources and limits</button></p>
-        <p>Monthly values are averaged into one value per year, and over the grid cells in the chosen area weighted by area. Trend: least-squares line with a t-test, Mann-Kendall test and Sen’s slope. Linear trends only.</p>
+        <h4 data-i18n>Method</h4>
+        <p><button type="button" class="link" data-open-methods data-i18n>Read the full methods, sources and limits</button></p>
+        <p data-i18n>Monthly values are averaged into one value per year, and over the grid cells in the chosen area weighted by area. Trend: least-squares line with a t-test, Mann-Kendall test and Sen’s slope. Linear trends only.</p>
       </div>
       <div>
-        <h4>Privacy</h4>
-        <p>No accounts, no analytics and no cookies. Your choices live only in the page address. The light or dark theme you pick is remembered in your own browser’s storage and never leaves your device. The coordinates of the place you investigate are sent to NASA POWER to fetch the data; if you press “use my location”, that position is used the same way and is not stored by this app. The app handles no personal data under Malaysia’s Personal Data Protection Act 2010.</p>
+        <h4 data-i18n>Privacy</h4>
+        <p data-i18n>No accounts, no analytics and no cookies. Your choices live only in the page address. The light or dark theme you pick is remembered in your own browser’s storage and never leaves your device. The coordinates of the place you investigate are sent to NASA POWER to fetch the data; if you press “use my location”, that position is used the same way and is not stored by this app. The app handles no personal data under Malaysia’s Personal Data Protection Act 2010.</p>
       </div>
       <div>
-        <h4>Third-party services</h4>
-        <p>Your browser connects to five outside services: NASA POWER (climate data), NASA GIBS (the satellite pictures on the globe and the live rain images), Google Fonts (typefaces, which means Google receives your IP address), cdnjs (the D3 charting library) and jsDelivr (the topojson-client library and Natural Earth map outlines from the world-atlas package). Each has its own privacy policy. The question box works entirely in your browser; nothing you type is sent anywhere. The AI helper’s plain-language summaries are also built in. Only if you paste your own OpenAI API key into the AI settings are your chat questions and the numbers of the current case sent to OpenAI; the key is stored only in your browser.</p>
+        <h4 data-i18n>Third-party services</h4>
+        <p data-i18n>Your browser connects to five outside services: NASA POWER (climate data), NASA GIBS (the satellite pictures on the globe and the live rain images), Google Fonts (typefaces, which means Google receives your IP address), cdnjs (the D3 charting library) and jsDelivr (the topojson-client library and Natural Earth map outlines from the world-atlas package). Each has its own privacy policy. The question box works entirely in your browser; nothing you type is sent anywhere. The AI helper’s plain-language summaries are also built in. Only if you paste your own OpenAI API key into the AI settings are your chat questions and the numbers of the current case sent to OpenAI; the key is stored only in your browser.</p>
       </div>
       <div>
-        <h4>Accessibility</h4>
-        <p>Light and dark themes, a phone layout, a table view of every chart and keyboard control throughout. The globe spins with the arrow keys and Enter chooses the place in the centre; the latitude and longitude boxes do the same job.</p>
+        <h4 data-i18n>Accessibility</h4>
+        <p data-i18n>Light and dark themes, a phone layout, a table view of every chart and keyboard control throughout. The globe spins with the arrow keys and Enter chooses the place in the centre; the latitude and longitude boxes do the same job.</p>
       </div>
       <div>
-        <h4>Licence and credits</h4>
-        <p>Code under the Apache License 2.0. Map outlines from Natural Earth (public domain). Type: SF Pro, the system font on Apple devices, with Inter (SIL Open Font License) on other devices. No NASA logo or insignia is used.</p>
-        <p id="contact">Contact: team Sunway to the Moon<span id="repo-wrap" hidden>, through the <a id="repo-link" href="#">project repository</a></span>.</p>
+        <h4 data-i18n>Licence and credits</h4>
+        <p data-i18n>Code under the Apache License 2.0. Map outlines from Natural Earth (public domain). Type: SF Pro, the system font on Apple devices, with Inter (SIL Open Font License) on other devices. No NASA logo or insignia is used.</p>
+        <p id="contact"><span data-i18n>Contact:</span> team Sunway to the Moon<span id="repo-wrap" hidden>, <span data-i18n>through the</span> <a id="repo-link" href="#" data-i18n>project repository</a></span>.</p>
       </div>
     </div>
   </footer>

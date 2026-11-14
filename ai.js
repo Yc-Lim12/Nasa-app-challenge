@@ -127,16 +127,32 @@
     { re: /r2|r²|r-squared|variation|wobble|explain/i, en: 'R² is the share of the year-to-year differences that the straight trend line accounts for. Climate data is noisy, so even a real trend often explains only a small share.' },
     { re: /data|source|nasa|power|merra|where.*from|sumber/i, en: 'The numbers come from NASA POWER, which serves satellite and model data (such as MERRA-2 and CERES) for any point on Earth since the 1980s.' }
   ];
+  // Never let a bad case or an odd question break the chat: check the numbers first,
+  // and catch anything unexpected.
+  function safeExplain(r) {
+    try {
+      var f = facts(r);
+      if (!isFinite(f.sen_slope_per_decade) || !isFinite(f.mann_kendall_p) || f.years_of_data < 2) return null;
+      return explain(r);
+    } catch (e) { return null; }
+  }
+  function safeAnswer(q) {
+    try { return offlineAnswer(String(q || '').slice(0, 300)); }
+    catch (e) { return L('Sorry, something went wrong while answering. Please try another question.'); }
+  }
+
   function offlineAnswer(q) {
     var hits = GLOSSARY.filter(function (g) { return g.re.test(q); }).slice(0, 2);
     var parts = hits.map(function (g) { return L(g.en, g.ms); });
     var wantsSummary = /summar|explain (this|the|it)|simpl|result|big|ringkas|terangkan|keputusan|besar/i.test(q);
     if (wantsSummary || !parts.length) {
-      if (res) parts.unshift(explain(res).slice(0, 2).map(function (x) { return '**' + x.title + ':** ' + x.text; }).join('\n'));
+      var ex = res ? safeExplain(res) : null;
+      if (ex) parts.unshift(ex.slice(0, 2).map(function (x) { return '**' + x.title + ':** ' + x.text; }).join('\n'));
+      else if (res) parts.unshift(L('I could not read the numbers for this case. Try another place or period, then ask again.'));
       else parts.unshift(L('Pick a place and a variable first, then I can explain the result.'));
     }
     if (!hits.length && !wantsSummary) {
-      parts.push(L('For free-form questions, add an OpenAI API key in the AI settings (⚙).'));
+      parts.push(L('I can only answer questions about this result. Try: "Is the change real?", "How fast is it changing?" or "Why might it be changing?"'));
     }
     return parts.join('\n\n');
   }
@@ -229,7 +245,8 @@
   function fillExplain() {
     var card = $('ai-explain');
     if (!card || !res) return;
-    var items = explain(res);
+    var items = safeExplain(res);
+    if (!items) { card.innerHTML = '<p class="ai-note">' + esc(L('I could not read the numbers for this case. Try another place or period, then ask again.')) + '</p>'; return; }
     var html = '<h3>' + esc(L('In plain words')) + '</h3><dl>' + items.map(function (x) {
       return '<div><dt>' + esc(x.title) + '</dt><dd>' + esc(x.text) + '</dd></div>';
     }).join('') + '</dl>';
@@ -274,7 +291,7 @@
       '</form>' +
       '<div class="ai-log" id="ai-log" aria-live="polite"></div>' +
       '<div class="ai-chips" id="ai-chips"></div>' +
-      '<form class="ai-input" id="ai-form"><input id="ai-q" type="text" autocomplete="off" enterkeyhint="send">' +
+      '<form class="ai-input" id="ai-form"><input id="ai-q" type="text" autocomplete="off" enterkeyhint="send" maxlength="300">' +
         '<button type="submit" class="ai-send" id="ai-send" aria-label="Send">↑</button></form>';
     document.body.appendChild(fab);
     document.body.appendChild(box);
@@ -355,7 +372,7 @@
   }
   function send(q) {
     addMsg('user', q);
-    if (!apiKey()) { addMsg('bot', offlineAnswer(q)); return; }
+    if (!apiKey()) { addMsg('bot', safeAnswer(q)); return; }
     busy = true; $('ai-send').disabled = true;
     var el = addMsg('bot', L('Thinking…')); el.classList.add('ai-typing');
     history.push({ role: 'user', content: q });
@@ -370,7 +387,7 @@
       el.classList.remove('ai-typing');
       el.innerHTML = e.name === 'AbortError' ? '<p class="ai-err">' + esc(L('Stopped.')) + '</p>'
         : '<p class="ai-err">' + esc(e.message || L('Could not reach OpenAI.')) + '</p>' +
-          '<p class="ai-note">' + esc(L('Built-in answer instead:')) + '</p>' + fmtReply(offlineAnswer(q));
+          '<p class="ai-note">' + esc(L('Built-in answer instead:')) + '</p>' + fmtReply(safeAnswer(q));
     }).finally(function () { busy = false; $('ai-send').disabled = false; });
   }
 

@@ -89,6 +89,9 @@
     var gMarks = svg.append('g').attr('class', 'g-marks');
     var cmpPin = svg.append('g').attr('class', 'g-pin g-pin-cmp');
     cmpPin.append('circle').attr('r', 5);
+    // the chosen place's name on its area (states and regions have no named dot)
+    var cmpName = svg.append('text').attr('class', 'g-sel-name g-sel-name-cmp');
+    var selName = svg.append('text').attr('class', 'g-sel-name');
     var pin = svg.append('g').attr('class', 'g-pin');
     pin.append('circle').attr('class', 'g-ring').attr('r', 6);
     pin.append('circle').attr('r', 5);
@@ -294,6 +297,14 @@
       insetRaf = requestAnimationFrame(frame);
     }
 
+    function drawSelName(t, s) {
+      if (!s || !s.name || s.dot) { t.style('display', 'none'); return; }
+      // just above the top edge of the area, or above the pin for one grid cell
+      var b = s.box, top = b ? [(b.lonMin + b.lonMax) / 2, b.latMax] : [s.lon, s.lat];
+      if (!visible(top)) { t.style('display', 'none'); return; }
+      var xy = proj(top);
+      t.style('display', null).attr('x', xy[0]).attr('y', xy[1] - (b ? 7 : 14)).text(s.name);
+    }
     function drawSel(shape, pinG, s) {
       if (!s) { shape.attr('d', null); pinG.style('display', 'none'); return; }
       shape.attr('d', s.box ? path(boxShape(s.box)) : null);
@@ -336,6 +347,8 @@
       } else { gLand.style('stroke-opacity', null); gBord.style('stroke-opacity', null); }
       drawSel(gCmp, cmpPin, cmp);
       drawSel(gSel, pin, sel);
+      drawSelName(cmpName, cmp);
+      drawSelName(selName, sel);
       drawCells();
       drawMarks();
       queueRaster();

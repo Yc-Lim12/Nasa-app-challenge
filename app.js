@@ -1450,7 +1450,9 @@
   }
 
   function selectionFor(lat, lon, size, placeId) {
-    return { lat: lat, lon: lon, size: size, placeId: placeId, box: regionOf({ lat: lat, lon: lon, size: size, placeId: placeId }) };
+    var p = place(placeId);
+    return { lat: lat, lon: lon, size: size, placeId: placeId, box: regionOf({ lat: lat, lon: lon, size: size, placeId: placeId }),
+      name: p ? T(p.short) : '', dot: !!(p && !p.region) };   // places with a named dot on the globe already show their name
   }
 
   function updateMap(recentre) {

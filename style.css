@@ -590,6 +590,11 @@ button.spot-row:focus-visible { outline: 2px solid var(--accent); outline-offset
 .g-pin-cmp circle { fill: #bf5af2; }
 @keyframes ring { from { transform: scale(1); opacity: 0.9; } to { transform: scale(3.4); opacity: 0; } }
 
+.g-sel-name {
+  fill: #fff; font: 600 13px var(--font); letter-spacing: -0.01em; text-anchor: middle;
+  paint-order: stroke; stroke: rgb(0 0 0 / 0.7); stroke-width: 3.5px; stroke-linejoin: round; pointer-events: none;
+}
+.g-sel-name-cmp { fill: #e9c8ff; }
 .g-place { cursor: pointer; }
 .g-place circle { fill: #fff; stroke: rgb(0 0 0 / 0.5); stroke-width: 1; transition: r .2s var(--spring); }
 

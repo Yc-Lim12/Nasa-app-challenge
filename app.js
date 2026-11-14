@@ -100,7 +100,7 @@
   // at most 10° × 10° per request, so bigger boxes are fetched in parts (fetchArea).
   // The slider position is an index into SIZE_STEPS; 0 means a single grid cell.
   var SIZE_STEPS = [0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20];
-  var SIZE_MAX = 20, TILE_MAX = 10;
+  var TILE_MAX = 10;   // the largest size is the last entry of SIZE_STEPS
   function sizeIndex(v) {
     var best = 0;
     for (var i = 1; i < SIZE_STEPS.length; i++) if (Math.abs(SIZE_STEPS[i] - v) < Math.abs(SIZE_STEPS[best] - v)) best = i;
@@ -375,24 +375,29 @@
     return { table: out, cells: land, ocean: ocean };
   }
 
+  function daysInMonth(y, m) { return new Date(y, m, 0).getDate(); }
+
   /**
    * One value per year: the mean of all twelve months, one chosen month, or a
    * three-month season (a negative month means that month of the year before).
+   * Months are weighted by their number of days, the same way NASA POWER
+   * computes its own annual value (so February counts a little less).
    */
   function yearlySeries(table, y0, y1, month) {
     var years = [], values = [], skipped = [];
     var ms = !month ? partMonths(0) : SEASONS[month] || [month];
     for (var y = y0; y <= y1; y++) {
-      var s = 0, missing = [];
+      var s = 0, days = 0, missing = [];
       for (var i = 0; i < ms.length; i++) {
         var m = Math.abs(ms[i]), yy = ms[i] < 0 ? y - 1 : y;
         var x = table[yy + (m < 10 ? '0' : '') + m];
-        if (x === undefined || x === null || x < FILL) missing.push(m);
-        else s += x;
+        if (x === undefined || x === null || x < FILL) { missing.push(m); continue; }
+        s += x * daysInMonth(yy, m);
+        days += daysInMonth(yy, m);
       }
       // a year with any month missing is left out, and remembered so the page can say so
       if (missing.length) { skipped.push({ year: y, missing: missing }); continue; }
-      years.push(y); values.push(s / ms.length);
+      years.push(y); values.push(s / days);
     }
     return { years: years, values: values, skipped: skipped, expected: y1 - y0 + 1 };
   }
@@ -461,11 +466,15 @@
     });
   }
 
-  /** Centred 5-year running mean; null where the window is incomplete. */
-  function runningMean(vals, k) {
-    var h = Math.floor(k / 2), out = [];
+  /**
+   * Centred k-year running mean; null where the window is incomplete.
+   * A window that spans a skipped year is incomplete too.
+   */
+  function runningMean(years, vals, k, dx) {
+    var h = Math.floor(k / 2), out = [], step = dx || 1;   // dx: spacing of the points (1 year, or 1/12 for months)
     for (var i = 0; i < vals.length; i++) {
-      if (i < h || i >= vals.length - h) { out.push(null); continue; }
+      var span = i < h || i >= vals.length - h ? null : years[i + h] - years[i - h];
+      if (span === null || Math.abs(span - 2 * h * step) > step / 2) { out.push(null); continue; }
       var s = 0;
       for (var j = i - h; j <= i + h; j++) s += vals[j];
       out.push(s / k);
@@ -698,7 +707,6 @@
     $('reset-years').textContent = T('Back to the full record ({a}–{b})', { a: FIRST_YEAR, b: LAST_YEAR });
 
     var total = st.ols.slope * (res.years[n - 1] - res.years[0]);
-    var nYears = yearCount(res);
     var tiles = '';
     var perDec = ' <small>' + esc(T('per decade')) + '</small>';
     var dirCls = st.direction === 'up' ? 'is-up' : st.direction === 'down' ? 'is-down' : '';
@@ -898,7 +906,7 @@
         what: T(vr.name).toLowerCase(), where: T(p.short)
       }));
       compareData = { id: p.id, v: vr.id, name: p.name, short: p.short, years: ser.years, values: ser.values,
-        stats: analyzeFor(snap, ser.years, ser.values) };
+        table: ser.table, stats: analyzeFor(snap, ser.years, ser.values) };   // table: for its own 1991–2020 baseline
       drawChart(current, false);
       var a = res.stats, b = compareData.stats;
       var dir = b.direction === 'up' ? 'rising' : (b.direction === 'down' ? 'falling' : 'flat');
@@ -968,8 +976,14 @@
       var lead = Math.abs(r) < 0.2 ? T('{a} and {b} show no clear link here (r = {r}).', { a: capFirst(A), b: B, r: r.toFixed(2) })
         : T(r > 0 ? 'Years with high {a} tend to have high {b}: {s} link (r = {r}).' : 'Years with high {a} tend to have low {b}: {s} link (r = {r}).',
           { a: A, b: B, s: strength(r), r: r.toFixed(2) });
-      var det = T('After removing both long-term trends, the link is {s} (r = {r}), which shows how much of it is just two things changing over the same years.',
-        { s: strength(rd).replace(/^(a|an) /, ''), r: rd.toFixed(2) });
+      // If removing the trends flips the sign, say so: the first link came only from both changing over the years.
+      var flipped = r * rd < 0 && Math.abs(rd) >= 0.2;
+      var det = flipped
+        ? T(rd < 0 ? 'After removing both long-term trends, the link turns the other way ({s}, r = {r}): a year with more {a} than usual tends to have less {b}. The first link came from both rising or falling over the same years.'
+          : 'After removing both long-term trends, the link turns the other way ({s}, r = {r}): a year with more {a} than usual tends to have more {b}. The first link came from both rising or falling over the same years.',
+          { s: strength(rd).replace(/^(a|an) /, ''), r: rd.toFixed(2), a: A, b: B })
+        : T('After removing both long-term trends, the link is {s} (r = {r}), which shows how much of it is just two things changing over the same years.',
+          { s: strength(rd).replace(/^(a|an) /, ''), r: rd.toFixed(2) });
       note.innerHTML = esc(lead) + ' ' + esc(det) + ' <span class="muted">' + esc(T('A link is not proof that one causes the other.')) + '</span>';
     }).catch(function (e) {
       if (requestId === var2RequestId && myRun === runId && current === res && $('var2').value === id) note.textContent = e.message;
@@ -1169,6 +1183,69 @@
     readForm(); updateMap(false);
   }
 
+  // ---- "At this spot": one quick reading per topic after a click on the globe ----
+
+  // One variable stands in for each topic. The full list is still in the case settings.
+  var SPOT_VARS = ['T2M', 'PRECTOTCORR', 'GWETROOT', 'CLOUD_AMT', 'AOD_55'];
+  var spotRun = 0;
+
+  function topicLabel(id) {
+    for (var i = 0; i < TOPICS.length; i++) if (TOPICS[i].id === id) return T(TOPICS[i].label);
+    return id;
+  }
+
+  function showSpot(lat, lon) {
+    var run = ++spotRun, box = $('spot');
+    var head = '<h2 class="spot-title">' + esc(T('At this spot')) + ' <span>' + esc(coordLabel(lat, lon)) + '</span></h2>';
+    box.innerHTML = head + '<p class="spot-note">' + esc(T('Asking NASA…')) + '</p>';
+    box.hidden = false;
+
+    // One request for all five variables, for the single grid cell that was clicked.
+    var url = urlFor(SPOT_VARS.join(','), lat, lon, 0);
+    fetchJson(url).then(function (json) {
+      if (run !== spotRun) return;               // a newer click has taken over
+      var rows = SPOT_VARS.map(function (id) {
+        var vr = variable(id);
+        var ser = yearlySeries(monthlyTable(json, id).table, FIRST_YEAR, LAST_YEAR, 0);
+        return { vr: vr, ser: ser, st: ser.years.length >= MIN_YEARS ? S.analyze(ser.years, ser.values) : null };
+      });
+      box.innerHTML = head + '<ul class="spot-list">' + rows.map(spotRow).join('') + '</ul>' +
+        '<p class="spot-note">' + esc(T('One grid cell, yearly averages from NASA POWER. Pick one to open the full case: chart, tests and evidence.')) + '</p>';
+    }).catch(function (e) {
+      if (run !== spotRun) return;
+      box.innerHTML = head + '<p class="spot-note">' + esc(e.message) + '</p>';
+    });
+  }
+
+  function spotRow(r) {
+    var vr = r.vr, label = '<span class="spot-topic">' + esc(topicLabel(vr.topic)) + '</span>' +
+      '<span class="spot-var">' + esc(vname(vr)) + '</span>';
+    if (!r.ser.years.length) {
+      return '<li><div class="spot-row spot-empty">' + label + '<span class="spot-val">' + esc(T('No data here')) + '</span></div></li>';
+    }
+    var last = r.ser.years.length - 1;
+    var value = '<span class="spot-val">' + esc(fmtValue(r.ser.values[last], vr)) + ' <small>' + r.ser.years[last] + '</small></span>';
+    var trend = '';
+    if (r.st) {
+      var arrow = r.st.direction === 'up' ? '↑ ' : (r.st.direction === 'down' ? '↓ ' : '');
+      trend = '<span class="spot-trend">' + esc(arrow + ratePhrase(r.st, vr)) +
+        ' <span class="badge badge-small badge-' + verdictClass(r.st.verdict) + '">' + esc(T(verdictLabel(r.st.verdict))) + '</span></span>';
+    }
+    return '<li><button type="button" class="spot-row" data-var="' + vr.id + '">' + label + value + trend + '</button></li>';
+  }
+
+  // Picking a row makes it the case: same spot, that variable, then run it.
+  function initSpot() {
+    $('spot').addEventListener('click', function (e) {
+      var row = e.target.closest('button[data-var]');
+      if (!row) return;
+      var vr = variable(row.getAttribute('data-var'));
+      state.topic = vr.topic; state.v = vr.id;
+      renderVariables();
+      investigate({ scroll: true });
+    });
+  }
+
   function initMap() {
     if (!window.TDGlobe || !window.d3) { $('map').hidden = true; return; }
     globe = window.TDGlobe.create($('map'), {
@@ -1177,9 +1254,15 @@
       onStyle: function (name) { toast(T(name)); },
       onPick: function (lat, lon) {
         setCustom(lat, lon);
-        if (current) scheduleLive(500); else investigate({ scroll: wideScreen() });
+        // The current variable runs as before (its result shows in the card on the globe),
+        // and the case file opens with a reading of every topic so the user can switch.
+        showSpot(lat, lon);
+        if (window.TDPanel) window.TDPanel.open();
+        if (!wideScreen()) $('spot').scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' });
+        if (current) scheduleLive(500); else investigate({ scroll: false });
       },
       onPlace: function (id) {
+        spotRun++; $('spot').hidden = true;      // the spot card belongs to a clicked point, not a named place
         var s = $('place');
         s.value = id;
         s.dispatchEvent(new Event('change', { bubbles: true }));
@@ -1285,11 +1368,18 @@
     if (!current) return;
     var vr = current.variable, ols = current.stats.ols;
     var csvCell = function (value) { return '"' + String(value).replace(/"/g, '""') + '"'; };
-    var monthly = current.step === 'month';
-    var lines = [[monthly ? 'month' : 'year', vr.id + (monthly ? '_minus_monthly_normal' : '') + (vr.unit ? ' (' + vr.unit + ')' : ''), 'trend_line'].map(csvCell).join(',')];
+    var monthly = current.step === 'month', sen = current.stats.sen;
+    var lines = [[monthly ? 'month' : 'year', vr.id + (monthly ? '_minus_monthly_normal' : '') + (vr.unit ? ' (' + vr.unit + ')' : ''),
+      'trend_line', 'band_low_95', 'band_high_95', 'prediction_low_95', 'prediction_high_95', 'residual', 'sen_line'].map(csvCell).join(',')];
     current.years.forEach(function (y, i) {
       var t = monthly ? Math.floor(y) + '-' + ('0' + Math.round((y - Math.floor(y)) * 12 + 0.5)).slice(-2) : y;
-      lines.push([t, current.values[i].toFixed(4), (ols.intercept + ols.slope * y).toFixed(4)].map(csvCell).join(','));
+      var fit = ols.intercept + ols.slope * y;
+      var lever = 1 / ols.n + Math.pow(y - ols.meanX, 2) / ols.sxx;
+      var h = ols.tCrit * ols.residualSE * Math.sqrt(lever);             // confidence band, adjusted for memory (as drawn)
+      var ph = ols.tCritPlain * ols.residualSE * Math.sqrt(1 + lever);   // prediction interval for single values
+      var resid = ols.resid ? ols.resid[i] : current.values[i] - fit;
+      lines.push([t].concat([current.values[i], fit, fit - h, fit + h, fit - ph, fit + ph, resid].map(function (v) { return v.toFixed(4); }))
+        .concat(sen ? [(sen.intercept + sen.slope * y).toFixed(4)] : ['']).map(csvCell).join(','));
     });
     var a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([lines.join('\n') + '\n'], { type: 'text/csv' }));
@@ -1365,6 +1455,7 @@
     buildForm();
     var fromLink = readHash();
     initMap();
+    initSpot();
     writeForm();
     syncViewControls();
     syncThemeButton();

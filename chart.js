@@ -9,7 +9,7 @@
 
   var A;   // the app's helpers and state, from TDChart.init()
   var S, T, esc, clamp, fmtValue, fmtAnom, pEquals, ratePhrase, verdictLabel, runningMean, yearlySeries,
-    chooseMonth, setPeriod, investigate, toast, view, MONTHS, MONTH_SHORT, MIN_YEARS, MERRA, CERES, REDUCED, whenLabel;
+    chooseMonth, setPeriod, toast, view, MONTHS, MONTH_SHORT, MIN_YEARS, REDUCED, whenLabel;
   function $(id) { return document.getElementById(id); }
 
   // ---- chart helpers -------------------------------------------------------
@@ -75,6 +75,31 @@
       : { lo: 'var(--div-lo)', hi: 'var(--div-hi)', loName: 'blue', hiName: 'red' };
   }
 
+  // ---- reference period ------------------------------------------------------
+  // "Difference from average" and the stripes use the WMO climate normal 1991–2020,
+  // so they do not shift when a different period is chosen.
+  var NORMAL_FROM = 1991, NORMAL_TO = 2020, NORMAL_MIN = 24;   // WMO: at least 80% of the 30 years
+
+  /**
+   * The value differences are measured from: the 1991–2020 mean of the same place and part
+   * of the year, or, when fewer than 24 of those years have data, the mean of the years shown.
+   */
+  function baselineOf(d, month, monthly) {
+    // Month-by-month values are already differences from each calendar month's average over
+    // the chosen years (see monthlyAnomalies in app.js), so their reference is zero.
+    if (monthly) {
+      return { value: 0, label: T('average of each calendar month, {a}–{b}', { a: Math.floor(d.years[0]), b: Math.floor(d.years[d.years.length - 1]) }),
+        normal: false, monthly: true, n: d.years.length };
+    }
+    if (d.table) {
+      var ser = yearlySeries(d.table, NORMAL_FROM, NORMAL_TO, month || 0);
+      if (ser.years.length >= NORMAL_MIN) {
+        return { value: S.mean(ser.values), label: T('{a}–{b} average', { a: NORMAL_FROM, b: NORMAL_TO }), normal: true, n: ser.years.length };
+      }
+    }
+    return { value: S.mean(d.values), label: T('average of {a}–{b}', { a: d.years[0], b: d.years[d.years.length - 1] }), normal: false, n: d.years.length };
+  }
+
   // ---- main chart ----------------------------------------------------------
 
   function drawChart(res, animate) {
@@ -82,24 +107,37 @@
     host.innerHTML = '';
     host.classList.toggle('anim', !!animate && !REDUCED);
     var vr = res.variable, yrs = res.years, ols = res.stats.ols;
-    var base = view.anom ? S.mean(res.values) : 0;
+    var ref = baselineOf(res, res.month, res.step === 'month');
+    var base = view.anom ? ref.value : 0;
     var vals = res.values.map(function (v) { return v - base; });
     var cmp = A.compareData && A.compareData.v === vr.id ? A.compareData : null;
-    var cbase = cmp && view.anom ? S.mean(cmp.values) : 0;
+    var cbase = cmp && view.anom ? baselineOf(cmp, res.month, res.step === 'month').value : 0;
     var cvals = cmp ? cmp.values.map(function (v) { return v - cbase; }) : [];
     var cols = cmp ? cmp.stats.ols : null;
     var monthly = res.step === 'month', dx = monthly ? 1 / 12 : 1;   // spacing of the points, in years
-    var smooth = view.smooth ? runningMean(vals, monthly ? 61 : 5) : null;   // five years either way
+    var smooth = view.smooth ? runningMean(yrs, vals, monthly ? 61 : 5, dx) : null;   // five years either way
 
-    var W = Math.max(300, host.clientWidth), narrow = W < 560, H = narrow ? 300 : 380;
+    var W = Math.max(300, host.clientWidth), narrow = W < 560, H = (narrow ? 300 : 380) + 14;
     var STRIPE = 14;
-    var m = { l: 56, r: narrow ? 16 : 118, t: 14, b: 34 + STRIPE + 8 };
+    var m = { l: 68, r: narrow ? 16 : 118, t: 14, b: 34 + STRIPE + 8 + 14 };   // +14 for the "Year" axis title
     var iw = W - m.l - m.r, ih = H - m.t - m.b;
+    var sen = res.stats.sen;
 
     function trendAt(x) { return ols.intercept + ols.slope * x - base; }
+    function senAt(x) { return sen.intercept + sen.slope * x - base; }
     function ctrendAt(x) { return cols.intercept + cols.slope * x - cbase; }
-    function half(x) {   // stats.js scales tCrit so the band is already adjusted for year-to-year memory
+    // Half-width of the 95% confidence band: where the true trend line probably is.
+    //   t * s * sqrt(1/n + (x - mean x)^2 / Sxx). stats.js scales tCrit so the band is
+    // already adjusted for year-to-year memory (lag-1 autocorrelation).
+    function half(x) {
       return ols.tCrit * ols.residualSE * Math.sqrt(1 / ols.n + Math.pow(x - ols.meanX, 2) / ols.sxx);
+    }
+    // Half-width of the 95% prediction band: where a single future year would probably land.
+    // Same formula with an extra 1 under the root for the year-to-year scatter.
+    // It uses the plain critical t (n − 2): the memory adjustment is about the slope, not about
+    // how far a single value scatters from the line.
+    function predHalf(x) {
+      return ols.tCritPlain * ols.residualSE * Math.sqrt(1 + 1 / ols.n + Math.pow(x - ols.meanX, 2) / ols.sxx);
     }
     var a0 = yrs[0], a1 = yrs[yrs.length - 1];
     var FUT = view.future ? 10 : 0, f1 = a1 + FUT;
@@ -108,9 +146,11 @@
 
     var all = vals.concat(cvals);
     var lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
-    [a0, a1, f1].forEach(function (x) {
-      lo = Math.min(lo, trendAt(x) - half(x)); hi = Math.max(hi, trendAt(x) + half(x));
+    // keep the whole prediction interval on the chart (it is wider than the confidence band)
+    [a0, a1].forEach(function (x) {
+      lo = Math.min(lo, trendAt(x) - predHalf(x)); hi = Math.max(hi, trendAt(x) + predHalf(x));
     });
+    if (FUT) { lo = Math.min(lo, trendAt(f1) - predHalf(f1)); hi = Math.max(hi, trendAt(f1) + predHalf(f1)); }
     if (cmp) [cmp.years[0], cmp.years[cmp.years.length - 1]].forEach(function (x) {
       lo = Math.min(lo, ctrendAt(x)); hi = Math.max(hi, ctrendAt(x));
     });
@@ -134,11 +174,17 @@
     }
     var span = x1 - x0, every = span > 30 ? 10 : (span > 12 ? 5 : (span > 6 ? 2 : 1));
     for (var y = Math.ceil(x0 / every) * every; y <= x1; y += every) {
-      svg.appendChild(svgEl('text', { x: sx(y), y: H - 10, 'text-anchor': 'middle', class: 'tick' }, y));
+      svg.appendChild(svgEl('text', { x: sx(y), y: H - 24, 'text-anchor': 'middle', class: 'tick' }, y));
     }
 
-    // climate stripes: one per year, coloured by difference from the period mean
-    var mean = S.mean(res.values), maxAbs = 0;
+    // axis titles, with units
+    svg.appendChild(svgEl('text', { x: m.l + iw / 2, y: H - 5, 'text-anchor': 'middle', class: 'axis-title' }, T('Year')));
+    var yTitle = (view.anom ? T('Difference from the {ref}', { ref: ref.label }) : T(vr.name)) + (vr.unit ? ' (' + vr.unit + ')' : '');
+    svg.appendChild(svgEl('text', { x: 0, y: 0, 'text-anchor': 'middle', class: 'axis-title',
+      transform: 'translate(13 ' + (m.t + ih / 2) + ') rotate(-90)' }, yTitle));
+
+    // climate stripes: one per year, coloured by difference from the reference average
+    var mean = ref.value, maxAbs = 0;
     res.values.forEach(function (v) { maxAbs = Math.max(maxAbs, Math.abs(v - mean)); });
     var sc = stripeColours(vr), yw = x1 === x0 ? iw : iw * dx / (x1 - x0);
     var sTop = m.t + ih + 6;
@@ -159,10 +205,22 @@
     }
     svg.appendChild(svgEl('polygon', { points: up.concat(dn).join(' '), class: 'band' }));
 
+    // 95% prediction interval over the observed years: where single years are expected to fall.
+    // About 1 year in 20 should land outside it if the linear model fits.
+    var pu = '', pd = '';
+    for (var pi = 0; pi <= 40; pi++) {
+      var px = a0 + (a1 - a0) * pi / 40;
+      pu += (pi ? 'L' : 'M') + sx(px).toFixed(1) + ' ' + sy(trendAt(px) + predHalf(px)).toFixed(1);
+      pd += (pi ? 'L' : 'M') + sx(px).toFixed(1) + ' ' + sy(trendAt(px) - predHalf(px)).toFixed(1);
+    }
+    svg.appendChild(svgEl('path', { d: pu + pd, class: 'pi' }));
+
+    // Lift the pen at missing values and at skipped years, so a gap shows as a gap.
     function pathOf(xs, ys) {
       var d = '', pen = false;
       for (var k = 0; k < xs.length; k++) {
         if (ys[k] === null) { pen = false; continue; }
+        if (k > 0 && xs[k] - xs[k - 1] > dx * 1.5) pen = false;
         d += (pen ? 'L' : 'M') + sx(xs[k]).toFixed(1) + ' ' + sy(ys[k]).toFixed(1);
         pen = true;
       }
@@ -181,22 +239,35 @@
     }
     var smoothPath = null;
     if (smooth) { smoothPath = svgEl('path', { d: pathOf(yrs, smooth), class: 'smooth' }); svg.appendChild(smoothPath); }
+    svg.appendChild(svgEl('line', { x1: sx(a0), y1: sy(senAt(a0)), x2: sx(a1), y2: sy(senAt(a1)), class: 'sen' }));
     svg.appendChild(svgEl('line', { x1: sx(a0), y1: sy(trendAt(a0)), x2: sx(a1), y2: sy(trendAt(a1)), class: 'trend' }));
 
-    // "If the trend continues": the same straight line carried 10 years past the data
+    // "If the trend continues": the same straight line carried 10 years past the data.
+    // The band here is the prediction band, because a future year scatters like past years did.
     if (FUT) {
       var fu = [], fd = [];
       for (var fi = 0; fi <= 20; fi++) {
         var fx = a1 + FUT * fi / 20;
-        fu.push(sx(fx).toFixed(1) + ',' + sy(trendAt(fx) + half(fx)).toFixed(1));
-        fd.unshift(sx(fx).toFixed(1) + ',' + sy(trendAt(fx) - half(fx)).toFixed(1));
+        fu.push(sx(fx).toFixed(1) + ',' + sy(trendAt(fx) + predHalf(fx)).toFixed(1));
+        fd.unshift(sx(fx).toFixed(1) + ',' + sy(trendAt(fx) - predHalf(fx)).toFixed(1));
       }
       svg.appendChild(svgEl('polygon', { points: fu.concat(fd).join(' '), class: 'band future-band' }));
       svg.appendChild(svgEl('line', { x1: sx(a1), y1: sy(trendAt(a1)), x2: sx(f1), y2: sy(trendAt(f1)), class: 'future' }));
       svg.appendChild(svgEl('line', { x1: sx(a1), x2: sx(a1), y1: m.t, y2: m.t + ih, class: 'nowline' }));
-      var fl = svgEl('text', { x: sx(f1) - 4, y: sy(trendAt(f1)) + (ols.slope >= 0 ? 18 : -10), 'text-anchor': 'end', class: 'future-label' },
-        T('If the trend continues'));
-      svg.appendChild(fl);
+      // No text label inside the chart: it covered data points on small screens.
+      // The legend says "If the trend continues" and wide screens also get "Trend, extended" in the margin.
+    }
+
+    // Pettitt change point, drawn only when significant: where the shift is, and the mean
+    // before and after it.
+    var cp = res.stats.cp, showCp = cp && cp.at > 0 && cp.p < 0.05;
+    if (showCp) {
+      var xc = (sx(yrs[cp.at - 1]) + sx(yrs[cp.at])) / 2, right = xc > m.l + iw * 0.6;
+      svg.appendChild(svgEl('line', { x1: xc, x2: xc, y1: m.t, y2: m.t + ih, class: 'cp-line' }));
+      svg.appendChild(svgEl('line', { x1: sx(a0), x2: xc, y1: sy(cp.meanBefore - base), y2: sy(cp.meanBefore - base), class: 'cp-mean' }));
+      svg.appendChild(svgEl('line', { x1: xc, x2: sx(a1), y1: sy(cp.meanAfter - base), y2: sy(cp.meanAfter - base), class: 'cp-mean' }));
+      svg.appendChild(svgEl('text', { x: right ? xc - 5 : xc + 5, y: m.t + 11, 'text-anchor': right ? 'end' : 'start', class: 'cp-label' },
+        T('Shift after {y} (Pettitt {p})', { y: whenLabel(yrs[cp.at - 1]), p: pEquals(cp.p) })));
     }
 
     // one-off spikes, ringed and labelled
@@ -251,7 +322,9 @@
       for (var k = 1; k < yrs.length; k++) if (Math.abs(sx(yrs[k]) - px) < Math.abs(sx(yrs[best]) - px)) best = k;
       return best;
     }
-    function yearAt(px) { return clamp(Math.round(x0 + (px - m.l) / iw * (x1 - x0)), x0, x1); }
+    // Only years that have data can be selected. The axis can run past them
+    // ("If the trend continues", or a longer comparison series).
+    function yearAt(px) { return clamp(Math.round(x0 + (px - m.l) / iw * (x1 - x0)), a0, a1); }
 
     var kb = yrs.length - 1;
     function showIdx(k) {
@@ -261,10 +334,14 @@
       dot.setAttribute('cx', cx); dot.setAttribute('cy', cy); dot.setAttribute('visibility', 'visible');
       var html = '<strong>' + esc(whenLabel(yy)) + '</strong><span><i class="key key-series"></i>' +
         (cmp ? esc(res.short) + ': ' : '') +
-        esc(view.anom ? T('{x} vs average', { x: fmtAnom(vals[k], vr) }) : fmtValue(vals[k], vr)) +
+        esc(view.anom ? T('{v} vs the {ref}', { v: fmtAnom(vals[k], vr), ref: ref.label }) : fmtValue(vals[k], vr)) +
         (view.anom ? ' <em>(' + esc(fmtValue(res.values[k], vr)) + ')</em>' : '') + '</span>';
-      html += '<span><i class="key key-trend"></i>' + esc(T('{x} on the trend line', { x: view.anom ? fmtAnom(trendAt(yy), vr) : fmtValue(trendAt(yy), vr) })) + '</span>';
-      if (smooth && smooth[k] !== null) html += '<span><i class="key key-smooth"></i>' + esc(view.anom ? fmtAnom(smooth[k], vr) : fmtValue(smooth[k], vr)) + ' ' + esc(T('5-year average')) + '</span>';
+      var show = function (v) { return view.anom ? fmtAnom(v, vr) : fmtValue(v, vr); };
+      html += '<span><i class="key key-trend"></i>' + esc(T('{v} on the trend line', { v: show(trendAt(yy)) })) + '</span>';
+      html += '<span><i class="key key-band"></i>' + esc(T('95% band: {a} to {b}', { a: show(trendAt(yy) - half(yy)), b: show(trendAt(yy) + half(yy)) })) + '</span>';
+      html += '<span><i class="key key-sen"></i>' + esc(T('{v} on the Sen line', { v: show(senAt(yy)) })) + '</span>';
+      html += '<span>' + esc(T('Residual: {v}', { v: fmtAnom(ols.resid[k], vr) })) + '</span>';
+      if (smooth && smooth[k] !== null) html += '<span><i class="key key-smooth"></i>' + esc(T('{v} 5-year average', { v: show(smooth[k]) })) + '</span>';
       var ci = cmp ? cmp.years.indexOf(yy) : -1;
       if (ci >= 0) {
         cdot.setAttribute('cx', cx); cdot.setAttribute('cy', sy(cvals[ci])); cdot.setAttribute('visibility', 'visible');
@@ -289,12 +366,12 @@
       if (drag) {
         if (Math.abs(px - drag.x) > 8) drag.moved = true;
         if (drag.moved) {
-          var a = clamp(Math.min(drag.x, px), m.l, m.l + iw), b = clamp(Math.max(drag.x, px), m.l, m.l + iw);
+          var a = clamp(Math.min(drag.x, px), sx(a0), sx(a1)), b = clamp(Math.max(drag.x, px), sx(a0), sx(a1));
           sel.setAttribute('x', a); sel.setAttribute('width', b - a); sel.setAttribute('visibility', 'visible');
           var ya = yearAt(a), yb = yearAt(b), n = yb - ya + 1;
           cross.setAttribute('visibility', 'hidden'); dot.setAttribute('visibility', 'hidden'); cdot.setAttribute('visibility', 'hidden');
-          tip.show('<strong>' + ya + '–' + yb + '</strong><span>' + n + ' years. ' +
-            (n >= MIN_YEARS ? 'Let go to test this period.' : 'Pick at least ' + MIN_YEARS + ' years.') + '</span>', (a + b) / 2, m.t + 30, svg, W);
+          tip.show('<strong>' + ya + '–' + yb + '</strong><span>' + esc(T('{n} years.', { n: n }) + ' ' +
+            (n >= MIN_YEARS ? T('Let go to test this period.') : T('Pick at least {n} years.', { n: MIN_YEARS }))) + '</span>', (a + b) / 2, m.t + 30, svg, W);
           return;
         }
       }
@@ -328,14 +405,221 @@
     });
 
     // legend and hint
-    var lg = '<span><i class="key key-series"></i>' + esc(cmp ? res.short : T(monthly ? 'Each month minus its normal' : 'Yearly value')) + '</span>' +
-      '<span><i class="key key-trend"></i>' + esc(T('Trend line')) + '</span><span><i class="key key-band"></i>' + esc(T('95% confidence band')) + '</span>';
-    if (smooth) lg += '<span><i class="key key-smooth"></i>' + T('5-year average') + '</span>';
-    if (FUT) lg += '<span><i class="key key-future"></i>' + T('If the trend continues') + '</span>';
-    if (cmp) lg += '<span><i class="key key-cmp"></i>' + esc(cmp.short) + '</span>';
+    // one legend entry: coloured key, name, and an explanation shown on hover
+    function key(cls, name, help) {
+      return '<span' + (help ? ' title="' + esc(T(help)) + '"' : '') + '><i class="key ' + cls + '"></i>' + esc(name) + '</span>';
+    }
+    var lg = key('key-series', cmp ? res.short : T(monthly ? 'Each month minus its normal' : 'Yearly value')) +
+      key('key-trend', T('Trend line'), 'Straight line fitted by least squares') +
+      key('key-band', T('95% confidence band'), 'Where the true trend line probably lies (95% confidence, allowing for year-to-year memory). Single values scatter much more widely, so most dots sit outside it.') +
+      key('key-pi', T('95% prediction interval'), 'Where single years are expected to fall (95% prediction interval). About 1 year in 20 should land outside it.') +
+      key('key-sen', T('Sen’s slope'), 'Theil–Sen line: the median of the slopes between every pair of years. Robust to outliers; pairs with the Mann–Kendall test.');
+    if (showCp) lg += key('key-cp', T('Change point'), 'Pettitt (1979) test: the most likely point where the values shift, with the mean before and after. A steady trend can also trigger it.');
+    if (smooth) lg += key('key-smooth', T('5-year average'));
+    if (FUT) lg += key('key-future', T('If the trend continues'), 'The trend line carried 10 years on. The shaded area is where a single year would probably land (95% prediction band), if nothing about the trend changes. It is not a forecast.');
+    if (cmp) lg += key('key-cmp', cmp.short);
     $('legend').innerHTML = lg;
-    $('chart-hint').textContent = T('Drag across the chart to test only those years. Stripes: {lo} years were below the average, {hi} years above.',
-      { lo: T(sc.loName), hi: T(sc.hiName) });
+    $('chart-hint').textContent = T('Drag across the chart to test only those years. Stripes: {lo} years were below the {ref}, {hi} years above.',
+      { lo: T(sc.loName), hi: T(sc.hiName), ref: ref.label });
+
+    drawResiduals(res, { W: W, m: m, x0: x0, x1: x1, narrow: narrow });
+    drawSensitivity(res, { W: W, m: m, narrow: narrow });
+    drawSummary(res);
+  }
+
+  // ---- trend vs start year -----------------------------------------------------
+  // The trend from every possible start year to the last year, with its 95% confidence
+  // interval. If the answer holds for most start years, it does not depend on where the
+  // record happens to begin.
+
+  function drawSensitivity(res, g) {
+    var host = $('sens');
+    if (!host) return;
+    host.innerHTML = '';
+    var yrs = res.years, vals = res.values, vr = res.variable, last = yrs[yrs.length - 1], pts = [], i;
+    // one start per calendar year (in monthly mode, the first month of that year); each needs
+    // at least MIN_YEARS calendar years of data up to the end
+    last = Math.floor(last);
+    for (i = 0; i < yrs.length; i++) {
+      var from = Math.floor(yrs[i]);
+      if (i > 0 && Math.floor(yrs[i - 1]) === from) continue;
+      if (last - from + 1 < MIN_YEARS) break;
+      var o = S.linearRegression(yrs.slice(i), vals.slice(i));
+      pts.push({ from: from, n: last - from + 1, slope: o.slope * 10, lo: o.ciLow * 10, hi: o.ciHigh * 10 });
+    }
+    if (pts.length < 2) return;
+
+    var W = g.W, H = 204, m = { l: g.m.l, r: g.narrow ? 16 : 30, t: 42, b: 36 };
+    var iw = W - m.l - m.r, ih = H - m.t - m.b, f0 = pts[0].from, f1 = pts[pts.length - 1].from;
+    var lo = Math.min(0, Math.min.apply(null, pts.map(function (p) { return p.lo; })));
+    var hi = Math.max(0, Math.max.apply(null, pts.map(function (p) { return p.hi; })));
+    var pad = (hi - lo || 1) * 0.08; lo -= pad; hi += pad;
+    function sx(x) { return m.l + (x - f0) / (f1 - f0) * iw; }
+    function sy(v) { return m.t + (hi - v) / (hi - lo) * ih; }
+
+    var svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, width: W, height: H, role: 'img',
+      'aria-label': 'Trend per decade for each start year up to ' + last + ', with 95% confidence intervals' });
+    var yt = niceTicks(lo, hi, 4), dp = Math.max(0, -Math.floor(Math.log10(yt.step) + 1e-9));
+    yt.ticks.forEach(function (t) {
+      svg.appendChild(svgEl('line', { x1: m.l, x2: m.l + iw, y1: sy(t), y2: sy(t), class: 'grid' }));
+      svg.appendChild(svgEl('text', { x: m.l - 8, y: sy(t) + 4, 'text-anchor': 'end', class: 'tick' },
+        (t > 0 ? '+' : t < 0 ? '−' : '') + Math.abs(t).toFixed(dp)));
+    });
+    svg.appendChild(svgEl('line', { x1: m.l, x2: m.l + iw, y1: sy(0), y2: sy(0), class: 'zero-solid' }));
+    var every = f1 - f0 > 30 ? 10 : (f1 - f0 > 12 ? 5 : 2);
+    for (var y = Math.ceil(f0 / every) * every; y <= f1; y += every) {
+      svg.appendChild(svgEl('text', { x: sx(y), y: H - 18, 'text-anchor': 'middle', class: 'tick' }, y));
+    }
+    svg.appendChild(svgEl('text', { x: m.l + iw / 2, y: H - 3, 'text-anchor': 'middle', class: 'axis-title' }, T('Start year')));
+
+    // one error bar per start year; filled when the 95% interval excludes zero. Click to test that period.
+    var slot = iw / Math.max(1, f1 - f0);
+    pts.forEach(function (p) {
+      var sig = p.lo > 0 || p.hi < 0, cls = sig ? ' sig' : '';
+      var gEl = svgEl('g', { class: 'sens-pt-group', tabindex: 0, role: 'button',
+        'aria-label': 'From ' + p.from + ': ' + signedNum(p.slope) + ' per decade, 95% CI ' + signedNum(p.lo) + ' to ' + signedNum(p.hi) + '. Test this period.' });
+      gEl.appendChild(svgEl('title', {}, T('From {a} to {b} ({n} years): {s} {u}per decade, 95% CI [{lo}, {hi}]. Click to test this period.',
+        { a: p.from, b: last, n: p.n, s: signedNum(p.slope), u: vr.unit ? vr.unit + ' ' : '', lo: signedNum(p.lo), hi: signedNum(p.hi) })));
+      gEl.appendChild(svgEl('rect', { x: sx(p.from) - slot / 2, y: m.t, width: slot, height: ih, class: 'sens-hit' }));
+      gEl.appendChild(svgEl('line', { x1: sx(p.from), x2: sx(p.from), y1: sy(p.lo), y2: sy(p.hi), class: 'sens-bar' + cls }));
+      gEl.appendChild(svgEl('circle', { cx: sx(p.from), cy: sy(p.slope), r: 3, class: 'sens-pt' + cls }));
+      var go = function () { setPeriod(p.from, last); };
+      gEl.addEventListener('click', go);
+      gEl.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+      svg.appendChild(gEl);
+    });
+
+    // title on the first line, the count on the second (they would collide side by side on mid-size screens)
+    var nSig = pts.filter(function (p) { return p.lo > 0 || p.hi < 0; }).length;
+    svg.appendChild(svgEl('text', { x: 0, y: 14, class: 'panel-title' },
+      T('Trend from each start year to {y}', { y: last }) + ' (' + (vr.unit ? vr.unit + ' ' : '') + T('per decade') + ')'));
+    svg.appendChild(svgEl('text', { x: 0, y: 30, class: 'tick' },
+      T('{s} of {n} start years give a 95% interval that excludes zero. Click a bar to test that period.', { s: nSig, n: pts.length })));
+    host.appendChild(svg);
+  }
+
+  // ---- residuals panel -------------------------------------------------------
+  // Observed minus the least-squares line, on the same year axis as the main chart.
+  // A straight-line fit is reasonable when these scatter evenly around zero with no pattern.
+
+  function drawResiduals(res, g) {
+    var host = $('resid');
+    if (!host) return;
+    host.innerHTML = '';
+    var ols = res.stats.ols, e = ols.resid, yrs = res.years, vr = res.variable, monthly = res.step === 'month';
+    // the title and the statistics take two lines (side by side they collide on mid-size screens)
+    var H = 164, m = { l: g.m.l, r: g.m.r, t: 42, b: 22 };
+    var iw = g.W - m.l - m.r, ih = H - m.t - m.b;
+    var band = 1.96 * ols.residualSE;
+    var lim = Math.max(band, Math.max.apply(null, e.map(Math.abs))) * 1.15 || 1;
+    function sx(x) { return m.l + (g.x1 === g.x0 ? iw / 2 : (x - g.x0) / (g.x1 - g.x0) * iw); }
+    function sy(v) { return m.t + (lim - v) / (2 * lim) * ih; }
+
+    var svg = svgEl('svg', { viewBox: '0 0 ' + g.W + ' ' + H, width: g.W, height: H, role: 'img',
+      'aria-label': 'Residuals from the linear trend, by year' });
+    var yt = niceTicks(-lim, lim, 3), dp = Math.max(0, -Math.floor(Math.log10(yt.step) + 1e-9));
+    yt.ticks.forEach(function (t) {
+      if (Math.abs(t) > lim) return;
+      svg.appendChild(svgEl('line', { x1: m.l, x2: m.l + iw, y1: sy(t), y2: sy(t), class: 'grid' }));
+      svg.appendChild(svgEl('text', { x: m.l - 8, y: sy(t) + 4, 'text-anchor': 'end', class: 'tick' },
+        (t > 0 ? '+' : t < 0 ? '−' : '') + Math.abs(t).toFixed(dp)));
+    });
+    svg.appendChild(svgEl('line', { x1: m.l, x2: m.l + iw, y1: sy(0), y2: sy(0), class: 'zero-solid' }));
+    [band, -band].forEach(function (b) {
+      svg.appendChild(svgEl('line', { x1: m.l, x2: m.l + iw, y1: sy(b), y2: sy(b), class: 'resid-sd' }));
+    });
+    if (!g.narrow) svg.appendChild(svgEl('text', { x: m.l + iw + 8, y: sy(band) + 4, class: 'endlabel' }, '±1.96 s'));
+
+    yrs.forEach(function (yy, k) {
+      var out = Math.abs(e[k]) > band;
+      svg.appendChild(svgEl('line', { x1: sx(yy), x2: sx(yy), y1: sy(0), y2: sy(e[k]), class: 'resid-stem' + (out ? ' out' : '') }));
+      svg.appendChild(svgEl('circle', { cx: sx(yy), cy: sy(e[k]), r: monthly ? 1.2 : 2.4, class: 'resid-pt' + (out ? ' out' : '') }));
+    });
+
+    svg.appendChild(svgEl('text', { x: 0, y: 14, class: 'panel-title' }, T('Residuals: observed minus trend line') + (vr.unit ? ' (' + vr.unit + ')' : '')));
+    svg.appendChild(svgEl('text', { x: 0, y: 30, class: 'tick' },
+      'lag-1 r = ' + ols.lag1.toFixed(2) + (ols.dw === null ? '' : ' · Durbin–Watson = ' + ols.dw.toFixed(2))));
+    host.appendChild(svg);
+  }
+
+  // ---- statistical summary ---------------------------------------------------
+
+  /** A number to n significant figures; scientific notation when very small or large. */
+  function num(v, n) {
+    if (v === null || v === undefined || !isFinite(v)) return '–';
+    if (v === 0) return '0';
+    var a = Math.abs(v), s = a >= 1e-3 && a < 1e6 ? String(Number(v.toPrecision(n || 3))) : v.toExponential((n || 3) - 1);
+    return s.replace('-', '−');
+  }
+  function signedNum(v, n) { return v > 0 ? '+' + num(v, n) : num(v, n); }
+  function pText(p) { return p === null || p === undefined ? '–' : p < 1e-3 ? num(p, 2) : p.toFixed(3); }
+
+  function drawSummary(res) {
+    var host = $('stats-summary');
+    if (!host) return;
+    var st = res.stats, o = st.ols, mk = st.mk, sen = st.sen, hr = st.hr, cp = st.cp, vr = res.variable;
+    var ref = baselineOf(res, res.month, res.step === 'month');
+    var unit = vr.unit ? vr.unit + ' ' : '', perDec = unit + T('per decade');
+    var dec = function (v) { return signedNum(v * 10); };              // per year → per decade
+    var range = function (a, b) { return '[' + dec(a) + ', ' + dec(b) + '] ' + perDec; };
+    var n = res.years.length, monthly = res.step === 'month', skipped = (res.skipped || []).length;
+    var lat = res.lat.toFixed(2), lon = res.lon.toFixed(2);
+    var where = res.size ? T('{s}° box centred on {lat}°, {lon}° (area-weighted mean of {c} grid cells)', { s: res.size, lat: lat, lon: lon, c: res.cells })
+      : T('single grid cell at {lat}°, {lon}°', { lat: lat, lon: lon });
+    var part = monthly ? T('each month minus its calendar-month average') + (res.month ? ' (' + T(MONTHS[res.month]) + ')' : '')
+      : res.month ? T('{month} mean', { month: T(MONTHS[res.month]) }) : T('annual mean (months weighted by days)');
+    var plainLo = o.slope - o.tCritPlain * o.se, plainHi = o.slope + o.tCritPlain * o.se;
+
+    // Row labels are translated when the table is built (see below); values are built here.
+    var rows = [
+      ['Linear regression (ordinary least squares)'],
+      ['Slope ± standard error', dec(o.slope) + ' ± ' + num(o.se * 10) + ' ' + perDec],
+      ['95% confidence interval', range(plainLo, plainHi)],
+      ['t-test on the slope', 't = ' + num(o.t) + ', df = ' + o.df + ', p = ' + pText(o.p)],
+      ['R² · residual standard deviation', num(o.r2) + ' · ' + num(o.residualSE) + (vr.unit ? ' ' + vr.unit : '')],
+
+      ['Autocorrelation of the residuals'],
+      ['Lag-1 autocorrelation r₁ · Durbin–Watson d', num(o.lag1) + ' · ' + num(o.dw)],
+      ['Lag-1 r used, with small-sample correction', num(o.lag1Adj)],
+      ['Effective sample size n_eff', T('{a} of {n} values', { a: num(o.nEff), n: n })],
+      ['Slope 95% CI, adjusted (drawn as the band)', range(o.ciLow, o.ciHigh)],
+      ['t-test p, adjusted', pText(o.pAdj)],
+
+      ['Mann–Kendall trend test'],
+      ['S · Var(S) · Z', num(mk.S, 4) + ' · ' + num(mk.varS, 4) + ' · ' + num(mk.z)],
+      ['Kendall’s τ · p', num(mk.tau) + ' · ' + pText(mk.p)],
+      ['p adjusted for year-to-year memory (used for the verdict)', pText(mk.pAdj)],
+      ['Hamed–Rao modified p (autocorrelation)', hr.p === null ? '– (' + T('corrected variance not positive') + ')' :
+        pText(hr.p) + ' (Var(S) × ' + num(hr.factor) + ', ' + (hr.lags.length ? T('lags {l}', { l: hr.lags.join(', ') }) : T('no significant lags')) + ')'],
+
+      ['Theil–Sen estimator'],
+      ['Sen’s slope', dec(sen.slope) + ' ' + perDec],
+      ['95% confidence interval (Sen 1968)', range(sen.ciLow, sen.ciHigh)],
+
+      ['Change point (Pettitt 1979)'],
+      ['Most likely shift', cp.at ? T('between {a} and {b}', { a: whenLabel(res.years[cp.at - 1]), b: whenLabel(res.years[cp.at]) }) : T('none (all values equal)')],
+      ['K · p', num(cp.K, 4) + ' · ' + pText(cp.p) + ' (' + T(cp.p < 0.05 ? 'significant, drawn on the chart' : 'not significant') + ')'],
+      ['Mean before · after the shift', cp.at ? num(cp.meanBefore, 4) + ' · ' + num(cp.meanAfter, 4) + (vr.unit ? ' ' + vr.unit : '') : '–'],
+
+      ['Data'],
+      ['Reference for differences and stripes', ref.normal ? T('{ref} (WMO climate normal; {n} of 30 years with data)', { ref: ref.label, n: ref.n })
+        : T('{ref} (fewer than {m} of the 1991–2020 years have data)', { ref: ref.label, m: NORMAL_MIN })],
+      ['Series', T('NASA POWER monthly {p}, {part}', { p: vr.param || vr.id, part: part })],
+      ['Location', where],
+      ['Period · values used', whenLabel(res.years[0]) + '–' + whenLabel(res.years[n - 1]) + ' · n = ' + n +
+        (skipped ? ' (' + T(monthly ? '{k} years with missing months' : '{k} skipped: incomplete months', { k: skipped }) + ')' : '')],
+      ['Source', vr.source]
+    ];
+
+    host.innerHTML = '<h4>' + esc(T('Statistical summary')) + '</h4><div class="table-scroll"><table class="stats-table"><tbody>' +
+      rows.map(function (r) {
+        return r.length === 1 ? '<tr class="group"><th colspan="2" scope="colgroup">' + esc(T(r[0])) + '</th></tr>'
+          : '<tr><th scope="row">' + esc(T(r[0])) + '</th><td>' + esc(r[1]) + '</td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<p class="hint">' + esc(T('Two-sided tests, α = 0.05. Per-decade values are the per-year slope × 10. The verdict above uses the ' +
+        'Mann–Kendall p-value adjusted for year-to-year memory. A steady trend can also make the Pettitt test significant, so a change point is most convincing when ' +
+        'the residuals jump at that year too.')) + ' ' + esc(T('References:') + ' Mann (1945); Kendall (1975); Pettitt (1979); Sen (1968); ' +
+        'Hamed & Rao (1998); Santer et al. (2000); WMO (2017).') + '</p>';
   }
 
   // ---- months panel --------------------------------------------------------
@@ -359,10 +643,12 @@
     if (sigs.length) {
       sigs.sort(function (a, b) { return Math.abs(b.st.sen.slope) - Math.abs(a.st.sen.slope); });
       var top = sigs[0];
+      // placeholders hold already-escaped HTML, so the sentence itself can be translated
       $('season-note').innerHTML = T(top.st.direction === 'up'
-        ? '<strong>{n} of {m}</strong> months show a significant trend. The biggest is <strong>{month}</strong>, rising by about {rate}.'
-        : '<strong>{n} of {m}</strong> months show a significant trend. The biggest is <strong>{month}</strong>, falling by about {rate}.',
-        { n: sigs.length, m: valid.length, month: esc(T(MONTHS[top.m])), rate: esc(ratePhrase(top.st, vr)) });
+        ? '{s} months show a significant trend. The biggest is {m}, rising by about {rate}.'
+        : '{s} months show a significant trend. The biggest is {m}, falling by about {rate}.',
+        { s: '<strong>' + esc(T('{a} of {b}', { a: sigs.length, b: valid.length })) + '</strong>',
+          m: '<strong>' + esc(T(MONTHS[top.m])) + '</strong>', rate: esc(ratePhrase(top.st, vr)) });
     } else {
       $('season-note').textContent = T('No single month shows a statistically significant trend here.');
     }
@@ -403,8 +689,9 @@
         narrow ? T(MONTH_SHORT[i]).charAt(0) : T(MONTH_SHORT[i])));
       function showTip() {
         var html = '<strong>' + esc(T(MONTHS[r.m])) + '</strong>' + (r.st
-          ? '<span>' + esc(ratePhrase(r.st, vr)) + '</span><span>' + verdictLabel(r.st.verdict) + ', ' + esc(pEquals(r.st.mk.pAdj)) + '</span>'
-          : '<span>' + esc(T('Not enough data')) + '</span>') + '<span><em>' + esc(T(on ? 'Click to go back to the whole year' : 'Click to investigate this month')) + '</em></span>';
+          ? '<span>' + esc(ratePhrase(r.st, vr)) + '</span><span>' + esc(T(verdictLabel(r.st.verdict))) + ', ' + esc(pEquals(r.st.mk.pAdj)) + '</span>'
+          : '<span>' + esc(T('Not enough data')) + '</span>') +
+          '<span><em>' + esc(T(on ? 'Click to go back to the whole year' : 'Click to investigate this month')) + '</em></span>';
         tip.show(html, cx, barTop, svg, W);
       }
       g.addEventListener('pointerenter', showTip);
@@ -434,8 +721,11 @@
     });
     var every = x1 - x0 > 30 ? 10 : 5;
     for (var y = Math.ceil(x0 / every) * every; y <= x1; y += every) svg.appendChild(svgEl('text', { x: sx(y), y: H - 8, 'text-anchor': 'middle', class: 'tick' }, y));
+    // A skipped year starts a new piece of line instead of joining across the gap.
     function line(z, cls) {
-      return svgEl('path', { d: ys.map(function (yy, i) { return (i ? 'L' : 'M') + sx(yy).toFixed(1) + ' ' + sy(z[i]).toFixed(1); }).join(' '), class: cls });
+      return svgEl('path', { d: ys.map(function (yy, i) {
+        return (i && yy - ys[i - 1] === 1 ? 'L' : 'M') + sx(yy).toFixed(1) + ' ' + sy(z[i]).toFixed(1);
+      }).join(' '), class: cls });
     }
     svg.appendChild(line(za, 'series'));
     svg.appendChild(line(zb, 'cmp'));
@@ -460,9 +750,29 @@
     inlineStyles(svg, clone);
     Array.prototype.forEach.call(clone.querySelectorAll('.hit, .brush, .cross, .dot, .dot-cmp'), function (n) { n.remove(); });
     clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-    var W = +svg.getAttribute('width'), H = +svg.getAttribute('height'), scale = 2, top = 64, bottom = 34;
+    var W = +svg.getAttribute('width'), H = +svg.getAttribute('height'), scale = 2, top = 86, bottom = 48;
     var cs = getComputedStyle(document.querySelector('.chart-card'));
     var bg = cs.backgroundColor, ink = getComputedStyle(document.body).color;
+    var FONT = '-apple-system, BlinkMacSystemFont, Inter, Segoe UI, sans-serif';
+
+    // The legend goes into the image too, so the lines and the band still make sense on their own.
+    var legend = Array.prototype.map.call(document.querySelectorAll('#legend > span'), function (s) {
+      var key = s.querySelector('.key'), kc = key ? getComputedStyle(key) : null;
+      var colour = !kc ? null : (kc.backgroundColor !== 'rgba(0, 0, 0, 0)' ? kc.backgroundColor : kc.borderTopColor);
+      return { text: s.textContent.trim(), colour: colour, opacity: kc ? +kc.opacity : 1 };
+    });
+    // Place the legend items in rows that fit the width, and make room for them above the chart.
+    var meas = document.createElement('canvas').getContext('2d');
+    meas.font = '12px ' + FONT;
+    var lx = 20, row = 0;
+    legend.forEach(function (it) {
+      var w = (it.colour ? 20 : 0) + meas.measureText(it.text).width;
+      if (lx > 20 && lx + w > W + 20) { lx = 20; row++; }
+      it.x = lx; it.row = row;
+      lx += w + 16;
+    });
+    top += row * 18;
+
     var url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(clone)], { type: 'image/svg+xml' }));
     var img = new Image();
     img.onload = function () {
@@ -471,14 +781,34 @@
       var x = c.getContext('2d');
       x.scale(scale, scale);
       x.fillStyle = bg; x.fillRect(0, 0, W + 40, H + top + bottom);
-      x.fillStyle = ink; x.font = '600 17px -apple-system, BlinkMacSystemFont, Inter, Segoe UI, sans-serif';
+      x.fillStyle = ink; x.font = '600 17px ' + FONT;
       x.fillText($('chart-title').textContent, 20, 30);
-      x.globalAlpha = 0.65; x.font = '13px -apple-system, BlinkMacSystemFont, Inter, Segoe UI, sans-serif';
+      x.globalAlpha = 0.65; x.font = '13px ' + FONT;
       x.fillText($('verdict-head').textContent, 20, 50);
+
+      // legend: a coloured key, then its name, in the rows worked out above
+      x.font = '12px ' + FONT;
+      legend.forEach(function (it) {
+        var ty = 73 + it.row * 18, tx = it.x;
+        if (it.colour) {
+          x.globalAlpha = Math.max(it.opacity, 0.35); x.fillStyle = it.colour; x.fillRect(tx, ty - 6, 14, 4);
+          tx += 20;
+        }
+        x.globalAlpha = 0.8; x.fillStyle = ink; x.fillText(it.text, tx, ty);
+      });
       x.globalAlpha = 1;
       x.drawImage(img, 20, top, W, H);
-      x.globalAlpha = 0.55; x.font = '11px -apple-system, BlinkMacSystemFont, Inter, Segoe UI, sans-serif';
-      x.fillText(T('Data: NASA POWER (MERRA-2, CERES). Made with Trend Detective, a student project not endorsed by NASA.'), 20, H + top + 22);
+
+      // source line, wrapped so it is never cut off on a narrow chart
+      x.globalAlpha = 0.55; x.fillStyle = ink; x.font = '11px ' + FONT;
+      var words = T('Data: NASA POWER (MERRA-2, CERES). Made with Trend Detective, a student project not endorsed by NASA.').split(' ');
+      var lineText = '', ly = H + top + 20;
+      words.forEach(function (w) {
+        var tryText = lineText ? lineText + ' ' + w : w;
+        if (x.measureText(tryText).width > W && lineText) { x.fillText(lineText, 20, ly); lineText = w; ly += 15; }
+        else lineText = tryText;
+      });
+      x.fillText(lineText, 20, ly);
       URL.revokeObjectURL(url);
       c.toBlob(function (blob) {
         var a = document.createElement('a');
@@ -497,9 +827,9 @@
       A = api;
       S = api.S; T = api.T; esc = api.esc; clamp = api.clamp; fmtValue = api.fmtValue; fmtAnom = api.fmtAnom;
       pEquals = api.pEquals; ratePhrase = api.ratePhrase; verdictLabel = api.verdictLabel; runningMean = api.runningMean;
-      yearlySeries = api.yearlySeries; chooseMonth = api.chooseMonth; setPeriod = api.setPeriod; investigate = api.investigate;
+      yearlySeries = api.yearlySeries; chooseMonth = api.chooseMonth; setPeriod = api.setPeriod;
       toast = api.toast; view = api.view; MONTHS = api.MONTHS; MONTH_SHORT = api.MONTH_SHORT; MIN_YEARS = api.MIN_YEARS; whenLabel = api.whenLabel;
-      MERRA = api.MERRA; CERES = api.CERES; REDUCED = api.REDUCED;
+      REDUCED = api.REDUCED;
     },
     drawChart: drawChart, drawSeason: drawSeason, drawPair: drawPair, savePng: savePng
   };

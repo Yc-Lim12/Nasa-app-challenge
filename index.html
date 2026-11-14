@@ -82,13 +82,18 @@
       <p class="brief" id="brief"></p>
     </section>
 
+    <!-- Filled in when someone clicks the globe: a quick reading of each topic at that spot. -->
+    <section class="spot" id="spot" hidden aria-live="polite"></section>
+
     <details class="settings" id="settings" open>
       <summary>
         <span class="settings-title" data-i18n>Case settings</span>
         <span class="settings-hint" data-i18n>What, where and when</span>
       </summary>
 
-      <form class="case" id="case-form" aria-label="Case settings">
+      <!-- novalidate: app.js keeps every value in range itself (e.g. latitude 95 becomes 89.5). The browser's
+           own check blocked "Investigate" with a warning hidden inside the folded settings. -->
+      <form class="case" id="case-form" aria-label="Case settings" novalidate>
         <ol class="steps">
           <li id="step-what">
             <h2 data-i18n>What to investigate</h2>
@@ -171,11 +176,14 @@
             <label class="inline-field"><span data-i18n>Compare with</span> <select id="compare"></select></label>
           </div>
           <div id="chart" class="chart"></div>
+          <div id="resid" class="chart chart-resid"></div>
+          <div id="sens" class="chart chart-sens"></div>
           <div class="chart-foot">
             <p class="hint" id="chart-hint"></p>
             <button type="button" class="link" id="reset-years" hidden></button>
           </div>
           <p class="compare-note" id="compare-note" hidden></p>
+          <section class="stats-summary" id="stats-summary" aria-label="Statistical summary"></section>
           <details class="table-view">
             <summary data-i18n>Show the numbers as a table</summary>
             <div class="table-scroll">
@@ -282,7 +290,7 @@
 
     <section>
       <h3 data-i18n>What the app measures</h3>
-      <p data-i18n>For a chosen place, variable and period, Trend Detective turns NASA’s monthly data into one value per year (the mean of the twelve months, one chosen month, or a three-month season; December to February takes December from the year before) and asks: is there a steady rise or fall, how fast is it, and could it be chance?</p>
+      <p data-i18n>For a chosen place, variable and period, Trend Detective turns NASA’s monthly data into one value per year (the mean of the twelve months weighted by their number of days, as NASA POWER computes its own annual values; one chosen month; or a three-month season, also weighted by days; December to February takes December from the year before) and asks: is there a steady rise or fall, how fast is it, and could it be chance?</p>
     </section>
 
     <section>

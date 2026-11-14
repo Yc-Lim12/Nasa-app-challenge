@@ -373,7 +373,7 @@
         });
         var t = f.time;
         var el = $('lp-when');
-        if (el) el.textContent = t.toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' }) + ' · ' +
+        if (el) el.textContent = t.toLocaleString(window.TDi18n && window.TDi18n.lang === 'bm' ? 'ms-MY' : undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' }) + ' · ' +
           t.toISOString().slice(11, 16) + ' UTC';
         var sl = $('lp-slider'); if (sl) sl.value = i;
       }

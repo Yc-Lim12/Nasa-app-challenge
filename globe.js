@@ -14,6 +14,7 @@
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
   function wrapLon(x) { return ((x + 540) % 360 + 360) % 360 - 180; }
   function fmt(lat, lon) {
+    if (window.TD && window.TD.coordLabel) return window.TD.coordLabel(lat, lon);   // U/S/T/B in Bahasa Malaysia
     return Math.abs(lat).toFixed(1) + '°' + (lat >= 0 ? 'N' : 'S') + ', ' +
       Math.abs(lon).toFixed(1) + '°' + (lon >= 0 ? 'E' : 'W');
   }
@@ -101,7 +102,7 @@
         });
     }
     var readBox = d3.select(host).append('div').attr('class', 'g-readout').attr('aria-hidden', 'true');
-    var readout = readBox.append('span').text(HINT);
+    var readout = readBox.append('span').text(trG(HINT));
     var sunEl = readBox.append('span').attr('class', 'g-sun');
     // says what the grey areas are, when the daily picture had gaps filled
     var fillEl = readBox.append('span').attr('class', 'g-sun g-fillnote').style('display', 'none');
@@ -113,7 +114,11 @@
           ? trG('Grey areas: no satellite photo (polar night or no pass yet). NASA Blue Marble shown, with sea ice from {d} (NASA GHRSST).').replace('{d}', ICE.date)
           : trG('Grey areas: no satellite photo (polar night or no pass yet). NASA Blue Marble shown.'));
     }
-    document.addEventListener('td:lang', showFillNote);
+    document.addEventListener('td:lang', function () {
+      showFillNote(); updateSun();
+      var bmHint = window.TDi18n && window.TDi18n.dict[HINT];
+      if (readout.text() === HINT || readout.text() === bmHint) readout.text(trG(HINT));
+    });
 
     var proj = d3.geoOrthographic().clipAngle(90).precision(0.3);
     var path = d3.geoPath(proj);
@@ -201,7 +206,7 @@
       night1 = d3.geoCircle().center(anti).radius(90)();
       night2 = d3.geoCircle().center(anti).radius(82)();
       var hh = String(d.getUTCHours()).padStart(2, '0'), mm = String(d.getUTCMinutes()).padStart(2, '0');
-      sunEl.text('Daylight now · ' + hh + ':' + mm + ' UTC');
+      sunEl.text(trG('Daylight now · {t} UTC').replace('{t}', hh + ':' + mm));
     }
     updateSun();
     setInterval(function () { updateSun(); render(); }, 60000);
@@ -1254,7 +1259,7 @@
       if (!drag) {
         if (e.target.closest && e.target.closest('.g-place')) return;
         var p = geoAt(e);
-        readout.text(p ? fmt(p[1], wrapLon(p[0])) : HINT);
+        readout.text(p ? fmt(p[1], wrapLon(p[0])) : trG(HINT));
         return;
       }
       var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
@@ -1296,7 +1301,7 @@
     }
     node.addEventListener('pointerup', function (e) { end(e, false); });
     node.addEventListener('pointercancel', function (e) { end(e, true); });
-    node.addEventListener('pointerleave', function () { if (!drag) readout.text(HINT); });
+    node.addEventListener('pointerleave', function () { if (!drag) readout.text(trG(HINT)); });
     node.addEventListener('dblclick', function (e) { e.preventDefault(); zoomBy(1.6); });
     // Trackpad pinch (and ctrl + wheel) zooms; a plain wheel still scrolls the page.
     node.addEventListener('wheel', function (e) {

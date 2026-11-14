@@ -499,7 +499,7 @@
   function setPeriod(a, b) {
     $('y0').value = a; $('y1').value = b;
     investigate({ scroll: false });
-    toast('Testing ' + a + '–' + b + ' only.');
+    toast(T('Testing {a}–{b} only.', { a: a, b: b }));
   }
 
   // ---- results -------------------------------------------------------------
@@ -660,7 +660,7 @@
 
     var full = res.y0 === FIRST_YEAR && res.y1 === LAST_YEAR;
     $('reset-years').hidden = full;
-    $('reset-years').textContent = 'Back to the full record (' + FIRST_YEAR + '–' + LAST_YEAR + ')';
+    $('reset-years').textContent = T('Back to the full record ({a}–{b})', { a: FIRST_YEAR, b: LAST_YEAR });
 
     var total = st.ols.slope * (res.years[n - 1] - res.years[0]);
     var nYears = yearCount(res);
@@ -1253,10 +1253,10 @@
 
   function copyLink() {
     var url = location.href;
-    var done = function () { toast('Link copied. Anyone who opens it sees this case.'); };
+    var done = function () { toast(T('Link copied. Anyone who opens it sees this case.')); };
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(url).then(done, function () { toast('Copy the link from the address bar.'); });
-    } else toast('Copy the link from the address bar.');
+      navigator.clipboard.writeText(url).then(done, function () { toast(T('Copy the link from the address bar.')); });
+    } else toast(T('Copy the link from the address bar.'));
   }
 
   // ---- small UI pieces -----------------------------------------------------
@@ -1298,18 +1298,18 @@
   }
 
   function locate() {
-    if (!navigator.geolocation) { toast('Your browser cannot share its location.'); return; }
+    if (!navigator.geolocation) { toast(T('Your browser cannot share its location.')); return; }
     var b = $('locate');
-    b.disabled = true; b.textContent = 'finding you…';
+    b.disabled = true; b.textContent = T('finding you…');
     navigator.geolocation.getCurrentPosition(function (pos) {
-      b.disabled = false; b.textContent = 'use my location';
+      b.disabled = false; b.textContent = T('use my location');
       setCustom(pos.coords.latitude, pos.coords.longitude);
       updateMap(true);
-      toast('Moved to ' + coordLabel(state.lat, state.lon) + '.');
+      toast(T('Moved to {x}.', { x: coordLabel(state.lat, state.lon) }));
       scheduleLive(100);
     }, function () {
-      b.disabled = false; b.textContent = 'use my location';
-      toast('Could not get your location. Click the map instead.');
+      b.disabled = false; b.textContent = T('use my location');
+      toast(T('Could not get your location. Click the map instead.'));
     }, { timeout: 10000, maximumAge: 600000 });
   }
 

@@ -534,6 +534,34 @@
       'Pilih tahun yang berbeza dan jawapannya boleh berubah. Jiang et al. (2021) mendapati Laut China Selatan memanas kira-kira 0.15 °C sedekad dari 1970 hingga 1997, kemudian hampir tidak berubah dari 1999 hingga 2010. Langkah ini hanya menguji 1999 hingga 2010. Adakah tren itu masih signifikan?',
     'Source:': 'Sumber:', 'Data: NASA POWER, {src}': 'Data: NASA POWER, {src}',
 
+    // ---- form, messages, methods title (final BM pass) ----
+    'Skip to the case file': 'Langkau ke fail kes',
+    'Place': 'Tempat',
+    'Or click anywhere on the globe, tap a named dot, or': 'Atau klik di mana-mana pada glob, ketik titik bernama, atau',
+    'use my location': 'gunakan lokasi saya',
+    'finding you…': 'mencari lokasi anda…',
+    'Latitude': 'Latitud',
+    'Longitude': 'Longitud',
+    'Area to average over': 'Kawasan untuk dipuratakan',
+    'From': 'Dari',
+    'To': 'Hingga',
+    'Part of the year': 'Bahagian tahun',
+    'Twenty years or more gives the test enough to work with.': 'Dua puluh tahun atau lebih memberi ujian cukup data untuk berfungsi.',
+    'Live: any change updates the result.': 'Langsung: sebarang perubahan terus mengemas kini keputusan.',
+    'Methods, sources and limits': 'Kaedah, sumber dan batasan',
+    'Testing {a}–{b} only.': 'Menguji {a}–{b} sahaja.',
+    'Back to the full record ({a}–{b})': 'Kembali ke rekod penuh ({a}–{b})',
+    'Link copied. Anyone who opens it sees this case.': 'Pautan disalin. Sesiapa yang membukanya akan melihat kes ini.',
+    'Copy the link from the address bar.': 'Salin pautan daripada bar alamat.',
+    'Your browser cannot share its location.': 'Pelayar anda tidak dapat berkongsi lokasinya.',
+    'Moved to {x}.': 'Dipindahkan ke {x}.',
+    'Could not get your location. Click the map instead.': 'Tidak dapat mendapatkan lokasi anda. Klik pada peta sebagai gantinya.',
+    'Pick at least {n} years to test a trend.': 'Pilih sekurang-kurangnya {n} tahun untuk menguji tren.',
+    'Data': 'Data',
+    'April': 'April',
+    'September': 'September',
+    'November': 'November',
+
     // ---- months ----
     'Whole year': 'Sepanjang tahun', 'January': 'Januari', 'February': 'Februari', 'March': 'Mac', 'May': 'Mei', 'June': 'Jun',
     'July': 'Julai', 'August': 'Ogos', 'October': 'Oktober', 'December': 'Disember',
@@ -546,21 +574,29 @@
   try { if (localStorage.getItem('td-lang') === 'bm') lang = 'bm'; } catch (e) { /* storage blocked */ }
 
   function norm(s) { return String(s).replace(/\s+/g, ' ').trim(); }
+  // Strings asked for in BM that have no translation yet. In the browser console: TDi18n.missing()
+  var missing = {};
+  function note(s) { if (/[A-Za-z]{3}/.test(s)) missing[norm(s)] = true; }
   function tr(s) {
     if (lang !== 'bm') return s;
-    return BM[s] || BM[norm(s)] || s;
+    var t = BM[s] || BM[norm(s)];
+    if (!t) note(s);
+    return t || s;
   }
 
   function applyPage() {
     document.documentElement.lang = lang === 'bm' ? 'ms' : 'en';
     Array.prototype.forEach.call(document.querySelectorAll('[data-i18n]'), function (el) {
       if (el.dataset.en === undefined) el.dataset.en = el.innerHTML;
+      if (lang === 'bm' && !BM[norm(el.dataset.en)]) note(el.dataset.en);
       el.innerHTML = lang === 'bm' ? (BM[norm(el.dataset.en)] || el.dataset.en) : el.dataset.en;
     });
     Array.prototype.forEach.call(document.querySelectorAll('[data-i18n-placeholder]'), function (el) {
       if (el.dataset.enPh === undefined) el.dataset.enPh = el.placeholder;
       el.placeholder = tr(el.dataset.enPh);
     });
+    var mn = document.getElementById('methods-lang-note');   // methods page stays English; say so in BM
+    if (mn) mn.hidden = lang !== 'bm';
     var b = document.getElementById('lang');
     if (b) {
       b.textContent = lang === 'bm' ? 'EN' : 'BM';
@@ -577,7 +613,9 @@
     document.dispatchEvent(new CustomEvent('td:lang', { detail: lang }));
   }
 
-  window.TDi18n = { tr: tr, set: set, get lang() { return lang; }, dict: BM };
+  window.TDi18n = { tr: tr, set: set, get lang() { return lang; }, dict: BM,
+    missing: function () { return Object.keys(missing); },
+    clearMissing: function () { missing = {}; } };
 
   function init() {
     applyPage();

@@ -19,7 +19,7 @@
 </script>
 </head>
 <body>
-<a class="skip" href="#case-panel">Skip to the case file</a>
+<a class="skip" href="#case-panel" data-i18n>Skip to the case file</a>
 
 <div class="app">
 
@@ -97,15 +97,15 @@
           </li>
           <li id="step-where">
             <h2 data-i18n>Where</h2>
-            <label class="field">Place
+            <label class="field"><span data-i18n>Place</span>
               <select id="place"></select>
             </label>
-            <p class="hint">Or click anywhere on the globe, tap a named dot, or <button type="button" class="link" id="locate">use my location</button>.</p>
+            <p class="hint"><span data-i18n>Or click anywhere on the globe, tap a named dot, or</span> <button type="button" class="link" id="locate" data-i18n>use my location</button>.</p>
             <div class="row">
-              <label class="field">Latitude <input id="lat" type="number" step="0.01" min="-89.5" max="89.5" inputmode="decimal"></label>
-              <label class="field">Longitude <input id="lon" type="number" step="0.01" min="-180" max="180" inputmode="decimal"></label>
+              <label class="field"><span data-i18n>Latitude</span> <input id="lat" type="number" step="0.01" min="-89.5" max="89.5" inputmode="decimal"></label>
+              <label class="field"><span data-i18n>Longitude</span> <input id="lon" type="number" step="0.01" min="-180" max="180" inputmode="decimal"></label>
             </div>
-            <label class="field">Area to average over
+            <label class="field"><span data-i18n>Area to average over</span>
               <span class="size-row">
                 <input id="size" type="range" min="0" max="11" step="1" aria-describedby="size-out">
                 <output id="size-out" for="size"></output>
@@ -115,23 +115,23 @@
           <li id="step-when">
             <h2 data-i18n>When</h2>
             <div class="row">
-              <label class="field">From <select id="y0"></select></label>
-              <label class="field">To <select id="y1"></select></label>
+              <label class="field"><span data-i18n>From</span> <select id="y0"></select></label>
+              <label class="field"><span data-i18n>To</span> <select id="y1"></select></label>
             </div>
-            <label class="field">Part of the year
+            <label class="field"><span data-i18n>Part of the year</span>
               <select id="month"></select>
             </label>
-            <label class="field">Time step
+            <label class="field"><span data-i18n>Time step</span>
               <select id="step">
-                <option value="year">One value per year</option>
-                <option value="month">Every month, seasonal cycle removed</option>
+                <option value="year" data-i18n>One value per year</option>
+                <option value="month" data-i18n>Every month, seasonal cycle removed</option>
               </select>
             </label>
-            <p class="hint">Twenty years or more gives the test enough to work with.</p>
+            <p class="hint" data-i18n>Twenty years or more gives the test enough to work with.</p>
           </li>
         </ol>
         <button type="submit" class="run" id="run">Investigate</button>
-        <p class="live-hint" id="live-hint" hidden><i class="pulse" aria-hidden="true"></i>Live: any change updates the result.</p>
+        <p class="live-hint" id="live-hint" hidden><i class="pulse" aria-hidden="true"></i><span data-i18n>Live: any change updates the result.</span></p>
         <p class="status" id="status" role="status" hidden></p>
       </form>
     </details>
@@ -276,9 +276,10 @@
 <dialog class="methods" id="methods" aria-labelledby="methods-title">
   <div class="methods-inner">
     <header class="methods-head">
-      <h2 id="methods-title">Methods, sources and limits</h2>
+      <h2 id="methods-title" data-i18n>Methods, sources and limits</h2>
       <button type="button" class="icon-btn" id="methods-close" aria-label="Close">✕</button>
     </header>
+    <p class="muted methods-lang-note" id="methods-lang-note" hidden>Bahagian ini hanya dalam bahasa Inggeris kerana mengandungi banyak istilah teknikal. Ringkasan dalam Bahasa Malaysia ada di bahagian “Cara membaca keputusan ini”.</p>
 
     <section>
       <h3>What the app measures</h3>

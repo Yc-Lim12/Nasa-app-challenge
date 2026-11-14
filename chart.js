@@ -309,7 +309,7 @@
       var ya = yearAt(Math.min(d.x, px)), yb = yearAt(Math.max(d.x, px));
       hide();
       if (yb - ya + 1 >= MIN_YEARS) setPeriod(ya, yb);
-      else toast('Pick at least ' + MIN_YEARS + ' years to test a trend.');
+      else toast(T('Pick at least {n} years to test a trend.', { n: MIN_YEARS }));
     }
     hit.addEventListener('pointerup', function (e) { endDrag(e, false); });
     hit.addEventListener('pointercancel', function (e) { endDrag(e, true); hide(); });

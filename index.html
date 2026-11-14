@@ -19,7 +19,7 @@
 </script>
 </head>
 <body>
-<a class="skip" href="#case-panel">Skip to the case file</a>
+<a class="skip" href="#case-panel" data-i18n>Skip to the case file</a>
 
 <div class="app">
 
@@ -102,15 +102,15 @@
           </li>
           <li id="step-where">
             <h2 data-i18n>Where</h2>
-            <label class="field">Place
+            <label class="field"><span data-i18n>Place</span>
               <select id="place"></select>
             </label>
-            <p class="hint">Or click anywhere on the globe, tap a named dot, or <button type="button" class="link" id="locate">use my location</button>.</p>
+            <p class="hint"><span data-i18n>Or click anywhere on the globe, tap a named dot, or</span> <button type="button" class="link" id="locate" data-i18n>use my location</button>.</p>
             <div class="row">
-              <label class="field">Latitude <input id="lat" type="number" step="0.01" min="-89.5" max="89.5" inputmode="decimal"></label>
-              <label class="field">Longitude <input id="lon" type="number" step="0.01" min="-180" max="180" inputmode="decimal"></label>
+              <label class="field"><span data-i18n>Latitude</span> <input id="lat" type="number" step="0.01" min="-89.5" max="89.5" inputmode="decimal"></label>
+              <label class="field"><span data-i18n>Longitude</span> <input id="lon" type="number" step="0.01" min="-180" max="180" inputmode="decimal"></label>
             </div>
-            <label class="field">Area to average over
+            <label class="field"><span data-i18n>Area to average over</span>
               <span class="size-row">
                 <input id="size" type="range" min="0" max="11" step="1" aria-describedby="size-out">
                 <output id="size-out" for="size"></output>
@@ -120,23 +120,23 @@
           <li id="step-when">
             <h2 data-i18n>When</h2>
             <div class="row">
-              <label class="field">From <select id="y0"></select></label>
-              <label class="field">To <select id="y1"></select></label>
+              <label class="field"><span data-i18n>From</span> <select id="y0"></select></label>
+              <label class="field"><span data-i18n>To</span> <select id="y1"></select></label>
             </div>
-            <label class="field">Part of the year
+            <label class="field"><span data-i18n>Part of the year</span>
               <select id="month"></select>
             </label>
-            <label class="field">Time step
+            <label class="field"><span data-i18n>Time step</span>
               <select id="step">
-                <option value="year">One value per year</option>
-                <option value="month">Every month, seasonal cycle removed</option>
+                <option value="year" data-i18n>One value per year</option>
+                <option value="month" data-i18n>Every month, seasonal cycle removed</option>
               </select>
             </label>
-            <p class="hint">Twenty years or more gives the test enough to work with.</p>
+            <p class="hint" data-i18n>Twenty years or more gives the test enough to work with.</p>
           </li>
         </ol>
         <button type="submit" class="run" id="run">Investigate</button>
-        <p class="live-hint" id="live-hint" hidden><i class="pulse" aria-hidden="true"></i>Live: any change updates the result.</p>
+        <p class="live-hint" id="live-hint" hidden><i class="pulse" aria-hidden="true"></i><span data-i18n>Live: any change updates the result.</span></p>
         <p class="status" id="status" role="status" hidden></p>
       </form>
     </details>
@@ -214,7 +214,7 @@
           <h3 data-i18n>Which months are changing most?</h3>
           <p id="season-note"></p>
           <div id="season" class="chart season"></div>
-          <p class="muted">Each bar is the trend for one month on its own, per decade. Solid bars are statistically significant, pale bars are not. Click a bar to investigate that month; click it again for the whole year.</p>
+          <p class="muted" data-i18n>Each bar is the trend for one month on its own, per decade. Solid bars are statistically significant, pale bars are not. Click a bar to investigate that month; click it again for the whole year.</p>
         </section>
 
         <section class="block var2-card">
@@ -228,11 +228,11 @@
 
         <details class="explain">
           <summary data-i18n>How to read this</summary>
-          <p><strong>Trend.</strong> A trend is a change that keeps going in one direction over many years. One hot year is weather. Thirty years that keep getting hotter is a trend.</p>
-          <p><strong>Significant.</strong> Every measurement wobbles from year to year, so a line through the points almost always tilts a little. A test asks: if nothing were really changing, how often would random wobble alone produce a tilt this clear? That chance is the p-value. When it is below 0.05 (1 in 20), scientists call the trend statistically significant.</p>
-          <p><strong>Two tests.</strong> The t-test assumes the wobble follows a bell curve. The Mann-Kendall test only compares which years are higher than which, so odd years and skewed data do not fool it. This page uses Mann-Kendall for the verdict and shows the t-test beside it.</p>
-          <p><strong>Stripes.</strong> The coloured strip under the chart has one stripe per year, coloured by how far that year was above or below the average of the whole period.</p>
-          <p><strong>Not significant does not mean no change.</strong> It means the record is too short or too noisy to be sure yet.</p>
+          <p data-i18n><strong>Trend.</strong> A trend is a change that keeps going in one direction over many years. One hot year is weather. Thirty years that keep getting hotter is a trend.</p>
+          <p data-i18n><strong>Significant.</strong> Every measurement wobbles from year to year, so a line through the points almost always tilts a little. A test asks: if nothing were really changing, how often would random wobble alone produce a tilt this clear? That chance is the p-value. When it is below 0.05 (1 in 20), scientists call the trend statistically significant.</p>
+          <p data-i18n><strong>Two tests.</strong> The t-test assumes the wobble follows a bell curve. The Mann-Kendall test only compares which years are higher than which, so odd years and skewed data do not fool it. This page uses Mann-Kendall for the verdict and shows the t-test beside it.</p>
+          <p data-i18n><strong>Stripes.</strong> The coloured strip under the chart has one stripe per year, coloured by how far that year was above or below the average of the whole period.</p>
+          <p data-i18n><strong>Not significant does not mean no change.</strong> It means the record is too short or too noisy to be sure yet.</p>
         </details>
 
         <section class="block scan">
@@ -251,30 +251,30 @@
 
     <div class="foot-grid">
       <div>
-        <h4>Data</h4>
-        <p>NASA Prediction Of Worldwide Energy Resources (POWER) monthly API, NASA Langley Research Center. Temperature, rain, soil, wind, humidity and ozone come from the MERRA-2 reanalysis (NASA Global Modeling and Assimilation Office). Sunlight, cloud and aerosol values come from CERES SYN1deg and GEWEX SRB.</p>
+        <h4 data-i18n>Data</h4>
+        <p data-i18n>NASA Prediction Of Worldwide Energy Resources (POWER) monthly API, NASA Langley Research Center. Temperature, rain, soil, wind, humidity and ozone come from the MERRA-2 reanalysis (NASA Global Modeling and Assimilation Office). Sunlight, cloud and aerosol values come from CERES SYN1deg and GEWEX SRB.</p>
       </div>
       <div>
-        <h4>Method</h4>
-        <p><button type="button" class="link" data-open-methods>Read the full methods, sources and limits</button></p>
-        <p>Monthly values are averaged into one value per year, and over the grid cells in the chosen area weighted by area. Trend: least-squares line with a t-test, Mann-Kendall test and Sen’s slope. Linear trends only.</p>
+        <h4 data-i18n>Method</h4>
+        <p><button type="button" class="link" data-open-methods data-i18n>Read the full methods, sources and limits</button></p>
+        <p data-i18n>Monthly values are averaged into one value per year, and over the grid cells in the chosen area weighted by area. Trend: least-squares line with a t-test, Mann-Kendall test and Sen’s slope. Linear trends only.</p>
       </div>
       <div>
-        <h4>Privacy</h4>
-        <p>No accounts, no analytics and no cookies. Your choices live only in the page address. The light or dark theme you pick is remembered in your own browser’s storage and never leaves your device. The coordinates of the place you investigate are sent to NASA POWER to fetch the data; if you press “use my location”, that position is used the same way and is not stored by this app. The app handles no personal data under Malaysia’s Personal Data Protection Act 2010.</p>
+        <h4 data-i18n>Privacy</h4>
+        <p data-i18n>No accounts, no analytics and no cookies. Your choices live only in the page address. The light or dark theme you pick is remembered in your own browser’s storage and never leaves your device. The coordinates of the place you investigate are sent to NASA POWER to fetch the data; if you press “use my location”, that position is used the same way and is not stored by this app. The app handles no personal data under Malaysia’s Personal Data Protection Act 2010.</p>
       </div>
       <div>
-        <h4>Third-party services</h4>
-        <p>Your browser connects to five outside services: NASA POWER (climate data), NASA GIBS (the satellite pictures on the globe and the live rain images), Google Fonts (typefaces, which means Google receives your IP address), cdnjs (the D3 charting library) and jsDelivr (the topojson-client library and Natural Earth map outlines from the world-atlas package). Each has its own privacy policy. The question box works entirely in your browser; nothing you type is sent anywhere. The AI helper’s plain-language summaries are also built in. Only if you paste your own OpenAI API key into the AI settings are your chat questions and the numbers of the current case sent to OpenAI; the key is stored only in your browser.</p>
+        <h4 data-i18n>Third-party services</h4>
+        <p data-i18n>Your browser connects to five outside services: NASA POWER (climate data), NASA GIBS (the satellite pictures on the globe and the live rain images), Google Fonts (typefaces, which means Google receives your IP address), cdnjs (the D3 charting library) and jsDelivr (the topojson-client library and Natural Earth map outlines from the world-atlas package). Each has its own privacy policy. The question box works entirely in your browser; nothing you type is sent anywhere. The AI helper’s plain-language summaries are also built in. Only if you paste your own OpenAI API key into the AI settings are your chat questions and the numbers of the current case sent to OpenAI; the key is stored only in your browser.</p>
       </div>
       <div>
-        <h4>Accessibility</h4>
-        <p>Light and dark themes, a phone layout, a table view of every chart and keyboard control throughout. The globe spins with the arrow keys and Enter chooses the place in the centre; the latitude and longitude boxes do the same job.</p>
+        <h4 data-i18n>Accessibility</h4>
+        <p data-i18n>Light and dark themes, a phone layout, a table view of every chart and keyboard control throughout. The globe spins with the arrow keys and Enter chooses the place in the centre; the latitude and longitude boxes do the same job.</p>
       </div>
       <div>
-        <h4>Licence and credits</h4>
-        <p>Code under the Apache License 2.0. Map outlines from Natural Earth (public domain). Type: SF Pro, the system font on Apple devices, with Inter (SIL Open Font License) on other devices. No NASA logo or insignia is used.</p>
-        <p id="contact">Contact: team Sunway to the Moon<span id="repo-wrap" hidden>, through the <a id="repo-link" href="#">project repository</a></span>.</p>
+        <h4 data-i18n>Licence and credits</h4>
+        <p data-i18n>Code under the Apache License 2.0. Map outlines from Natural Earth (public domain). Type: SF Pro, the system font on Apple devices, with Inter (SIL Open Font License) on other devices. No NASA logo or insignia is used.</p>
+        <p id="contact"><span data-i18n>Contact:</span> team Sunway to the Moon<span id="repo-wrap" hidden>, <span data-i18n>through the</span> <a id="repo-link" href="#" data-i18n>project repository</a></span>.</p>
       </div>
     </div>
   </footer>
@@ -284,76 +284,76 @@
 <dialog class="methods" id="methods" aria-labelledby="methods-title">
   <div class="methods-inner">
     <header class="methods-head">
-      <h2 id="methods-title">Methods, sources and limits</h2>
+      <h2 id="methods-title" data-i18n>Methods, sources and limits</h2>
       <button type="button" class="icon-btn" id="methods-close" aria-label="Close">✕</button>
     </header>
 
     <section>
-      <h3>What the app measures</h3>
-      <p>For a chosen place, variable and period, Trend Detective turns NASA’s monthly data into one value per year (the mean of the twelve months weighted by their number of days, as NASA POWER computes its own annual values; one chosen month; or a three-month season, also weighted by days; December to February takes December from the year before) and asks: is there a steady rise or fall, how fast is it, and could it be chance?</p>
+      <h3 data-i18n>What the app measures</h3>
+      <p data-i18n>For a chosen place, variable and period, Trend Detective turns NASA’s monthly data into one value per year (the mean of the twelve months weighted by their number of days, as NASA POWER computes its own annual values; one chosen month; or a three-month season, also weighted by days; December to February takes December from the year before) and asks: is there a steady rise or fall, how fast is it, and could it be chance?</p>
     </section>
 
     <section>
-      <h3>Data sources</h3>
+      <h3 data-i18n>Data sources</h3>
       <ul>
-        <li><strong>NASA POWER</strong> (Prediction Of Worldwide Energy Resources), NASA Langley Research Center, monthly API, 1981 onwards. <a href="https://power.larc.nasa.gov/" target="_blank" rel="noopener">power.larc.nasa.gov</a></li>
-        <li><strong>MERRA-2 reanalysis</strong> for temperature, rain, soil wetness, evaporation, humidity, water vapour, snow, wind and ozone. Gelaro, R., et al. (2017). The Modern-Era Retrospective Analysis for Research and Applications, Version 2 (MERRA-2). <em>Journal of Climate</em>, 30(14), 5419–5454.</li>
-        <li><strong>CERES SYN1deg</strong> (from 2001) and <strong>GEWEX SRB</strong> (before 2001) for sunlight, cloud and aerosol. Doelling, D. R., et al. (2013). Geostationary enhanced temporal interpolation for CERES flux products. <em>Journal of Atmospheric and Oceanic Technology</em>, 30(6), 1072–1090.</li>
-        <li><strong>Satellite pictures on the globe</strong>: NASA Blue Marble (shaded relief and bathymetry, NASA Earth Observatory) and the daily true-colour image from the VIIRS instrument on NOAA-20, both delivered by NASA GIBS. They are pictures for viewing, not data for trend tests. The layers button on the globe switches between them and the plain dark map.</li>
-        <li><strong>GPM IMERG</strong> half-hourly precipitation rate, shown in “Rain now”, delivered as images by NASA GIBS (Global Imagery Browse Services). These are pictures for viewing, not data for trend tests.</li>
-        <li>Sea surface temperature is MERRA-2 surface skin temperature over water, which MERRA-2 takes from observed sea temperatures.</li>
+        <li data-i18n><strong>NASA POWER</strong> (Prediction Of Worldwide Energy Resources), NASA Langley Research Center, monthly API, 1981 onwards. <a href="https://power.larc.nasa.gov/" target="_blank" rel="noopener">power.larc.nasa.gov</a></li>
+        <li data-i18n><strong>MERRA-2 reanalysis</strong> for temperature, rain, soil wetness, evaporation, humidity, water vapour, snow, wind and ozone. Gelaro, R., et al. (2017). The Modern-Era Retrospective Analysis for Research and Applications, Version 2 (MERRA-2). <em>Journal of Climate</em>, 30(14), 5419–5454.</li>
+        <li data-i18n><strong>CERES SYN1deg</strong> (from 2001) and <strong>GEWEX SRB</strong> (before 2001) for sunlight, cloud and aerosol. Doelling, D. R., et al. (2013). Geostationary enhanced temporal interpolation for CERES flux products. <em>Journal of Atmospheric and Oceanic Technology</em>, 30(6), 1072–1090.</li>
+        <li data-i18n><strong>Satellite pictures on the globe</strong>: NASA Blue Marble (shaded relief and bathymetry, NASA Earth Observatory) and the daily true-colour image from the VIIRS instrument on NOAA-20, both delivered by NASA GIBS. They are pictures for viewing, not data for trend tests. The layers button on the globe switches between them and the plain dark map.</li>
+        <li data-i18n><strong>GPM IMERG</strong> half-hourly precipitation rate, shown in “Rain now”, delivered as images by NASA GIBS (Global Imagery Browse Services). These are pictures for viewing, not data for trend tests.</li>
+        <li data-i18n>Sea surface temperature is MERRA-2 surface skin temperature over water, which MERRA-2 takes from observed sea temperatures.</li>
       </ul>
     </section>
 
     <section>
-      <h3>Statistics</h3>
+      <h3 data-i18n>Statistics</h3>
       <ul>
-        <li><strong>Mann-Kendall test</strong> for a monotonic trend, with tie correction and continuity correction. The verdict uses it: p &lt; 0.05 is “significant”, p &lt; 0.10 “borderline”. Mann, H. B. (1945). Nonparametric tests against trend. <em>Econometrica</em>, 13, 245–259. Kendall, M. G. (1975). <em>Rank Correlation Methods</em>. Griffin.</li>
-        <li><strong>Sen’s slope</strong>, the median of all pairwise slopes, for the headline rate. Sen, P. K. (1968). Estimates of the regression coefficient based on Kendall’s tau. <em>Journal of the American Statistical Association</em>, 63, 1379–1389.</li>
-        <li><strong>Least-squares line</strong> with a two-sided t-test and a 95% confidence band, shown beside Mann-Kendall.</li>
-        <li><strong>Year-to-year memory.</strong> Neighbouring years (or months) are often alike, which makes plain tests overconfident. Both tests are adjusted for it: from the lag-1 autocorrelation r of the residuals, with the small-sample bias correction r + (1 + 4r)/n (between 0 and 0.95), the effective number of independent values is n* = n(1 − r)/(1 + r). The Mann-Kendall variance is multiplied by n/n*, the slope’s standard error is rescaled to n* − 2 degrees of freedom, and the 95% range of the line uses the adjusted numbers. The verdict uses the memory-adjusted Mann-Kendall p-value. In our simulation of trend-free monthly series with r = 0.6, plain tests called about 30% significant; the adjusted tests about 5%.</li>
-        <li><strong>Removing the seasonal cycle.</strong> The yearly average already removes it, because each year covers one full cycle. With “Every month, seasonal cycle removed”, each month instead becomes its difference from the average of the same calendar month over the chosen years, giving twelve points a year, tested with the same memory adjustment.</li>
-        <li><strong>Bigger areas.</strong> NASA POWER answers at most 10° × 10° per request. Areas up to 20° × 20°, and whole regions such as Borneo, are fetched as equal tiles of at most 10°, their grid cells merged (a cell on a shared edge is counted once) and averaged with the same area weighting. A whole-world average is not offered: it would need about 650 requests of 20–45 seconds each.</li>
-        <li><strong>Soil over the ocean.</strong> Over open ocean NASA POWER gives topsoil wetness as exactly 1 in every month (the other land-only variables give no data there). Such grid cells are treated as no data: left out of area averages and the trend map, and a spot that is all ocean gets a message instead of a result.</li>
-        <li><strong>Data quality.</strong> A year with any month missing is left out of the yearly series, and the page says which years were left out and why.</li>
-        <li><strong>Years needed to tell</strong> uses the formula of Weatherhead, E. C., et al. (1998). Factors affecting the detection of trends: statistical considerations and applications to environmental data. <em>Journal of Geophysical Research</em>, 103(D14), 17149–17161. It assumes the present trend and year-to-year noise carry on.</li>
-        <li><strong>Spike, not trend</strong> flags years whose distance from the Sen trend line is more than 3.5 robust standard deviations (1.4826 × median absolute deviation), then re-runs the test without them.</li>
-        <li>The code was checked against SciPy (<code>linregress</code>, <code>theilslopes</code>) and a reference Mann-Kendall implementation.</li>
+        <li data-i18n><strong>Mann-Kendall test</strong> for a monotonic trend, with tie correction and continuity correction. The verdict uses it: p &lt; 0.05 is “significant”, p &lt; 0.10 “borderline”. Mann, H. B. (1945). Nonparametric tests against trend. <em>Econometrica</em>, 13, 245–259. Kendall, M. G. (1975). <em>Rank Correlation Methods</em>. Griffin.</li>
+        <li data-i18n><strong>Sen’s slope</strong>, the median of all pairwise slopes, for the headline rate. Sen, P. K. (1968). Estimates of the regression coefficient based on Kendall’s tau. <em>Journal of the American Statistical Association</em>, 63, 1379–1389.</li>
+        <li data-i18n><strong>Least-squares line</strong> with a two-sided t-test and a 95% confidence band, shown beside Mann-Kendall.</li>
+        <li data-i18n><strong>Year-to-year memory.</strong> Neighbouring years (or months) are often alike, which makes plain tests overconfident. Both tests are adjusted for it: from the lag-1 autocorrelation r of the residuals, with the small-sample bias correction r + (1 + 4r)/n (between 0 and 0.95), the effective number of independent values is n* = n(1 − r)/(1 + r). The Mann-Kendall variance is multiplied by n/n*, the slope’s standard error is rescaled to n* − 2 degrees of freedom, and the 95% range of the line uses the adjusted numbers. The verdict uses the memory-adjusted Mann-Kendall p-value. In our simulation of trend-free monthly series with r = 0.6, plain tests called about 30% significant; the adjusted tests about 5%.</li>
+        <li data-i18n><strong>Removing the seasonal cycle.</strong> The yearly average already removes it, because each year covers one full cycle. With “Every month, seasonal cycle removed”, each month instead becomes its difference from the average of the same calendar month over the chosen years, giving twelve points a year, tested with the same memory adjustment.</li>
+        <li data-i18n><strong>Bigger areas.</strong> NASA POWER answers at most 10° × 10° per request. Areas up to 20° × 20°, and whole regions such as Borneo, are fetched as equal tiles of at most 10°, their grid cells merged (a cell on a shared edge is counted once) and averaged with the same area weighting. A whole-world average is not offered: it would need about 650 requests of 20–45 seconds each.</li>
+        <li data-i18n><strong>Soil over the ocean.</strong> Over open ocean NASA POWER gives topsoil wetness as exactly 1 in every month (the other land-only variables give no data there). Such grid cells are treated as no data: left out of area averages and the trend map, and a spot that is all ocean gets a message instead of a result.</li>
+        <li data-i18n><strong>Data quality.</strong> A year with any month missing is left out of the yearly series, and the page says which years were left out and why.</li>
+        <li data-i18n><strong>Years needed to tell</strong> uses the formula of Weatherhead, E. C., et al. (1998). Factors affecting the detection of trends: statistical considerations and applications to environmental data. <em>Journal of Geophysical Research</em>, 103(D14), 17149–17161. It assumes the present trend and year-to-year noise carry on.</li>
+        <li data-i18n><strong>Spike, not trend</strong> flags years whose distance from the Sen trend line is more than 3.5 robust standard deviations (1.4826 × median absolute deviation), then re-runs the test without them.</li>
+        <li data-i18n>The code was checked against SciPy (<code>linregress</code>, <code>theilslopes</code>) and a reference Mann-Kendall implementation.</li>
       </ul>
     </section>
 
     <section>
-      <h3>Maps</h3>
+      <h3 data-i18n>Maps</h3>
       <ul>
-        <li><strong>Trend map</strong>: every NASA POWER grid cell (0.5° × 0.625°) in a box of your choice (2° to 10° a side, 10° by default) gets its own Sen’s slope and Mann-Kendall test. Red means rising, blue falling. A dot marks cells where p &lt; 0.05.</li>
-        <li><strong>Opposite trends</strong> are reported when at least three significant cells rise and at least three fall in the same box.</li>
-        <li><strong>Timelapse</strong> plays every month in the period. “Difference from normal” subtracts each cell’s own average for that calendar month, so the seasons do not swamp the change.</li>
-        <li><strong>Wind</strong> particles follow the average 10-metre wind (MERRA-2 eastward and northward components) for the chosen period and month.</li>
+        <li data-i18n><strong>Trend map</strong>: every NASA POWER grid cell (0.5° × 0.625°) in a box of your choice (2° to 10° a side, 10° by default) gets its own Sen’s slope and Mann-Kendall test. Red means rising, blue falling. A dot marks cells where p &lt; 0.05.</li>
+        <li data-i18n><strong>Opposite trends</strong> are reported when at least three significant cells rise and at least three fall in the same box.</li>
+        <li data-i18n><strong>Timelapse</strong> plays every month in the period. “Difference from normal” subtracts each cell’s own average for that calendar month, so the seasons do not swamp the change.</li>
+        <li data-i18n><strong>Wind</strong> particles follow the average 10-metre wind (MERRA-2 eastward and northward components) for the chosen period and month.</li>
       </ul>
     </section>
 
     <section>
-      <h3>Limits</h3>
+      <h3 data-i18n>Limits</h3>
       <ul>
-        <li>Only straight-line (monotonic) trends are tested. A rise then fall can look like no trend.</li>
-        <li>The memory adjustment uses lag-1 autocorrelation only; longer cycles such as El Niño are not modelled.</li>
-        <li>Reanalysis data is a model constrained by observations, not a direct measurement, and is coarse (about 50 km). Small towns, hills and coasts are smoothed out.</li>
-        <li>“If the trend continues” only extends the straight line. It is not a forecast or a climate projection.</li>
-        <li>Testing many variables or many map cells at the 0.05 level gives about one false alarm in twenty.</li>
+        <li data-i18n>Only straight-line (monotonic) trends are tested. A rise then fall can look like no trend.</li>
+        <li data-i18n>The memory adjustment uses lag-1 autocorrelation only; longer cycles such as El Niño are not modelled.</li>
+        <li data-i18n>Reanalysis data is a model constrained by observations, not a direct measurement, and is coarse (about 50 km). Small towns, hills and coasts are smoothed out.</li>
+        <li data-i18n>“If the trend continues” only extends the straight line. It is not a forecast or a climate projection.</li>
+        <li data-i18n>Testing many variables or many map cells at the 0.05 level gives about one false alarm in twenty.</li>
       </ul>
     </section>
 
     <section>
-      <h3>Not included, and why</h3>
+      <h3 data-i18n>Not included, and why</h3>
       <ul>
-        <li><strong>Greenness (NDVI)</strong>: NASA’s MODIS NDVI is reachable from a browser only through the ORNL subset service, which returns 10 dates per request (about 17 seconds each). A full 2003–2025 record for one place would take about 15 minutes.</li>
-        <li><strong>Water storage (GRACE)</strong> and <strong>NASA climate projections (NEX-GDDP-CMIP6)</strong>: these come as large NetCDF files with no browser API. They need a small processing step on a computer first, which can then save results for the app to load.</li>
+        <li data-i18n><strong>Greenness (NDVI)</strong>: NASA’s MODIS NDVI is reachable from a browser only through the ORNL subset service, which returns 10 dates per request (about 17 seconds each). A full 2003–2025 record for one place would take about 15 minutes.</li>
+        <li data-i18n><strong>Water storage (GRACE)</strong> and <strong>NASA climate projections (NEX-GDDP-CMIP6)</strong>: these come as large NetCDF files with no browser API. They need a small processing step on a computer first, which can then save results for the app to load.</li>
       </ul>
     </section>
 
     <section>
-      <h3>Questions in plain English</h3>
-      <p>The question box does not use an AI service. A small set of rules in your browser looks for words such as “rain”, “haze”, “nights” or “hotter”, and for place names, months and years, then sets up the case. Nothing you type leaves your device.</p>
+      <h3 data-i18n>Questions in plain English</h3>
+      <p data-i18n>The question box does not use an AI service. A small set of rules in your browser looks for words such as “rain”, “haze”, “nights” or “hotter”, and for place names, months and years, then sets up the case. Nothing you type leaves your device.</p>
     </section>
   </div>
 </dialog>

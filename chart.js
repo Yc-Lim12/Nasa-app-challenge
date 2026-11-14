@@ -661,7 +661,7 @@
     function sy(v) { return mg.t + (lim - v) / (2 * lim) * ih; }
 
     var svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, width: W, height: H,
-      'aria-label': 'Trend per decade for each month of the year' });
+      'aria-label': T('Trend per decade for each month of the year') });
     yt.ticks.forEach(function (t) {
       if (Math.abs(t) > lim) return;
       svg.appendChild(svgEl('line', { x1: mg.l, x2: mg.l + iw, y1: sy(t), y2: sy(t), class: 'grid' }));
@@ -675,7 +675,7 @@
     var tip = makeTip(host);
     rows.forEach(function (r, i) {
       var cx = mg.l + bw * (i + 0.5), on = res.month === r.m;
-      var label = MONTHS[r.m] + ': ' + (r.st ? ratePhrase(r.st, vr) + ', ' + verdictLabel(r.st.verdict).toLowerCase() : 'not enough data');
+      var label = T(MONTHS[r.m]) + ': ' + (r.st ? ratePhrase(r.st, vr) + ', ' + verdictLabel(r.st.verdict).toLowerCase() : T('not enough data'));
       var g = svgEl('g', { class: 'mgroup' + (on ? ' on' : ''), tabindex: 0, role: 'button', 'aria-label': label, 'aria-pressed': on ? 'true' : 'false' });
       g.appendChild(svgEl('rect', { x: mg.l + bw * i + 1, y: mg.t, width: bw - 2, height: ih, rx: 6, class: 'mcol' }));
       var barTop = mg.t + ih / 2;
@@ -689,7 +689,7 @@
         narrow ? T(MONTH_SHORT[i]).charAt(0) : T(MONTH_SHORT[i])));
       function showTip() {
         var html = '<strong>' + esc(T(MONTHS[r.m])) + '</strong>' + (r.st
-          ? '<span>' + esc(ratePhrase(r.st, vr)) + '</span><span>' + esc(T(verdictLabel(r.st.verdict))) + ', ' + esc(pEquals(r.st.mk.pAdj)) + '</span>'
+          ? '<span>' + esc(ratePhrase(r.st, vr)) + '</span><span>' + esc(verdictLabel(r.st.verdict)) + ', ' + esc(pEquals(r.st.mk.pAdj)) + '</span>'
           : '<span>' + esc(T('Not enough data')) + '</span>') +
           '<span><em>' + esc(T(on ? 'Click to go back to the whole year' : 'Click to investigate this month')) + '</em></span>';
         tip.show(html, cx, barTop, svg, W);

@@ -17,7 +17,10 @@
         { text: 'Is it only the city? The trend map tests every grid cell around the Klang Valley. Red is warming, and a dot means the warming is significant.',
           cfg: { v: 'T2M', place: 'klang' }, layer: 'trend' },
         { text: 'If the trend continues: the dotted line carries today’s rate ten years past the data. It is a simple extension, not a forecast.',
-          cfg: { v: 'T2M', place: 'klang', future: true } }
+          cfg: { v: 'T2M', place: 'klang', future: true } },
+        { text: 'Compare with published research. Saimi et al. (2020) found significant warming at four airport stations in Peninsular Malaysia, between 0.014 and 0.059 °C per year (1970–2016). That is 0.14 to 0.59 °C per decade. Is the rate on this chart in that range?',
+          cfg: { v: 'T2M', place: 'klang' },
+          source: { cite: 'Saimi et al. (2020), Sustainability 12(22), 9533', url: 'https://mdpi.com/2071-1050/12/22/9533' } }
       ]
     },
     {
@@ -28,7 +31,10 @@
         { text: 'Only September, the peak of the haze season. Fire years such as 2015 and 2019 stand out. The “Spike, not trend” note checks whether they drive the trend or are one-off events.',
           cfg: { v: 'AOD_55', place: 'klang', y0: 2001, month: 9 } },
         { text: 'Every September on the map, one year after another. The slider is set to September 2015: press play to compare the other years.',
-          cfg: { v: 'AOD_55', place: 'klang', y0: 2001, month: 9 }, layer: 'lapse', layerOpts: { frame: '201509' } }
+          cfg: { v: 'AOD_55', place: 'klang', y0: 2001, month: 9 }, layer: 'lapse', layerOpts: { frame: '201509' } },
+        { text: 'Compare with published research. Cohen, Lecoeur and Ng (2017) studied satellite data from 2001 to 2013 and found one haze peak a year in southern Southeast Asia, usually from August to October, driven by fires. They did not report a long-term trend. Does the September chart show the same spikes?',
+          cfg: { v: 'AOD_55', place: 'klang', y0: 2001, month: 9 },
+          source: { cite: 'Cohen, Lecoeur and Ng (2017), Atmospheric Chemistry and Physics 17, 721–743', url: 'https://acp.copernicus.org/articles/17/721/2017/' } }
       ]
     },
     {
@@ -41,7 +47,10 @@
         { text: 'Rain trends across the whole Peninsula. If one part grows wetter while another dries, the opposite-trend finder says so and marks both.',
           cfg: { v: 'PRECTOTCORR', lat: 4.2, lon: 102.0, size: 2, compare: '' }, layer: 'trend' },
         { text: 'Why the coasts differ: the monsoon winds. In January they blow from the north-east onto the east coast. Tap “Jul” to see the southwest monsoon.',
-          cfg: { v: 'PRECTOTCORR', lat: 4.2, lon: 102.0, size: 2, compare: '' }, layer: 'wind', layerOpts: { month: 1 } }
+          cfg: { v: 'PRECTOTCORR', lat: 4.2, lon: 102.0, size: 2, compare: '' }, layer: 'wind', layerOpts: { month: 1 } },
+        { text: 'Compare with published research. Suhaila et al. (2010) studied rain gauges from 1975 to 2004. In the southwest monsoon, total rain and wet days fell at most stations while rain intensity rose. In the northeast monsoon, several stations grew wetter. Do the two coasts on this chart agree?',
+          cfg: { v: 'PRECTOTCORR', place: 'eastcoast', compare: 'penang', month: 12 },
+          source: { cite: 'Suhaila et al. (2010), Sains Malaysiana 39(4), 533–542', url: 'https://www.ukm.my/jsm/english_journals/vol39num4_2010/vol39num4_2010pg533-542.html' } }
       ]
     },
     {
@@ -52,7 +61,10 @@
         { text: 'The Strait of Malacca, between the Peninsula and Sumatra, drawn against the South China Sea spot.',
           cfg: { v: 'SST', lat: 3.0, lon: 100.5, size: 0, compare: 'pt:5.00,105.00' } },
         { text: 'Warming across the whole area. Over the sea, dots mark the cells where the change is significant. Over land, this map shows ground temperature.',
-          cfg: { v: 'SST', lat: 4.0, lon: 104.0, size: 2, compare: '' }, layer: 'trend' }
+          cfg: { v: 'SST', lat: 4.0, lon: 104.0, size: 2, compare: '' }, layer: 'trend' },
+        { text: 'Pick the years and the answer can change. Jiang et al. (2021) found the South China Sea warmed by about 0.15 °C per decade from 1970 to 1997, then hardly at all from 1999 to 2010. This step tests only 1999 to 2010. Is the trend still significant?',
+          cfg: { v: 'SST', lat: 5.0, lon: 105.0, size: 2, y0: 1999, y1: 2010 },
+          source: { cite: 'Jiang et al. (2021), Climate Dynamics 57, 2093–2108', url: 'https://link.springer.com/10.1007/s00382-021-05796-8' } }
       ]
     }
     ,
@@ -83,6 +95,14 @@
     }).join('');
   }
 
+  // Which NASA dataset this step uses, and the paper a research step compares with.
+  function sourceLine(st) {
+    var vr = TD.variable ? TD.variable(st.cfg.v) : null;
+    var html = vr && vr.source ? '<p class="muted story-data">' + esc(T('Data: NASA POWER, {src}', { src: vr.source })) + '</p>' : '';
+    if (st.source) html += '<p class="muted story-src">' + esc(T('Source:')) + ' <a href="' + esc(st.source.url) + '" target="_blank" rel="noopener">' + esc(st.source.cite) + '</a></p>';
+    return html;
+  }
+
   function card() {
     var box = $('story');
     if (!cur) { box.hidden = true; box.innerHTML = ''; return; }
@@ -91,7 +111,7 @@
     box.innerHTML = '<div class="story-top"><span class="story-kicker">' + esc(T(s.kicker || 'Malaysia story')) + ' · ' +
       esc(T('Step {a} of {b}', { a: step + 1, b: s.steps.length })) + '</span>' +
       '<button type="button" class="story-x" data-act="exit" aria-label="' + esc(T('Close story')) + '">✕</button></div>' +
-      '<h2>' + esc(T(s.title)) + '</h2><p>' + esc(T(st.text)) + '</p>' +
+      '<h2>' + esc(T(s.title)) + '</h2><p>' + esc(T(st.text)) + '</p>' + sourceLine(st) +
       '<div class="story-nav"><div class="story-dots">' + s.steps.map(function (x, i) {
         return '<i class="' + (i === step ? 'on' : i < step ? 'done' : '') + '"></i>';
       }).join('') + '</div>' +

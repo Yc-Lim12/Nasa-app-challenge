@@ -294,7 +294,9 @@
       var r = node.getBoundingClientRect(), sx = r.width / W || 1;
       var x = xy[0] * sx, y = xy[1] * sx, avail = (W - inset) * sx, gap = 24, edge = 8;
       badgeEl.style('display', null);
-      if (badgeH === null) { var bn = badgeEl.node(); badgeH = bn.offsetHeight; badgeW = bn.offsetWidth; }
+      // measure once per badge, and again when a map layer turns the card compact
+      var lay = !!(host.parentNode && host.parentNode.classList.contains('layer-on'));
+      if (badgeH === null || lay !== badgeLay) { var bn = badgeEl.node(); badgeH = bn.offsetHeight; badgeW = bn.offsetWidth; badgeLay = lay; }
       // Beside the place, on the side with more room. On a narrow screen where
       // neither side fits, sit just below (or above) the place instead.
       var flip = x > avail * (avail < 600 ? 0.5 : 0.62);
@@ -317,7 +319,7 @@
       badgeEl.classed('flip', flip && !under).classed('under', under)
         .style('left', left + 'px').style('top', top + 'px').style('--dy', (y - top) + 'px');
     }
-    var badgeH = null, badgeW = 0;   // measured once per badge, not on every frame
+    var badgeH = null, badgeW = 0, badgeLay = false;   // measured once per badge, not on every frame
 
     /** A small chart of the yearly values and their trend line, inside the badge. */
     function sparkline(sp) {
@@ -689,10 +691,12 @@
     function cellShape(c) {
       return { type: 'Polygon', coordinates: [[[c.lon0, c.lat0], [c.lon0, c.lat1], [c.lon1, c.lat1], [c.lon1, c.lat0], [c.lon0, c.lat0]]] };
     }
-    // Grid cells (trend map, timelapse) are painted as one smooth, see-through colour
-    // field on the raster canvas: colours blend between cell centres (bilinear), so the
-    // terrain underneath stays visible and there are no hairline seams between squares.
-    var cellGrid = null;
+    // Grid cells (trend map, timelapse) are painted on the raster canvas. 'crisp' (the
+    // default) gives every pixel the colour of the NASA grid cell it falls in, so the
+    // map shows the data's real resolution; faint borders appear once cells are large
+    // on screen. 'smooth' blends between cell centres (bilinear) for a softer look.
+    // Either way only the drawing changes, never the values.
+    var cellGrid = null, cellMode = 'crisp', cellAlpha = 0.75, cellPx = 0, lastCellDraw = 0, cellSettle = 0;
     function setCells(list) {
       cells = list;
       gCells.selectAll('path').remove();
@@ -704,6 +708,8 @@
         dotSel = gDots.selectAll('circle').data(list.filter(function (c) { return c.dot; })).enter().append('circle').attr('r', 1.8);
         buildCellGrid(list);
         paintCellGrid(function (c) { return c.fill; });
+        var g = cellGrid;   // outline of the whole area, curved like the lines of latitude
+        gCells.append('path').attr('class', 'g-cells-edge').datum(areaShape(g.lonMin, g.lonMax, g.latMin, g.latMax));
       }
       host.classList.toggle('has-cells', !!(list && list.length));
       if (!raster) {
@@ -738,11 +744,20 @@
         a[o] = col.r * op; a[o + 1] = col.g * op; a[o + 2] = col.b * op; a[o + 3] = op;
       });
     }
+    function areaShape(lo0, lo1, la0, la1) {
+      var ring = [], n = Math.max(2, Math.ceil(Math.max(lo1 - lo0, la1 - la0) / 0.5)), i;
+      for (i = 0; i <= n; i++) ring.push([lo0, la0 + (la1 - la0) * i / n]);
+      for (i = 1; i <= n; i++) ring.push([lo0 + (lo1 - lo0) * i / n, la1]);
+      for (i = 1; i <= n; i++) ring.push([lo1, la1 - (la1 - la0) * i / n]);
+      for (i = 1; i <= n; i++) ring.push([lo1 - (lo1 - lo0) * i / n, la0]);
+      return { type: 'Polygon', coordinates: [ring] };
+    }
     function sampleCells(lon, lat) {
       var g = cellGrid;
       if (lat < g.latMin || lat > g.latMax) return null;
       lon = lon - 360 * Math.round((lon - (g.lonMin + g.lonMax) / 2) / 360);
       if (lon < g.lonMin || lon > g.lonMax) return null;
+      if (cellMode === 'crisp') return sampleCrisp(g, lon, lat);
       var fx = (lon - g.lonMin) / g.dlon - 0.5, fy = (lat - g.latMin) / g.dlat - 0.5;
       fx = fx < 0 ? 0 : fx > g.nx - 1 ? g.nx - 1 : fx; fy = fy < 0 ? 0 : fy > g.ny - 1 ? g.ny - 1 : fy;
       var x0 = Math.floor(fx), y0 = Math.floor(fy), x1 = Math.min(g.nx - 1, x0 + 1), y1 = Math.min(g.ny - 1, y0 + 1);
@@ -755,7 +770,27 @@
         (a[i00] * w00 + a[i10] * w10 + a[i01] * w01 + a[i11] * w11) / al,
         (a[i00 + 1] * w00 + a[i10 + 1] * w10 + a[i01 + 1] * w01 + a[i11 + 1] * w11) / al,
         (a[i00 + 2] * w00 + a[i10 + 2] * w10 + a[i01 + 2] * w01 + a[i11 + 2] * w11) / al,
-        al * 255];
+        al * 255 * cellAlpha];
+    }
+    // the colour of the one cell under (lon, lat), with a faint border near its edges
+    function sampleCrisp(g, lon, lat) {
+      var fx = (lon - g.lonMin) / g.dlon, fy = (lat - g.latMin) / g.dlat;
+      var ix = Math.min(g.nx - 1, Math.floor(fx)), iy = Math.min(g.ny - 1, Math.floor(fy)), o = (iy * g.nx + ix) * 4, a = g.rgba;
+      var al = a[o + 3];
+      if (al < 0.02) return null;
+      var r = a[o] / al, gg = a[o + 1] / al, b = a[o + 2] / al;
+      if (cellPx) {
+        // distance to the nearest cell edge in screen pixels (cos(lat) narrows the columns)
+        var ex = Math.min(fx - ix, ix + 1 - fx) * cellPx * g.dlon * Math.cos(lat * Math.PI / 180);
+        var ey = Math.min(fy - iy, iy + 1 - fy) * cellPx * g.dlat;
+        if (ex < 0.7 || ey < 0.7) { r *= 0.72; gg *= 0.72; b *= 0.72; }
+      }
+      return [r, gg, b, al * 255 * cellAlpha];
+    }
+    function setCellStyle(mode, alpha) {
+      if (mode) cellMode = mode === 'smooth' ? 'smooth' : 'crisp';
+      if (alpha != null) cellAlpha = Math.max(0.2, Math.min(1, alpha));
+      if (cellGrid && !raster) queueRaster();
     }
     function recolorCells(fn) {
       if (!cellGrid) return;
@@ -763,6 +798,8 @@
       if (!raster) queueRaster();   // the lon/lat cache stays valid: only the colours changed
     }
     function drawCells() {
+      var edge = gCells.select('path.g-cells-edge');
+      if (!edge.empty()) edge.attr('d', path);
       if (!dotSel) return;
       dotSel.each(function (c) {
         var p = [(c.lon0 + c.lon1) / 2, (c.lat0 + c.lat1) / 2], el = d3.select(this);
@@ -804,9 +841,18 @@
     function drawRaster() {
       var src = raster ? raster.sample : cellGrid ? sampleCells : null;
       if (!src) return;
-      var moving = !!(drag || anim || spinning);
-      // CSS pixels per sample: fine at rest, coarser while the globe moves
-      var step = moving ? 4 : Math.max(1, 2 / dpr), w = Math.ceil(W / step), h = Math.ceil(H / step);
+      var moving = !!(drag || anim || spinning), crisp = !raster && cellMode === 'crisp';
+      // CSS pixels per sample: fine at rest (one per pixel for crisp cells, so their
+      // edges are sharp), coarser while the globe moves
+      // While colours change quickly (timelapse playing), crisp cells draw at half
+      // resolution and get one sharp redraw once the frames stop.
+      var now = performance.now(), rapid = crisp && !moving && now - lastCellDraw < 250;
+      lastCellDraw = now;
+      if (rapid) { clearTimeout(cellSettle); cellSettle = setTimeout(queueRaster, 260); }
+      var step = moving ? 4 : crisp ? (rapid ? 2 : 1) : Math.max(1, 2 / dpr), w = Math.ceil(W / step), h = Math.ceil(H / step);
+      // screen pixels per degree near the centre; cell borders only once cells are big
+      var ppd = R * k * Math.PI / 180;
+      cellPx = crisp && !moving && cellGrid && Math.min(cellGrid.dlon, cellGrid.dlat) * ppd >= 14 ? ppd : 0;
       var key = [rot[0].toFixed(3), rot[1].toFixed(3), k.toFixed(4), W, H, step].join('|');
       if (!rasterCache || rasterCache.key !== key) {
         // cache the lon/lat under every sample pixel, so a new frame is just lookups
@@ -838,7 +884,7 @@
       rbctx.putImageData(img, 0, 0);
       rCanvas.width = Math.round(W * dpr); rCanvas.height = Math.round(H * dpr);
       rctx.setTransform(1, 0, 0, 1, 0, 0);
-      rctx.imageSmoothingEnabled = true;
+      rctx.imageSmoothingEnabled = !crisp || moving || rapid;
       rctx.imageSmoothingQuality = 'high';
       rctx.drawImage(rBuf, 0, 0, rCanvas.width, rCanvas.height);
     }
@@ -1120,6 +1166,7 @@
       spin: spin,
       setBadge: setBadge,
       setCells: setCells,
+      setCellStyle: setCellStyle,
       recolorCells: recolorCells,
       setMarks: setMarks,
       setRaster: setRaster,

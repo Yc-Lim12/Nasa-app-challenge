@@ -535,7 +535,9 @@
 
   function verdictText(res) {
     var vr = res.variable, st = res.stats;
-    var v = { name: capFirst(vname(vr).toLowerCase()), where: T(res.placeName), period: periodPhrase(res),
+    var v = { name: capFirst(vname(vr).toLowerCase()),
+      where: res.placeId === 'custom' ? coordLabel(res.lat, res.lon) : T(res.placeName),   // built at display time: U/S/T/B in BM
+      period: periodPhrase(res),
       rate: T('{x} per decade', { x: withUnit(sig(st.sen.slope * 10, 2), vr.unit) }) };
     // exactly the same value every year (e.g. snow depth 0 in the tropics): nothing to test
     var first = res.values[0], same = res.values.every(function (x) { return x === first; });
@@ -1222,17 +1224,29 @@
 
   // One variable stands in for each topic. The full list is still in the case settings.
   var SPOT_VARS = ['T2M', 'PRECTOTCORR', 'GWETROOT', 'CLOUD_AMT', 'AOD_55'];
-  var spotRun = 0;
+  var spotRun = 0, spotLast = null;   // last readings, so the card can be redrawn in the other language
 
   function topicLabel(id) {
     for (var i = 0; i < TOPICS.length; i++) if (TOPICS[i].id === id) return T(TOPICS[i].label);
     return id;
   }
 
+  function spotHead(lat, lon) {
+    return '<h2 class="spot-title">' + esc(T('At this spot')) + ' <span>' + esc(coordLabel(lat, lon)) + '</span></h2>';
+  }
+
+  /** Draw the finished card from stored readings (also after a language switch). */
+  function drawSpot() {
+    if (!spotLast) return;
+    $('spot').innerHTML = spotHead(spotLast.lat, spotLast.lon) +
+      '<ul class="spot-list">' + spotLast.rows.map(spotRow).join('') + '</ul>' +
+      '<p class="spot-note">' + esc(T('One grid cell, yearly averages from NASA POWER. Pick one to open the full case: chart, tests and evidence.')) + '</p>';
+  }
+
   function showSpot(lat, lon) {
     var run = ++spotRun, box = $('spot');
-    var head = '<h2 class="spot-title">' + esc(T('At this spot')) + ' <span>' + esc(coordLabel(lat, lon)) + '</span></h2>';
-    box.innerHTML = head + '<p class="spot-note">' + esc(T('Asking NASA…')) + '</p>';
+    spotLast = null;
+    box.innerHTML = spotHead(lat, lon) + '<p class="spot-note">' + esc(T('Asking NASA…')) + '</p>';
     box.hidden = false;
 
     // One request for all five variables, for the single grid cell that was clicked.
@@ -1244,11 +1258,11 @@
         var ser = yearlySeries(monthlyTable(json, id).table, FIRST_YEAR, LAST_YEAR, 0);
         return { vr: vr, ser: ser, st: ser.years.length >= MIN_YEARS ? S.analyze(ser.years, ser.values) : null };
       });
-      box.innerHTML = head + '<ul class="spot-list">' + rows.map(spotRow).join('') + '</ul>' +
-        '<p class="spot-note">' + esc(T('One grid cell, yearly averages from NASA POWER. Pick one to open the full case: chart, tests and evidence.')) + '</p>';
+      spotLast = { lat: lat, lon: lon, rows: rows };
+      drawSpot();
     }).catch(function (e) {
       if (run !== spotRun) return;
-      box.innerHTML = head + '<p class="spot-note">' + esc(e.message) + '</p>';
+      box.innerHTML = spotHead(lat, lon) + '<p class="spot-note">' + esc(e.message) + '</p>';
     });
   }
 
@@ -1297,7 +1311,7 @@
         if (current) scheduleLive(500); else investigate({ scroll: false });
       },
       onPlace: function (id) {
-        spotRun++; $('spot').hidden = true;      // the spot card belongs to a clicked point, not a named place
+        spotRun++; spotLast = null; $('spot').hidden = true;   // the spot card belongs to a clicked point, not a named place
         var s = $('place');
         s.value = id;
         s.dispatchEvent(new Event('change', { bubbles: true }));
@@ -1637,6 +1651,7 @@
     rerender: function () {
       buildForm(); writeForm(); syncViewControls(); syncThemeButton();
       $('run').textContent = T('Investigate');
+      drawSpot();
       if (current) render(current); else updateBrief();
     }
   };

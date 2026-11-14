@@ -300,14 +300,16 @@
     function drawSelName(t, s) {
       if (!s || !s.name || s.dot) { t.style('display', 'none'); return; }
       // just above the top edge of the area, or above the pin for one grid cell
-      var b = s.box, top = b ? [(b.lonMin + b.lonMax) / 2, b.latMax] : [s.lon, s.lat];
+      var b = s.box;
+      if (s.shape) { var gb = d3.geoBounds(s.shape); b = { lonMin: gb[0][0], lonMax: gb[1][0], latMax: gb[1][1] }; }
+      var top = b ? [(b.lonMin + b.lonMax) / 2, b.latMax] : [s.lon, s.lat];
       if (!visible(top)) { t.style('display', 'none'); return; }
       var xy = proj(top);
       t.style('display', null).attr('x', xy[0]).attr('y', xy[1] - (b ? 7 : 14)).text(s.name);
     }
     function drawSel(shape, pinG, s) {
       if (!s) { shape.attr('d', null); pinG.style('display', 'none'); return; }
-      shape.attr('d', s.box ? path(boxShape(s.box)) : null);
+      shape.attr('d', s.shape ? path(s.shape) : s.box ? path(boxShape(s.box)) : null);   // a state's real outline, or the box
       var p = [s.lon, s.lat];
       if (visible(p)) {
         var xy = proj(p);

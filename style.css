@@ -294,11 +294,11 @@ button, input, select { font: inherit; color: inherit; letter-spacing: inherit; 
 /* area-to-average slider */
 .size-row { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
 .field .size-row input[type="range"] {
-  flex: 1; min-width: 0; height: 28px; margin: 0; padding: 0; background: transparent; border: 0; box-shadow: none; accent-color: var(--accent);
+  flex: 1; min-width: 40%; height: 28px; margin: 0; padding: 0; background: transparent; border: 0; box-shadow: none; accent-color: var(--accent);
 }
 .field .size-row input[type="range"]:focus { box-shadow: none; background: transparent; }
 .field .size-row input[type="range"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-.size-row output { flex: none; min-width: 12.5em; text-align: right; font-size: 15px; font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
+.size-row output { flex: 0 1 auto; max-width: 58%; min-width: 12.5em; text-align: right; font-size: 15px; font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
 
 /* buttons */
 .run {
@@ -595,6 +595,7 @@ button.spot-row:focus-visible { outline: 2px solid var(--accent); outline-offset
   paint-order: stroke; stroke: rgb(0 0 0 / 0.7); stroke-width: 3.5px; stroke-linejoin: round; pointer-events: none;
 }
 .g-sel-name-cmp { fill: #e9c8ff; }
+.size-back { display: block; margin-top: 6px; font-size: 13px; }
 .g-place { cursor: pointer; }
 .g-place circle { fill: #fff; stroke: rgb(0 0 0 / 0.5); stroke-width: 1; transition: r .2s var(--spring); }
 

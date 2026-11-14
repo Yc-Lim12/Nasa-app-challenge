@@ -29,7 +29,7 @@ function loadDataApi() {
   };
   let source = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
   const initHook = "  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);";
-  source = source.replace(initHook, "  window.__test = { readHash: readHash, writeHash: writeHash, downloadCsv: downloadCsv, setCurrent: function (v) { current = v; } };\n" + initHook);
+  source = source.replace(initHook, "  window.__test = { readHash: readHash, writeHash: writeHash, downloadCsv: downloadCsv, setCurrent: function (v) { current = v; }, cellShare: cellShare, place: place };\n" + initHook);
   assert.notEqual(source.indexOf('window.__test'), -1, 'test hooks were inserted');
   vm.runInNewContext(source, context, { filename: 'app.js' });
   return { TD: window.TD, hooks: window.__test, location, getDownloadedBlob: () => downloadedBlob };
@@ -163,4 +163,26 @@ test('open-ocean topsoil wetness (NASA gives 1 in every month) is left out, not 
   assert.equal(wet.cells, 1);
   // other variables are never treated this way
   assert.equal(TD.isOceanFill('T2M', months(1)), false);
+});
+
+test('Malaysian state weights add up to the real state area', () => {
+  const states = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'malaysia-states.json'), 'utf8')).states;
+  // official land areas in km² (Department of Statistics Malaysia)
+  const official = { pahang: 36137, sarawak: 124450, sabah: 73904, johor: 19166, selangor: 8104, kualalumpur: 243, putrajaya: 49, melaka: 1664, perlis: 821, labuan: 92 };
+  const R = 6371, rad = Math.PI / 180;
+  for (const id of Object.keys(official)) {
+    const p = hooks.place(id);
+    assert.ok(p && p.state, id + ' is a place');
+    p.outline = states[id]; p.weights = {};
+    let km2 = 0;
+    // NASA POWER grid: cell centres every 0.625° of longitude and 0.5° of latitude
+    for (let lat = 0.25; lat < 8; lat += 0.5) {
+      for (let lon = 99.375; lon < 120; lon += 0.625) {
+        const share = hooks.cellShare(p, lon, lat);
+        if (share) km2 += share * (0.625 * rad * R * Math.cos(lat * rad)) * (0.5 * rad * R);
+      }
+    }
+    const err = Math.abs(km2 - official[id]) / official[id];
+    assert.ok(err < 0.12, id + ': weighted cells cover ' + Math.round(km2) + ' km², official ' + official[id] + ' km²');
+  }
 });

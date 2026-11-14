@@ -129,6 +129,67 @@
     return big.concat(small).sort(function (a, b) { return a.short < b.short ? -1 : 1; });
   }
 
+  // ---- real state outlines (data/malaysia-states.json, from geoBoundaries / OpenStreetMap) ----
+  // A state with an outline averages only the NASA grid cells that overlap it, each
+  // weighted by how much of the cell lies inside (and by cos(latitude) as usual).
+  // NASA POWER is still asked for the rectangle around the state.
+  var outlinesReady = (typeof fetch === 'function' ? fetch('data/malaysia-states.json').then(function (r) {
+    if (!r.ok) throw new Error('no outlines');
+    return r.json();
+  }).then(function (d) {
+    PLACES.forEach(function (p) {
+      var g = p.state && d.states[p.id];
+      if (!g) return;
+      var lo = 180, hi = -180, la = 90, ha = -90;
+      g.coordinates.forEach(function (poly) { poly[0].forEach(function (c) {
+        lo = Math.min(lo, c[0]); hi = Math.max(hi, c[0]); la = Math.min(la, c[1]); ha = Math.max(ha, c[1]);
+      }); });
+      // the rectangle NASA is asked for: whole grid cells around the outline, at least 2° a side
+      var b = { latMin: Math.floor(la * 2) / 2, latMax: Math.ceil(ha * 2) / 2, lonMin: Math.floor(lo * 2) / 2, lonMax: Math.ceil(hi * 2) / 2 };
+      [['latMin', 'latMax'], ['lonMin', 'lonMax']].forEach(function (k) {
+        var grow = 2 - (b[k[1]] - b[k[0]]);
+        if (grow > 0) { b[k[0]] -= grow / 2; b[k[1]] += grow / 2; }
+      });
+      p.outline = g; p.bounds = b; p.weights = {};
+      p.size = Math.max(2, Math.round(Math.max(b.latMax - b.latMin, b.lonMax - b.lonMin)));
+    });
+    if (window.TD && window.TD.outlinesLoaded) window.TD.outlinesLoaded();
+  }) : Promise.reject(new Error('no fetch'))).catch(function () { /* opened from disk: rectangles only */ });
+
+  function inRing(r, x, y) {
+    var inside = false;
+    for (var i = 0, j = r.length - 1; i < r.length; j = i++) {
+      if ((r[i][1] > y) !== (r[j][1] > y) && x < (r[j][0] - r[i][0]) * (y - r[i][1]) / (r[j][1] - r[i][1]) + r[i][0]) inside = !inside;
+    }
+    return inside;
+  }
+  function inOutline(g, x, y) {
+    for (var i = 0; i < g.coordinates.length; i++) {
+      var poly = g.coordinates[i];
+      if (inRing(poly[0], x, y)) {
+        var hole = false;
+        for (var h = 1; h < poly.length; h++) if (inRing(poly[h], x, y)) { hole = true; break; }
+        if (!hole) return true;
+      }
+    }
+    return false;
+  }
+  /** Share (0–1) of the NASA grid cell centred at lon, lat that lies inside the outline. */
+  function cellShare(p, lon, lat) {
+    var key = lon.toFixed(3) + ',' + lat.toFixed(3);
+    if (p.weights[key] !== undefined) return p.weights[key];
+    var N = p.small ? 24 : 8, hit = 0, dx = 0.625, dy = 0.5;   // finer sampling for the territories smaller than a cell
+    for (var i = 0; i < N; i++) for (var j = 0; j < N; j++) {
+      if (inOutline(p.outline, lon - dx / 2 + (i + 0.5) * dx / N, lat - dy / 2 + (j + 0.5) * dy / N)) hit++;
+    }
+    return (p.weights[key] = hit / (N * N));
+  }
+  /** The outline a case uses, or null (a box, a point, or the state shown as a box). */
+  function outlineOf(st) {
+    var p = st && place(st.placeId);
+    return p && p.outline && !st.boxed ? p : null;
+  }
+
   // Area to average over: one grid cell, or a box from 2° to 20°. NASA POWER answers
   // at most 10° × 10° per request, so bigger boxes are fetched in parts (fetchArea).
   // The slider position is an index into SIZE_STEPS; 0 means a single grid cell.
@@ -141,6 +202,13 @@
   }
   function sizeLabel(v) {
     var p = place(state.placeId);
+    if (p && p.bounds && state.boxed) {
+      return v < 2 ? T('One grid cell (about 50 km)')
+        : T('{b}° box around {name} (about {km} km)', { b: v, name: T(p.short), km: (Math.round(v * 111 / 10) * 10).toLocaleString() });
+    }
+    if (p && p.outline) {
+      return p.small ? T('{name}’s outline (smaller than one grid cell)', { name: T(p.short) }) : T('The state’s own outline');
+    }
     if (p && p.state && p.bounds) {
       var sb = p.bounds;
       return T('A rectangle around the state ({a}° × {b}°), with some sea and neighbouring land', { a: sb.latMax - sb.latMin, b: sb.lonMax - sb.lonMin });
@@ -154,7 +222,15 @@
       : T('{b}° box (about {km} km)', { b: v, km: (Math.round(v * 111 / 10) * 10).toLocaleString() }) +
         (v > TILE_MAX ? ' · ' + T('loads in parts, about a minute') : '');
   }
-  function showSize() { var o = $('size-out'); if (o) o.textContent = sizeLabel(state.size); }
+  function showSize() {
+    var o = $('size-out'); if (o) o.textContent = sizeLabel(state.size);
+    // a state or region turned into a box: one click brings its own area back
+    var back = $('size-back'), p = place(state.placeId);
+    if (back) {
+      back.hidden = !(p && p.bounds && state.boxed);
+      back.textContent = p && p.outline ? T('Back to the state’s outline') : T('Back to the whole region');
+    }
+  }
 
   var MONTHS = ['Whole year', 'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December',
@@ -182,7 +258,8 @@
     topic: 'heat', v: 'T2M', placeId: HOME.id, placeName: HOME.name, short: HOME.short,
     lat: HOME.lat, lon: HOME.lon, size: HOME.size,
     y0: FIRST_YEAR, y1: LAST_YEAR, month: 0, compare: '',
-    step: 'year'          // 'year': one value per year; 'month': every month, seasonal cycle removed
+    step: 'year',         // 'year': one value per year; 'month': every month, seasonal cycle removed
+    boxed: false          // a state or region shown as a square box of the slider's size instead of its own area
   };
   var view = { anom: false, smooth: false, future: false };
   var cache = {};
@@ -262,7 +339,7 @@
   /** The area a case covers: a named region's bounds, a square box, or null for one grid cell. */
   function regionOf(st) {
     var p = place(st.placeId);
-    if (p && p.bounds) return p.bounds;
+    if (p && p.bounds && !st.boxed) return p.bounds;
     return st.size ? box(st.lat, st.lon, st.size) : null;
   }
 
@@ -450,7 +527,8 @@
     return out;
   }
 
-  function monthlyTable(json, param) {
+  function monthlyTable(json, param, st) {
+    var shape = outlineOf(st);
     if (json.properties) {
       var pt = trimSpliced(param, json.properties.parameter[param] || {});
       if (isOceanFill(param, pt)) { logOcean(param, 1, json); return { table: {}, cells: 0, ocean: 1 }; }
@@ -460,6 +538,10 @@
     var sum = {}, wsum = {}, ocean = 0, land = 0;
     feats.forEach(function (f) {
       var w = Math.cos(f.geometry.coordinates[1] * Math.PI / 180);
+      if (shape) {
+        w *= cellShare(shape, f.geometry.coordinates[0], f.geometry.coordinates[1]);
+        if (w <= 0) return;                     // outside the state
+      }
       var t = trimSpliced(param, f.properties.parameter[param] || {});
       if (isOceanFill(param, t)) { ocean++; return; }
       land++;
@@ -557,8 +639,8 @@
 
   function loadSeries(vid, st, onProgress) {
     var pm = prm(variable(vid));
-    return fetchArea(pm, st, onProgress).then(function (json) {
-      var mt = monthlyTable(json, pm);
+    return outlinesReady.then(function () { return fetchArea(pm, st, onProgress); }).then(function (json) {
+      var mt = monthlyTable(json, pm, st);
       var ser = seriesOf(mt.table, st);
       ser.cells = mt.cells;
       ser.ocean = mt.ocean;
@@ -891,7 +973,8 @@
 
     $('about-var').innerHTML = '<strong>' + esc(vname(vr)) + '.</strong> ' + esc(T(vr.def)) +
       ' <span class="muted">' + esc(T('Source: {src}, through NASA POWER.', { src: T(vr.source) })) + ' ' +
-      (res.cells > 1 ? esc(T('Averaged over {n} grid cells in the area, weighted by area.', { n: res.cells }))
+      (outlineOf(res) ? esc(T('Averaged over the {n} grid cells that overlap {name}, each weighted by how much of it lies inside the state (outline: geoBoundaries / OpenStreetMap).', { n: res.cells, name: T(res.short) }))
+        : res.cells > 1 ? esc(T('Averaged over {n} grid cells in the area, weighted by area.', { n: res.cells }))
         : esc(T('One grid cell at {where}.', { where: coordLabel(res.lat, res.lon) }))) +
       (res.ocean ? ' ' + esc(T('{n} open-ocean cells were left out: NASA POWER has no soil there.', { n: res.ocean })) : '') +
       (monthly ? ' ' + esc(T('Each value is that month minus the average for the same calendar month in {a}–{b}.', { a: res.y0, b: res.y1 })) : '') + '</span>';
@@ -975,7 +1058,7 @@
       render({ variable: vr, years: ser.years, values: ser.values, cells: ser.cells, table: ser.table,
         skipped: ser.skipped, expected: ser.expected, step: snap.step, ocean: ser.ocean,
         stats: analyzeFor(snap, ser.years, ser.values), placeName: snap.placeName, short: snap.short, placeId: snap.placeId,
-        lat: snap.lat, lon: snap.lon, size: snap.size, month: snap.month, y0: snap.y0, y1: snap.y1 });
+        lat: snap.lat, lon: snap.lon, size: snap.size, boxed: snap.boxed, month: snap.month, y0: snap.y0, y1: snap.y1 });
       if (opts.scroll) $('result').scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' });
     }).catch(function (e) {
       if (id !== runId) return;
@@ -1310,7 +1393,8 @@
     state.lat = clamp(isNaN(lat) ? 0 : lat, -89.5, 89.5);
     state.lon = clamp(isNaN(lon) ? 0 : lon, -180, 180);
     var pr = place($('place').value);
-    if (pr && pr.bounds) state.size = pr.size;           // a whole region keeps its own area
+    if (!pr || !pr.bounds) state.boxed = false;
+    if (pr && pr.bounds && !state.boxed) state.size = pr.size;   // a whole region or state keeps its own area
     else state.size = SIZE_STEPS[clamp(parseInt($('size').value, 10) || 0, 0, SIZE_STEPS.length - 1)];
     state.step = $('step').value === 'month' ? 'month' : 'year';
     var a = parseInt($('y0').value, 10), b = parseInt($('y1').value, 10);
@@ -1449,15 +1533,16 @@
     else r.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' });
   }
 
-  function selectionFor(lat, lon, size, placeId) {
-    var p = place(placeId);
-    return { lat: lat, lon: lon, size: size, placeId: placeId, box: regionOf({ lat: lat, lon: lon, size: size, placeId: placeId }),
+  function selectionFor(lat, lon, size, placeId, boxed) {
+    var p = place(placeId), st = { lat: lat, lon: lon, size: size, placeId: placeId, boxed: boxed };
+    var o = outlineOf(st);
+    return { lat: lat, lon: lon, size: size, placeId: placeId, box: regionOf(st), shape: o ? o.outline : null,
       name: p ? T(p.short) : '', dot: !!(p && !p.region) };   // places with a named dot on the globe already show their name
   }
 
   function updateMap(recentre) {
     if (!globe) return;
-    globe.setSelection(selectionFor(state.lat, state.lon, state.size, state.placeId));
+    globe.setSelection(selectionFor(state.lat, state.lon, state.size, state.placeId, state.boxed));
     var p = current && compareTarget();
     globe.setCompare(p ? selectionFor(p.lat, p.lon, current.size, p.id) : null);
     if (recentre) globe.flyTo(state.lat, state.lon, state.size);
@@ -1469,7 +1554,7 @@
     var h = 'v=' + state.v + '&lat=' + state.lat + '&lon=' + state.lon + '&size=' + state.size +
       '&y0=' + state.y0 + '&y1=' + state.y1 + '&m=' + state.month + '&p=' + state.placeId +
       (state.compare ? '&c=' + encodeURIComponent(state.compare) : '') + (view.anom ? '&a=1' : '') + (view.smooth ? '&s=1' : '') + (view.future ? '&f=1' : '') +
-      (state.step === 'month' ? '&ts=m' : '');
+      (state.step === 'month' ? '&ts=m' : '') + (state.boxed ? '&bx=1' : '');
     try { history.replaceState(null, '', '#' + h); } catch (e) { /* file preview: ignore */ }
   }
 
@@ -1493,7 +1578,8 @@
     state.lon = q.lon !== undefined && Number.isFinite(lon) ? clamp(lon, -180, 180) : (p ? p.lon : HOME.lon);
     var qs = Number(q.size);
     state.size = SIZE_STEPS.indexOf(qs) >= 0 ? qs : 2;
-    if (p && p.bounds) state.size = p.size;            // a whole region keeps its own area
+    state.boxed = !!(p && p.bounds && q.bx === '1');
+    if (p && p.bounds && !state.boxed) state.size = p.size;   // a whole region keeps its own area
     state.step = q.ts === 'm' ? 'month' : 'year';
     var y0 = Number(q.y0), y1 = Number(q.y1);
     var validYear = function (y) { return Number.isInteger(y) && y >= FIRST_YEAR && y <= LAST_YEAR; };
@@ -1625,6 +1711,7 @@
     });
     $('place').addEventListener('change', function () {
       var p = place($('place').value);
+      state.boxed = false;
       if (p) { state.placeId = p.id; state.lat = p.lat; state.lon = p.lon; state.size = p.size; writeForm(); }
       readForm();
     });
@@ -1634,10 +1721,16 @@
     // while dragging: resize the box on the globe live; on release: frame it and re-run
     $('size').addEventListener('input', function () {
       var p = place($('place').value);
-      if (p && p.bounds) $('place').value = 'custom';   // moving the slider means a box of your own
+      if (p && p.bounds) state.boxed = true;   // moving the slider: a square box of that size around the state or region, name kept
       readForm(); updateMap(false);
     });
     $('size').addEventListener('change', function () { readForm(); updateMap(true); });
+    $('size-back').addEventListener('click', function () {
+      var p = place(state.placeId);
+      if (!p) return;
+      state.boxed = false; state.size = p.size; state.lat = p.lat; state.lon = p.lon;
+      writeForm(); readForm(); scheduleLive();
+    });
     // Any change inside the form re-runs an open case (after the handlers above).
     $('case-form').addEventListener('change', function () { readForm(); scheduleLive(); });
     $('brief').addEventListener('click', function (e) {
@@ -1748,6 +1841,11 @@
     compareSpot: function (lat, lon) {
       state.compare = 'pt:' + lat.toFixed(2) + ',' + lon.toFixed(2);
       if (current) { fillCompare(current); loadCompare(); writeHash(); }
+    },
+    outlinesLoaded: function () {   // state outlines arrived: the chosen state's area and map shape follow
+      var p = place(state.placeId);
+      if (p && p.outline && !state.boxed) state.size = p.size;
+      showSize(); updateMap(false);
     },
     rerender: function () {
       buildForm(); writeForm(); syncViewControls(); syncThemeButton();

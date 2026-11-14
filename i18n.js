@@ -261,6 +261,13 @@
     'Light or dark, English or Bahasa Malaysia, the map style, and this tour again.': 'Cerah atau gelap, Bahasa Inggeris atau Bahasa Malaysia, gaya peta, dan lawatan ini semula.',
     'For a chosen place, variable and period, Trend Detective turns NASA’s monthly data into one value per year (the mean of the twelve months weighted by their number of days, as NASA POWER computes its own annual values; one chosen month; or a three-month season, also weighted by days; December to February takes December from the year before) and asks: is there a steady rise or fall, how fast is it, and could it be chance?':
       'Untuk tempat, pemboleh ubah dan tempoh yang dipilih, Trend Detective menukar data bulanan NASA kepada satu nilai setahun (purata dua belas bulan ditimbang mengikut bilangan hari, seperti NASA POWER mengira nilai tahunannya sendiri; satu bulan yang dipilih; atau musim tiga bulan, juga ditimbang mengikut hari; Disember hingga Februari mengambil Disember tahun sebelumnya) dan bertanya: adakah terdapat kenaikan atau penurunan yang konsisten, berapa cepat, dan mungkinkah ia kebetulan?',
+    '{what} is only measured on land with soil. NASA POWER has no soil values at this spot (open ocean or an ice sheet). Choose another place or variable.':
+      '{what} hanya diukur di darat yang bertanah. NASA POWER tiada nilai tanah di tempat ini (lautan terbuka atau kepingan ais). Pilih tempat atau pemboleh ubah lain.',
+    'NASA POWER has no {what} data at this spot. Land-only variables (soil wetness, land evaporation, snow depth) have no values over the ocean or the big ice sheets. Choose another place or variable.':
+      'NASA POWER tiada data {what} di tempat ini. Pemboleh ubah darat sahaja (kelembapan tanah, penyejatan darat, kedalaman salji) tiada nilai di atas lautan atau kepingan ais besar. Pilih tempat atau pemboleh ubah lain.',
+    '{name} around {where} is {value} in every year, so there is no change to test.': '{name} di sekitar {where} ialah {value} setiap tahun, jadi tiada perubahan untuk diuji.',
+    'No change': 'Tiada perubahan',
+    'Every year {period} has exactly the same value. For snow depth this simply means there is no snow here.': 'Setiap tahun {period} mempunyai nilai yang sama. Bagi kedalaman salji, ini bermaksud tiada salji di sini.',
     'Grid cells': 'Sel grid', 'Smooth': 'Licin', 'Opacity': 'Kelegapan', 'How to draw the grid': 'Cara melukis grid',
     'Guided stories': 'Kisah berpandu', 'World story': 'Kisah dunia',
     'Wildfire smoke over Wisconsin': 'Asap kebakaran hutan di Wisconsin', 'Summer haze far from the fires': 'Jerebu musim panas jauh dari kebakaran',

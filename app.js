@@ -537,6 +537,13 @@
     var vr = res.variable, st = res.stats;
     var v = { name: capFirst(vname(vr).toLowerCase()), where: T(res.placeName), period: periodPhrase(res),
       rate: T('{x} per decade', { x: withUnit(sig(st.sen.slope * 10, 2), vr.unit) }) };
+    // exactly the same value every year (e.g. snow depth 0 in the tropics): nothing to test
+    var first = res.values[0], same = res.values.every(function (x) { return x === first; });
+    if (same) {
+      return { head: T('{name} around {where} is {value} in every year, so there is no change to test.', { name: v.name, where: v.where, value: fmtValue(first, vr) }),
+        badge: T('No change'), cls: 'none',
+        sub: T('Every year {period} has exactly the same value. For snow depth this simply means there is no snow here.', v) };
+    }
     if (st.direction === 'flat') {
       return { head: T('{name} around {where} has not changed.', v), badge: T('No trend'), cls: 'none',
         sub: T('The typical year-to-year change {period} is zero.', v) };
@@ -851,8 +858,15 @@
       if (id !== runId) return;
       var got = yearCount(ser);
       if (ser.ocean && !ser.cells) {
-        throw new Error(T('{what} is only measured on land, and this spot is open ocean. Choose a place on land, or another variable.', {
+        throw new Error(T('{what} is only measured on land with soil. NASA POWER has no soil values at this spot (open ocean or an ice sheet). Choose another place or variable.', {
           what: capFirst(T(vr.name).toLowerCase()) }));
+      }
+      // no valid value at all in NASA's answer (e.g. land-only variables over the sea or an ice sheet)
+      var anyValue = false;
+      for (var tk in ser.table) { var tv = ser.table[tk]; if (tv !== null && tv !== undefined && tv >= FILL) { anyValue = true; break; } }
+      if (!anyValue) {
+        throw new Error(T('NASA POWER has no {what} data at this spot. Land-only variables (soil wetness, land evaporation, snow depth) have no values over the ocean or the big ice sheets. Choose another place or variable.', {
+          what: T(vr.name).toLowerCase() }));
       }
       if (got < MIN_YEARS) {
         throw new Error(T('Only {n} usable years of {what} here for that period. A trend test needs at least {min}. Try a longer period, another place or another variable.', {

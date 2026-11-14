@@ -109,10 +109,12 @@ nothing to install. Python is used to check it:
 pip install -r tools/requirements.txt
 python tools/validate_stats.py   # every number stats.js reports vs SciPy (315 checks)
 python tools/coverage.py         # simulation: 95% interval coverage and false-alarm rates
+python tools/check_variables.py  # all 18 variables x 6 places on real NASA data, app vs independent Python
 ```
 
-Both scripts run the website's own `stats.js` through Node.js, so they test the exact
-code the site uses. Results are in [tools/VALIDATION.md](tools/VALIDATION.md).
+These scripts run the website's own `stats.js` (and, for `check_variables.py`, its `app.js`
+data pipeline) through Node.js, so they test the exact code the site uses. Results are in
+[tools/VALIDATION.md](tools/VALIDATION.md) and [tools/VARIABLE_CHECK.md](tools/VARIABLE_CHECK.md).
 
 ## Other tools used
 

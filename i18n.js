@@ -129,6 +129,7 @@
     // ---- case summary ----
     'Testing {what} around {where}, {when}, {part}.': 'Menguji {what} di sekitar {where}, {when}, {part}.',
     'in {month}': 'pada {month}', 'whole year': 'sepanjang tahun',
+    'yearly average': 'purata tahunan', '{month} average': 'purata {month}',
 
     // ---- map tools ----
     'centre': 'tengah', 'east': 'timur', 'north-east': 'timur laut', 'north': 'utara', 'north-west': 'barat laut',
@@ -286,7 +287,96 @@
     'July': 'Julai', 'August': 'Ogos', 'October': 'Oktober', 'December': 'Disember',
     'Seasons': 'Musim', 'One month': 'Satu bulan',
     'June to August': 'Jun hingga Ogos', 'September to November': 'September hingga November',
-    'December to February': 'Disember hingga Februari', 'March to May': 'Mac hingga Mei'
+    'December to February': 'Disember hingga Februari', 'March to May': 'Mac hingga Mei',
+    'Mar': 'Mac', 'Aug': 'Ogo', 'Oct': 'Okt', 'Dec': 'Dis',
+
+    // ---- scientific chart: reference period, tooltip, legend, drag ----
+    '{a}–{b} average': 'purata {a}–{b}', 'average of {a}–{b}': 'purata {a}–{b}',
+    'Difference from the {ref}': 'Beza daripada {ref}', 'Start year': 'Tahun mula',
+    'Shift after {y} (Pettitt {p})': 'Anjakan selepas {y} (Pettitt {p})',
+    '{v} vs the {ref}': '{v} berbanding {ref}', '{v} on the trend line': '{v} pada garis tren',
+    '95% band: {a} to {b}': 'Jalur 95%: {a} hingga {b}', '{v} on the Sen line': '{v} pada garis Sen',
+    'Residual: {v}': 'Baki: {v}', '{v} 5-year average': '{v} purata 5 tahun',
+    '{n} years.': '{n} tahun.', 'Let go to test this period.': 'Lepaskan untuk menguji tempoh ini.',
+    'Pick at least {n} years.': 'Pilih sekurang-kurangnya {n} tahun.',
+    'Pick at least {n} years to test a trend.': 'Pilih sekurang-kurangnya {n} tahun untuk menguji tren.',
+    '95% confidence band': 'Jalur keyakinan 95%', '95% prediction interval': 'Selang ramalan 95%', 'Change point': 'Titik perubahan',
+    'Straight line fitted by least squares': 'Garis lurus yang dipadankan dengan kaedah kuasa dua terkecil',
+    'Where the true trend line probably lies (95% confidence). Single years scatter much more widely, so most dots sit outside it.':
+      'Kedudukan sebenar garis tren yang paling mungkin (keyakinan 95%). Setiap tahun bertaburan lebih luas, jadi kebanyakan titik berada di luarnya.',
+    'Where single years are expected to fall (95% prediction interval). About 1 year in 20 should land outside it.':
+      'Julat yang dijangka bagi setiap tahun (selang ramalan 95%). Kira-kira 1 daripada 20 tahun dijangka berada di luarnya.',
+    'Theil–Sen line: the median of the slopes between every pair of years. Robust to outliers; pairs with the Mann–Kendall test.':
+      'Garis Theil–Sen: median cerun antara setiap pasangan tahun. Tidak mudah terjejas oleh nilai luar biasa; digunakan bersama ujian Mann–Kendall.',
+    'Pettitt (1979) test: the most likely point where the values shift, with the mean before and after. A steady trend can also trigger it.':
+      'Ujian Pettitt (1979): titik yang paling mungkin berlaku anjakan nilai, dengan purata sebelum dan selepasnya. Tren yang mantap juga boleh mencetuskannya.',
+    'The trend line carried 10 years on. The shaded area is where a single year would probably land (95% prediction band), if nothing about the trend changes. It is not a forecast.':
+      'Garis tren dilanjutkan 10 tahun. Kawasan berlorek ialah julat yang mungkin bagi satu tahun (jalur ramalan 95%) jika tren tidak berubah. Ini bukan ramalan.',
+    'Drag across the chart to test only those years. Stripes: {lo} years were below the {ref}, {hi} years above.':
+      'Seret merentasi carta untuk menguji tahun-tahun itu sahaja. Jalur: tahun {lo} di bawah {ref}, tahun {hi} di atasnya.',
+    'blue': 'biru', 'red': 'merah', 'brown': 'perang', 'teal': 'hijau kebiruan',
+
+    // ---- residuals and trend-vs-start-year panels ----
+    'Residuals: observed minus trend line': 'Baki: nilai cerapan tolak garis tren',
+    'Trend from each start year to {y}': 'Tren dari setiap tahun mula hingga {y}',
+    '{s} of {n} start years give a 95% interval that excludes zero. Click a bar to test that period.':
+      '{s} daripada {n} tahun mula memberi selang 95% yang tidak merangkumi sifar. Klik bar untuk menguji tempoh itu.',
+    'From {a} to {b} ({n} years): {s} {u}per decade, 95% CI [{lo}, {hi}]. Click to test this period.':
+      'Dari {a} hingga {b} ({n} tahun): {s} {u}sedekad, SK 95% [{lo}, {hi}]. Klik untuk menguji tempoh ini.',
+
+    // ---- statistical summary table ----
+    'Statistical summary': 'Ringkasan statistik',
+    'Linear regression (ordinary least squares)': 'Regresi linear (kuasa dua terkecil biasa)',
+    'Slope ± standard error': 'Cerun ± ralat piawai', '95% confidence interval': 'Selang keyakinan 95%',
+    'R² · residual standard deviation': 'R² · sisihan piawai baki',
+    'Autocorrelation of the residuals': 'Autokorelasi baki',
+    'Lag-1 autocorrelation r₁ · Durbin–Watson d': 'Autokorelasi lat-1 r₁ · Durbin–Watson d',
+    'Effective sample size n_eff (Santer et al. 2000)': 'Saiz sampel berkesan n_eff (Santer et al. 2000)',
+    'Slope 95% CI, adjusted': 'Selang keyakinan 95% cerun, dilaraskan', 't-test p, adjusted': 'Nilai p ujian-t, dilaraskan',
+    'Mann–Kendall trend test': 'Ujian tren Mann–Kendall', 'Kendall’s τ · p': 'τ Kendall · p',
+    'Hamed–Rao modified p (autocorrelation)': 'p terubah suai Hamed–Rao (autokorelasi)',
+    'Theil–Sen estimator': 'Penganggar Theil–Sen', '95% confidence interval (Sen 1968)': 'Selang keyakinan 95% (Sen 1968)',
+    'Change point (Pettitt 1979)': 'Titik perubahan (Pettitt 1979)', 'Most likely shift': 'Anjakan paling mungkin',
+    'Mean before · after the shift': 'Purata sebelum · selepas anjakan',
+    'Reference for differences and stripes': 'Rujukan bagi beza dan jalur', 'Series': 'Siri', 'Location': 'Lokasi',
+    'Period · years used': 'Tempoh · tahun digunakan', 'Source': 'Sumber',
+    '{a} of {n} years': '{a} daripada {n} tahun', 'too few effective years': 'terlalu sedikit tahun berkesan',
+    'corrected variance not positive': 'varians terlaras tidak positif', 'lags {l}': 'lat {l}', 'no significant lags': 'tiada lat yang signifikan',
+    'between {a} and {b}': 'antara {a} dan {b}', 'none (all values equal)': 'tiada (semua nilai sama)',
+    'significant, drawn on the chart': 'signifikan, dilukis pada carta', 'not significant': 'tidak signifikan',
+    '{ref} (WMO climate normal; {n} of 30 years with data)': '{ref} (normal iklim WMO; {n} daripada 30 tahun ada data)',
+    '{ref} (fewer than {m} of the 1991–2020 years have data)': '{ref} (kurang daripada {m} tahun 1991–2020 ada data)',
+    'NASA POWER monthly {p}, {part}': 'NASA POWER bulanan {p}, {part}', '{month} mean': 'purata {month}',
+    'annual mean (months weighted by days)': 'purata tahunan (bulan diberi pemberat mengikut bilangan hari)',
+    '{s}° box centred on {lat}°, {lon}° (area-weighted mean of {c} grid cells)': 'kotak {s}° berpusat di {lat}°, {lon}° (purata berpemberat luas bagi {c} sel grid)',
+    'single grid cell at {lat}°, {lon}°': 'satu sel grid di {lat}°, {lon}°', '{k} skipped: incomplete months': '{k} dilangkau: bulan tidak lengkap',
+    'Two-sided tests, α = 0.05. Per-decade values are the per-year slope × 10. The verdict above uses the Mann–Kendall p-value. A steady trend can also make the Pettitt test significant, so a change point is most convincing when the residuals jump at that year too.':
+      'Ujian dua hujung, α = 0.05. Nilai sedekad ialah cerun setahun × 10. Keputusan di atas menggunakan nilai p Mann–Kendall. Tren yang mantap juga boleh menjadikan ujian Pettitt signifikan, jadi titik perubahan paling meyakinkan apabila baki turut melonjak pada tahun itu.',
+    'References:': 'Rujukan:',
+
+    // ---- months panel ----
+    'There is not enough monthly data here to test each month.': 'Data bulanan di sini tidak mencukupi untuk menguji setiap bulan.',
+    'No single month shows a statistically significant trend here.': 'Tiada bulan yang menunjukkan tren signifikan secara statistik di sini.',
+    '{s} months show a significant trend. The biggest is {m}, rising by about {rate}.': '{s} bulan menunjukkan tren signifikan. Yang terbesar ialah {m}, meningkat kira-kira {rate}.',
+    '{s} months show a significant trend. The biggest is {m}, falling by about {rate}.': '{s} bulan menunjukkan tren signifikan. Yang terbesar ialah {m}, menurun kira-kira {rate}.',
+    '{a} of {b}': '{a} daripada {b}', 'Not enough data': 'Data tidak mencukupi',
+    'Click to go back to the whole year': 'Klik untuk kembali ke sepanjang tahun', 'Click to investigate this month': 'Klik untuk menyiasat bulan ini',
+
+    // ---- "At this spot" card, trend-map correction, two variables, failed case ----
+    'At this spot': 'Di lokasi ini', 'No data here': 'Tiada data di sini',
+    'One grid cell, yearly averages from NASA POWER. Pick one to open the full case: chart, tests and evidence.':
+      'Satu sel grid, purata tahunan daripada NASA POWER. Pilih satu untuk membuka kes penuh: carta, ujian dan bukti.',
+    'Dot: significant after correcting for testing many cells at once (Benjamini–Hochberg false discovery rate, 5%). Red: going up, blue: going down, per decade.':
+      'Titik: signifikan selepas pembetulan kerana banyak sel diuji serentak (kadar penemuan palsu Benjamini–Hochberg, 5%). Merah: meningkat, biru: menurun, sedekad.',
+    '{r} pass p < 0.05 on their own; the correction keeps {s}.': '{r} lulus p < 0.05 secara berasingan; pembetulan mengekalkan {s}.',
+    'After removing both long-term trends, the link turns the other way ({s}, r = {r}): a year with more {a} than usual tends to have less {b}. The first link came from both rising or falling over the same years.':
+      'Selepas kedua-dua tren jangka panjang dibuang, hubungan itu berbalik arah ({s}, r = {r}): tahun dengan {a} lebih tinggi daripada biasa cenderung mempunyai {b} lebih rendah. Hubungan pertama datang daripada kedua-duanya meningkat atau menurun dalam tahun yang sama.',
+    'After removing both long-term trends, the link turns the other way ({s}, r = {r}): a year with more {a} than usual tends to have more {b}. The first link came from both rising or falling over the same years.':
+      'Selepas kedua-dua tren jangka panjang dibuang, hubungan itu berbalik arah ({s}, r = {r}): tahun dengan {a} lebih tinggi daripada biasa cenderung mempunyai {b} lebih tinggi juga. Hubungan pertama datang daripada kedua-duanya meningkat atau menurun dalam tahun yang sama.',
+    'The faded result below is the previous case ({what}, {from}–{to}).': 'Keputusan pudar di bawah ialah kes sebelumnya ({what}, {from}–{to}).',
+    'Fetching {what} for {where} from NASA POWER…': 'Mengambil {what} untuk {where} daripada NASA POWER…',
+    'Only {n} usable years of {what} here for that period. A trend test needs at least {min}. Try a longer period, another place or another variable.':
+      'Hanya {n} tahun data {what} yang boleh digunakan di sini bagi tempoh itu. Ujian tren memerlukan sekurang-kurangnya {min}. Cuba tempoh lebih panjang, tempat lain atau pemboleh ubah lain.'
   };
 
   var lang = 'en';

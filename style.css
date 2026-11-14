@@ -328,6 +328,7 @@ button, input, select { font: inherit; color: inherit; letter-spacing: inherit; 
 .evidence { scroll-margin-top: 70px; }
 #result { scroll-margin-top: 70px; transition: opacity .3s var(--ease); }
 #result.is-loading { opacity: 0.4; }
+#result.stale { opacity: 0.4; filter: grayscale(0.6); }
 
 .progress {
   height: 3px; margin-bottom: 16px; border-radius: 3px; overflow: hidden;
@@ -875,6 +876,19 @@ button.spot-row:focus-visible { outline: 2px solid var(--accent); outline-offset
 .chart-resid .resid-stem { stroke: var(--series-1); stroke-width: 1.5; opacity: 0.55; }
 .chart-resid .resid-pt { fill: var(--series-1); }
 .chart-resid .out { stroke: var(--warn-ink); fill: var(--warn-ink); opacity: 1; }
+.chart .cp-line { stroke: var(--div-wet); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.chart .cp-mean { stroke: var(--div-wet); stroke-width: 2; opacity: 0.85; }
+.chart .cp-label { fill: var(--div-wet); font: 600 11px var(--font); }
+.key-cp { border-top-style: dashed; border-color: var(--div-wet); }
+.chart-sens { margin-top: 6px; }
+.chart-sens .zero-solid { stroke: var(--ink-3); stroke-width: 1; }
+.chart-sens .sens-hit { fill: transparent; cursor: pointer; }
+.chart-sens .sens-pt-group:hover .sens-hit, .chart-sens .sens-pt-group:focus-visible .sens-hit { fill: var(--hover); }
+.chart-sens .sens-pt-group:focus-visible { outline: none; }
+.chart-sens .sens-bar { stroke: var(--ink-3); stroke-width: 1.5; opacity: 0.6; }
+.chart-sens .sens-pt { fill: var(--panel); stroke: var(--ink-3); stroke-width: 1.5; }
+.chart-sens .sens-bar.sig { stroke: var(--series-2); opacity: 0.9; }
+.chart-sens .sens-pt.sig { fill: var(--series-2); stroke: var(--series-2); }
 .stats-summary { margin-top: 18px; }
 .stats-summary h4 { font-size: 15px; margin-bottom: 8px; }
 .stats-table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }

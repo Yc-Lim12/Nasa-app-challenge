@@ -137,7 +137,7 @@
     var rBuf = document.createElement('canvas'), rbctx = rBuf.getContext('2d');
     var raster = null, rasterQueued = false, rasterCache = null;
     var field = null, particles = [], pRaf = 0, pClear = true;
-    var cells = null, cellSel = null, dotSel = null, marks = [];
+    var dotSel = null, marks = [];
 
     var placeG = gPlaces.selectAll('g').data(opts.places || []).enter().append('g').attr('class', 'g-place')
       .on('click', function (e, d) { e.stopPropagation(); if (opts.onPlace) opts.onPlace(d.id); })
@@ -688,9 +688,6 @@
 
     // ---- data layers ---------------------------------------------------------
 
-    function cellShape(c) {
-      return { type: 'Polygon', coordinates: [[[c.lon0, c.lat0], [c.lon0, c.lat1], [c.lon1, c.lat1], [c.lon1, c.lat0], [c.lon0, c.lat0]]] };
-    }
     // Grid cells (trend map, timelapse) are painted on the raster canvas. 'crisp' (the
     // default) gives every pixel the colour of the NASA grid cell it falls in, so the
     // map shows the data's real resolution; faint borders appear once cells are large
@@ -698,13 +695,11 @@
     // Either way only the drawing changes, never the values.
     var cellGrid = null, cellMode = 'crisp', cellAlpha = 0.75, cellPx = 0, lastCellDraw = 0, cellSettle = 0;
     function setCells(list) {
-      cells = list;
       gCells.selectAll('path').remove();
       gDots.selectAll('circle').remove();
-      cellSel = dotSel = null;
+      dotSel = null;
       cellGrid = null;
       if (list && list.length) {
-        cellSel = true;
         dotSel = gDots.selectAll('circle').data(list.filter(function (c) { return c.dot; })).enter().append('circle').attr('r', 1.8);
         buildCellGrid(list);
         paintCellGrid(function (c) { return c.fill; });

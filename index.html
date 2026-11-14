@@ -91,7 +91,9 @@
         <span class="settings-hint" data-i18n>What, where and when</span>
       </summary>
 
-      <form class="case" id="case-form" aria-label="Case settings">
+      <!-- novalidate: app.js keeps every value in range itself (e.g. latitude 95 becomes 89.5). The browser's
+           own check blocked "Investigate" with a warning hidden inside the folded settings. -->
+      <form class="case" id="case-form" aria-label="Case settings" novalidate>
         <ol class="steps">
           <li id="step-what">
             <h2 data-i18n>What to investigate</h2>
@@ -169,6 +171,7 @@
           </div>
           <div id="chart" class="chart"></div>
           <div id="resid" class="chart chart-resid"></div>
+          <div id="sens" class="chart chart-sens"></div>
           <div class="chart-foot">
             <p class="hint" id="chart-hint"></p>
             <button type="button" class="link" id="reset-years" hidden></button>

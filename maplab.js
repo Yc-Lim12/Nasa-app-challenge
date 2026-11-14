@@ -1,7 +1,8 @@
 /*
  * Trend Detective map tools, drawn on the globe:
  *   Trend map      one Sen's slope + Mann-Kendall test per NASA POWER grid cell (red up, blue down)
- *   Significance   a dot on every cell where p < 0.05
+ *   Significance   a dot on every cell still significant after the Benjamini–Hochberg
+ *                  false discovery rate correction (5%) across all cells
  *   Opposite trends finds areas in the same box that go up and down, with a caption
  *   Timelapse      every month of the period, as values or as difference from normal
  *   Rain now       the last 12 hours of NASA GPM IMERG rain (images from NASA GIBS)
@@ -141,26 +142,32 @@
       if (!ok.length) { fail(T('Trend map'), T('There is not enough data here for this variable and period.')); return; }
       var rates = ok.map(function (c) { return c.stats.sen.slope * 10; });
       var lim = percentile(rates.map(Math.abs), 0.95) || Math.max.apply(null, rates.map(Math.abs)) || 1;
+      // Many cells are tested at once, so about 1 in 20 would pass p < 0.05 by chance alone.
+      // Dots use the Benjamini–Hochberg false discovery rate correction (5%) across all cells.
+      var pass = TD.S.benjaminiHochberg(ok.map(function (c) { return c.stats.mk.p; }), 0.05);
+      ok.forEach(function (c, i) { c.fdr = pass[i]; });
+      var rawSig = ok.filter(function (c) { return c.stats.mk.p < 0.05; }).length;
       var list = ok.map(function (c) {
         var b = cellBounds(c), r = c.stats.sen.slope * 10, t = Math.max(-1, Math.min(1, r / lim));
         b.fill = d3.interpolateRdBu(0.5 - t / 2);
         b.opacity = 0.82;
-        b.dot = c.stats.mk.p < 0.05;
+        b.dot = c.fdr;
         return b;
       });
       TD.globe.setCellStyle(CELLS.mode, CELLS.alpha);
       TD.globe.setCells(list);
 
-      var up = ok.filter(function (c) { return c.stats.mk.p < 0.05 && c.stats.sen.slope > 0; });
-      var dn = ok.filter(function (c) { return c.stats.mk.p < 0.05 && c.stats.sen.slope < 0; });
+      var up = ok.filter(function (c) { return c.fdr && c.stats.sen.slope > 0; });
+      var dn = ok.filter(function (c) { return c.fdr && c.stats.sen.slope < 0; });
       var html = '<div class="lp-head"><strong>' + esc(T('Trend map')) + '</strong><span>' + esc(TD.vname(vr)) + ', ' +
         TD.state.y0 + '–' + TD.state.y1 + (TD.state.month ? ', ' + esc(T(TD.MONTHS[TD.state.month])) : '') + '</span></div>';
       html += boxCtl() + cellCtl();
       html += '<div class="lp-scale"><span>' + esc(TD.withUnit(TD.signed(-lim, 2), vr.unit)) + '</span><i class="lp-ramp lp-ramp-div"></i><span>' +
         esc(TD.withUnit(TD.signed(lim, 2), vr.unit)) + '</span></div>';
-      html += '<p class="lp-key"><span class="lp-dot"></span>' + esc(T('Dot: statistically significant (p < 0.05). Red: going up, blue: going down, per decade.')) + '</p>';
+      html += '<p class="lp-key"><span class="lp-dot"></span>' + esc(T('Dot: significant after correcting for testing many cells at once (Benjamini–Hochberg false discovery rate, 5%). Red: going up, blue: going down, per decade.')) + '</p>';
       html += '<p class="lp-note">' + esc(T('{s} of {n} grid cells show a significant trend: {u} rising, {d} falling.',
-        { s: up.length + dn.length, n: ok.length, u: up.length, d: dn.length })) + '</p>';
+        { s: up.length + dn.length, n: ok.length, u: up.length, d: dn.length })) + ' ' +
+        esc(T('{r} pass p < 0.05 on their own; the correction keeps {s}.', { r: rawSig, s: up.length + dn.length })) + '</p>';
 
       // Opposite-trend finder
       var marks = [];
@@ -396,7 +403,6 @@
     Promise.all(['U10M', 'V10M'].map(function (pm) { return TD.fetchJson(TD.urlFor(pm, s.lat, s.lon, BOX)); })).then(function (js) {
       if (my !== token) return;
       loadKey = gridKey();
-      var b = TD.box(s.lat, s.lon, BOX);
       var mean = function (table) {
         var sum = 0, n = 0;
         for (var k in table) {

@@ -183,7 +183,7 @@
   function capFirst(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
   function verdictLabel(v) { return v === 'significant' ? 'Significant' : (v === 'borderline' ? 'Borderline' : 'No clear trend'); }
   function verdictClass(v) { return v === 'significant' ? 'sig' : (v === 'borderline' ? 'border' : 'none'); }
-  function ratePhrase(st, vr) { return withUnit(signed(st.sen.slope * 10, 2), vr.unit) + ' per decade'; }
+  function ratePhrase(st, vr) { return withUnit(signed(st.sen.slope * 10, 2), vr.unit) + ' ' + T('per decade'); }
 
   // ---- data ----------------------------------------------------------------
 
@@ -416,6 +416,7 @@
     var fresh = !current || current.variable.id !== res.variable.id || current.placeName !== res.placeName;
     if (!current) $('settings').open = false;   // first answer: fold the settings away so the result comes first
     current = res;
+    $('result').classList.remove('stale');      // a new answer replaces any faded previous one
     var vr = res.variable, st = res.stats, n = res.years.length;
     var spk = findSpikes(res.years, res.values, st);
     res.spikes = spk.list;
@@ -435,7 +436,7 @@
     replay($('verdict'));
 
     $('chart-title').textContent = vname(vr) + (vr.unit ? ' (' + vr.unit + ')' : '') + ', ' +
-      (res.month ? MONTHS[res.month] + ' average' : 'yearly average') + ', ' + res.placeName;
+      (res.month ? T('{month} average', { month: T(MONTHS[res.month]) }) : T('yearly average')) + ', ' + T(res.placeName);
     $('empty').hidden = true;
     $('result').hidden = false;
     $('live-hint').hidden = false;
@@ -542,12 +543,12 @@
     if (globe) globe.setBadge({ title: vname(vr), text: T('Asking NASA'), cls: 'loading' });
     document.dispatchEvent(new CustomEvent('td:investigate', { detail: snap }));
     var cached = !!cache[urlFor(prm(vr), snap.lat, snap.lon, snap.size)];
-    if (!cached) setStatus('Fetching ' + vr.name.toLowerCase() + ' for ' + state.placeName + ' from NASA POWER…');
+    if (!cached) setStatus(T('Fetching {what} for {where} from NASA POWER…', { what: vname(vr).toLowerCase(), where: T(state.placeName) }));
     loadSeries(vr.id, snap).then(function (ser) {
       if (id !== runId) return;
       if (ser.years.length < MIN_YEARS) {
-        throw new Error('Only ' + ser.years.length + ' usable years of ' + vr.name.toLowerCase() +
-          ' here for that period. A trend test needs at least ' + MIN_YEARS + '. Try a longer period, another place or another variable.');
+        throw new Error(T('Only {n} usable years of {what} here for that period. A trend test needs at least {min}. Try a longer period, another place or another variable.',
+          { n: ser.years.length, what: vname(vr).toLowerCase(), min: MIN_YEARS }));
       }
       render({ variable: vr, years: ser.years, values: ser.values, cells: ser.cells, table: ser.table,
         stats: S.analyze(ser.years, ser.values), placeName: snap.placeName, short: snap.short, placeId: snap.placeId,
@@ -555,7 +556,12 @@
       if (opts.scroll) $('result').scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' });
     }).catch(function (e) {
       if (id !== runId) return;
-      setStatus(e.message, true);
+      // The last good result stays on screen for reference, faded and labelled, so it is
+      // never mistaken for an answer to the case that just failed.
+      var stale = !!current;
+      $('result').classList.toggle('stale', stale);
+      setStatus(e.message + (stale ? ' ' + T('The faded result below is the previous case ({what}, {from}–{to}).',
+        { what: vname(current.variable).toLowerCase(), from: current.years[0], to: current.years[current.years.length - 1] }) : ''), true);
       if (globe) globe.setBadge({ title: T('No answer here'), text: T('See the case file for why'), cls: 'none' });
     }).then(function () {
       if (id !== runId) return;
@@ -601,7 +607,7 @@
       if (myRun !== runId || state.compare !== p.id) return;
       if (ser.years.length < MIN_YEARS) throw new Error('There is not enough ' + vr.name.toLowerCase() + ' data for ' + p.short + ' in that period.');
       compareData = { id: p.id, v: vr.id, name: p.name, short: p.short, years: ser.years, values: ser.values,
-        stats: S.analyze(ser.years, ser.values) };
+        table: ser.table, stats: S.analyze(ser.years, ser.values) };   // table: for its own 1991–2020 baseline
       drawChart(current, false);
       var a = res.stats, b = compareData.stats;
       var dir = b.direction === 'up' ? 'rising' : (b.direction === 'down' ? 'falling' : 'flat');

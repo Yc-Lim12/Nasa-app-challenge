@@ -276,6 +276,38 @@
   }
 
   /**
+   * Pettitt (1979) change-point test: is there one point where the values shift up or down?
+   * With ranks r, U_t = 2(r_1 + … + r_t) − t(n + 1) for t = 1 … n−1, and K = max |U_t|.
+   * The shift comes after the first `at` values. p ≈ 2 exp(−6K² / (n³ + n²)), capped at 1.
+   * A steady trend also gives a large K, so read it alongside the trend tests.
+   */
+  function pettitt(y) {
+    var n = y.length, r = ranks(y), sum = 0, K = 0, at = 0;
+    for (var t = 1; t < n; t++) {
+      sum += r[t - 1];
+      var U = Math.abs(2 * sum - t * (n + 1));
+      if (U > K) { K = U; at = t; }
+    }
+    var p = Math.min(1, 2 * Math.exp(-6 * K * K / (n * n * n + n * n)));
+    return { K: K, at: at, p: p,
+      meanBefore: at ? mean(y.slice(0, at)) : null, meanAfter: at ? mean(y.slice(at)) : null };
+  }
+
+  /**
+   * Benjamini–Hochberg (1995): which of many p-values stay significant when they are tested
+   * together, keeping the expected share of false discoveries at q. Returns true/false per p.
+   */
+  function benjaminiHochberg(ps, q) {
+    var m = ps.length, order = [], i, last = -1;
+    for (i = 0; i < m; i++) order.push(i);
+    order.sort(function (a, b) { return ps[a] - ps[b]; });
+    for (i = 0; i < m; i++) if (ps[order[i]] <= (i + 1) / m * q) last = i;
+    var pass = ps.map(function () { return false; });
+    for (i = 0; i <= last; i++) pass[order[i]] = true;
+    return pass;
+  }
+
+  /**
    * Run every test on one series and decide a verdict.
    * Verdict uses the Mann-Kendall p-value: < 0.05 significant, < 0.10 borderline.
    */
@@ -286,7 +318,7 @@
     var verdict = mk.p < 0.05 ? 'significant' : (mk.p < 0.10 ? 'borderline' : 'none');
     var direction = sen.slope > 0 ? 'up' : (sen.slope < 0 ? 'down' : 'flat');
     return { ols: ols, mk: mk, sen: sen, verdict: verdict, direction: direction,
-      hr: hamedRao(x, y, mk, sen.slope), adj: adjustForAutocorrelation(ols) };
+      hr: hamedRao(x, y, mk, sen.slope), adj: adjustForAutocorrelation(ols), cp: pettitt(y) };
   }
 
   var api = {
@@ -294,7 +326,7 @@
     normPValue: normPValue, mean: mean, median: median,
     linearRegression: linearRegression, mannKendall: mannKendall,
     senSlope: senSlope, hamedRao: hamedRao, adjustForAutocorrelation: adjustForAutocorrelation,
-    ranks: ranks, analyze: analyze
+    ranks: ranks, pettitt: pettitt, benjaminiHochberg: benjaminiHochberg, analyze: analyze
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.TDStats = api;

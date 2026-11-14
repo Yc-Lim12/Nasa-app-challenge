@@ -408,6 +408,13 @@
     'Ask AI for more ideas': 'Tanya AI untuk idea lain',
     'Question {a} of 3': 'Soalan {a} daripada 3',
     'Close': 'Tutup',
+    'Source: {src}, through NASA POWER.': 'Sumber: {src}, melalui NASA POWER.',
+    'Averaged over {n} grid cells in the area, weighted by area.': 'Purata {n} sel grid di kawasan ini, berpemberat luas.',
+    'One grid cell at {where}.': 'Satu sel grid di {where}.',
+    'MERRA-2 reanalysis (NASA GMAO)': 'Reanalisis MERRA-2 (NASA GMAO)',
+    'CERES SYN1deg, GEWEX SRB before 2001 (NASA LaRC)': 'CERES SYN1deg, GEWEX SRB sebelum 2001 (NASA LaRC)',
+    'Ask': 'Tanya', 'Current case': 'Kes semasa', 'Hide the case file': 'Sembunyikan fail kes',
+    'Interactive globe': 'Glob interaktif', 'Topics': 'Topik', 'Variables': 'Pemboleh ubah', 'What to plot': 'Apa yang diplot',
     'Now click a place on the globe to test it.': 'Sekarang klik tempat pada glob untuk mengujinya.',
     'Not sure what to ask? Help me choose': 'Tidak pasti apa hendak ditanya? Bantu saya pilih',
     'A big city': 'Bandar besar',
@@ -845,6 +852,11 @@
     Array.prototype.forEach.call(document.querySelectorAll('[data-i18n-placeholder]'), function (el) {
       if (el.dataset.enPh === undefined) el.dataset.enPh = el.placeholder;
       el.placeholder = tr(el.dataset.enPh);
+    });
+    // screen-reader labels written in index.html (marked data-i18n-aria)
+    Array.prototype.forEach.call(document.querySelectorAll('[data-i18n-aria]'), function (el) {
+      if (el.dataset.enAria === undefined) el.dataset.enAria = el.getAttribute('aria-label');
+      el.setAttribute('aria-label', tr(el.dataset.enAria));
     });
     var b = document.getElementById('lang');
     if (b) {

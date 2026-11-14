@@ -802,8 +802,9 @@
     } else sp.hidden = true;
 
     $('about-var').innerHTML = '<strong>' + esc(vname(vr)) + '.</strong> ' + esc(T(vr.def)) +
-      ' <span class="muted">Source: ' + esc(vr.source) + ', through NASA POWER. ' +
-      (res.cells > 1 ? 'Averaged over ' + res.cells + ' grid cells in the area, weighted by area.' : 'One grid cell at ' + esc(coordLabel(res.lat, res.lon)) + '.') +
+      ' <span class="muted">' + esc(T('Source: {src}, through NASA POWER.', { src: T(vr.source) })) + ' ' +
+      (res.cells > 1 ? esc(T('Averaged over {n} grid cells in the area, weighted by area.', { n: res.cells }))
+        : esc(T('One grid cell at {where}.', { where: coordLabel(res.lat, res.lon) }))) +
       (res.ocean ? ' ' + esc(T('{n} open-ocean cells were left out: NASA POWER has no soil there.', { n: res.ocean })) : '') +
       (monthly ? ' ' + esc(T('Each value is that month minus the average for the same calendar month in {a}–{b}.', { a: res.y0, b: res.y1 })) : '') + '</span>';
 
@@ -873,6 +874,7 @@
           n: got, what: T(vr.name).toLowerCase(), min: MIN_YEARS
         }));
       }
+      failedCase = false;
       render({ variable: vr, years: ser.years, values: ser.values, cells: ser.cells, table: ser.table,
         skipped: ser.skipped, expected: ser.expected, step: snap.step, ocean: ser.ocean,
         stats: analyzeFor(snap, ser.years, ser.values), placeName: snap.placeName, short: snap.short, placeId: snap.placeId,
@@ -885,6 +887,8 @@
       // The old answer belonged to other settings: take it away so it cannot be read
       // as the result of this case. Only the message above stays.
       current = null; compareData = null;
+      failedCase = true;    // keep re-running on form changes, so fixing the years brings the answer back
+      writeHash();          // the share link shows these settings too, not the old answer's
       $('result').hidden = true;
       $('empty').hidden = true;
       document.dispatchEvent(new CustomEvent('td:clear'));
@@ -896,8 +900,9 @@
   }
 
   /** Once a case is open, any change to the form re-runs it. */
+  var failedCase = false;   // the last run of an open case failed (e.g. too few years)
   function scheduleLive(delay) {
-    if (!current) return;
+    if (!current && !failedCase) return;
     clearTimeout(liveTimer);
     liveTimer = setTimeout(function () { investigate({ scroll: false }); }, delay || 450);
   }

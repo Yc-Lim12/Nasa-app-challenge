@@ -24,7 +24,7 @@
 <div class="app">
 
 <!-- ===== The observatory: a live globe ===== -->
-<section class="stage" aria-label="Interactive globe">
+<section class="stage" aria-label="Interactive globe" data-i18n-aria>
   <div id="map" class="globe globe-stage"></div>
 
   <header class="stage-head">
@@ -35,12 +35,12 @@
       <label class="sr-only" for="ask" data-i18n>Ask a question</label>
       <svg class="ask-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       <input id="ask" type="search" enterkeyhint="search" placeholder="Ask: Is Penang getting rainier?" data-i18n-placeholder>
-      <button type="submit" class="ask-go" aria-label="Ask">↵</button>
+      <button type="submit" class="ask-go" aria-label="Ask" data-i18n-aria>↵</button>
     </form>
     <p class="ask-out" id="ask-out" aria-live="polite"></p>
   </header>
 
-  <div class="layers" id="layers" role="group" aria-label="Map layers">
+  <div class="layers" id="layers" role="group" aria-label="Map layers" data-i18n-aria>
     <button type="button" data-layer="" aria-pressed="true" data-i18n>Globe</button>
     <button type="button" data-layer="trend" aria-pressed="false" data-i18n>Trend map</button>
     <button type="button" data-layer="lapse" aria-pressed="false" data-i18n>Timelapse</button>
@@ -56,7 +56,7 @@
     <i class="tab-dot" id="panel-dot" hidden></i>
   </button>
 
-  <nav class="stage-foot" id="stage-foot" aria-label="Guided stories">
+  <nav class="stage-foot" id="stage-foot" aria-label="Guided stories" data-i18n-aria>
     <button type="button" class="stage-label story-toggle" id="story-toggle" aria-expanded="true" aria-controls="stories"><span data-i18n>Guided stories</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     <ol class="starters" id="stories"></ol>
     <ol id="starters" hidden></ol>
@@ -68,7 +68,7 @@
   <div class="panel-bar">
     <p class="panel-title"><span data-i18n>Case file</span> <span class="case-loc" id="case-loc"></span></p>
     <div class="bar-actions">
-      <button type="button" class="icon-btn panel-close" id="panel-close" aria-label="Hide the case file"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button type="button" class="icon-btn panel-close" id="panel-close" aria-label="Hide the case file" data-i18n-aria><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     </div>
   </div>
 
@@ -76,7 +76,7 @@
 
     <section class="story" id="story" hidden aria-live="polite"></section>
 
-    <section class="brief-block" aria-label="Current case">
+    <section class="brief-block" aria-label="Current case" data-i18n-aria>
       <p class="brief" id="brief"></p>
     </section>
 
@@ -91,12 +91,12 @@
 
       <!-- novalidate: app.js keeps every value in range itself (e.g. latitude 95 becomes 89.5). The browser's
            own check blocked "Investigate" with a warning hidden inside the folded settings. -->
-      <form class="case" id="case-form" aria-label="Case settings" novalidate>
+      <form class="case" id="case-form" aria-label="Case settings" data-i18n-aria novalidate>
         <ol class="steps">
           <li id="step-what">
             <h2 data-i18n>What to investigate</h2>
-            <div class="topics" id="topics" role="group" aria-label="Topics"></div>
-            <div class="variables" id="variables" role="radiogroup" aria-label="Variables"></div>
+            <div class="topics" id="topics" role="group" aria-label="Topics" data-i18n-aria></div>
+            <div class="variables" id="variables" role="radiogroup" aria-label="Variables" data-i18n-aria></div>
           </li>
           <li id="step-where">
             <h2 data-i18n>Where</h2>
@@ -165,7 +165,7 @@
             <span class="legend" id="legend" aria-hidden="true"></span>
           </figcaption>
           <div class="toolbar">
-            <div class="seg" id="mode" role="group" aria-label="What to plot">
+            <div class="seg" id="mode" role="group" aria-label="What to plot" data-i18n-aria>
               <button type="button" data-mode="values" aria-pressed="true" data-i18n>Values</button>
               <button type="button" data-mode="anom" aria-pressed="false" data-i18n>Difference from average</button>
             </div>
@@ -182,7 +182,7 @@
           <p class="compare-note" id="compare-note" hidden></p>
           <div id="resid" class="chart chart-resid"></div>
           <div id="sens" class="chart chart-sens"></div>
-          <section class="stats-summary" id="stats-summary" aria-label="Statistical summary"></section>
+          <section class="stats-summary" id="stats-summary" aria-label="Statistical summary" data-i18n-aria></section>
           <details class="table-view">
             <summary data-i18n>Show the numbers as a table</summary>
             <div class="table-scroll">
@@ -284,7 +284,7 @@
   <div class="methods-inner">
     <header class="methods-head">
       <h2 id="methods-title" data-i18n>Methods, sources and limits</h2>
-      <button type="button" class="icon-btn" id="methods-close" aria-label="Close">✕</button>
+      <button type="button" class="icon-btn" id="methods-close" aria-label="Close" data-i18n-aria>✕</button>
     </header>
 
     <section>

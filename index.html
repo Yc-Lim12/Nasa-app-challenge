@@ -327,6 +327,7 @@
       <h3 data-i18n>Maps</h3>
       <ul>
         <li data-i18n><strong>Trend map</strong>: every NASA POWER grid cell (0.5° × 0.625°) in a box of your choice (2° to 10° a side, 10° by default) gets its own Sen’s slope and Mann-Kendall test. Red means rising, blue falling. A dot marks cells where p &lt; 0.05.</li>
+        <li data-i18n><strong>Whole-globe trend map</strong>: NASA POWER serves at most a 10° box per request, so the whole globe (648 boxes, about 2 GB) is built once by <code>tools/build_global_trends.mjs</code> for air temperature and rain, 1981–2025. Every grid cell gets days-weighted yearly means; cells are averaged into 5° × 5° areas weighted by cos(latitude); each area is tested with the same <code>stats.js</code> (Sen’s slope, memory-adjusted Mann-Kendall), and the false discovery rate correction (5%) is applied across all 2,592 areas. <code>maths/check_global.py</code> recomputes sample areas from NASA directly with SciPy and pymannkendall.</li>
         <li data-i18n><strong>Opposite trends</strong> are reported when at least three significant cells rise and at least three fall in the same box.</li>
         <li data-i18n><strong>Timelapse</strong> plays every month in the period. “Difference from normal” subtracts each cell’s own average for that calendar month, so the seasons do not swamp the change.</li>
         <li data-i18n><strong>Wind</strong> particles follow the average 10-metre wind (MERRA-2 eastward and northward components) for the chosen period and month.</li>

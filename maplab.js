@@ -37,6 +37,18 @@
       '<label class="lp-alpha"><span>' + esc(T('Opacity')) + '</span><input type="range" id="lp-alpha" min="20" max="100" step="5" value="' +
       Math.round(CELLS.alpha * 100) + '" aria-label="' + esc(T('Opacity')) + '"></label></div>';
   }
+  // Trend map area: the live box around the place, or the whole globe. The globe can't be
+  // asked for live (648 NASA POWER boxes, about 2 GB), so it is pre-built for a few
+  // variables by tools/build_global_trends.mjs into data/global/<PARAM>.json.
+  var GLOBAL_READY = { T2M: true, PRECTOTCORR: true };
+  var SCOPE = 'box', globalCache = {};
+  try { if (localStorage.getItem('td-mapscope') === 'globe') SCOPE = 'globe'; } catch (err) { /* private mode */ }
+  function scopeCtl() {
+    return '<div class="lp-seg lp-scope" role="group" aria-label="' + esc(T('Map area')) + '">' +
+      '<button type="button" data-scope="box" aria-pressed="' + (SCOPE === 'box') + '">' + esc(T('This area')) + '</button>' +
+      '<button type="button" data-scope="globe" aria-pressed="' + (SCOPE === 'globe') + '">' + esc(T('Whole globe')) + '</button></div>';
+  }
+  function trendKey() { return SCOPE === 'globe' ? 'globe|' + TD.state.v : gridKey(); }
   var TD, panel, active = '', loadKey = '', token = 0;
   var grid = null;           // { key, cells, dlon, dlat, vr }
   var lapse = { timer: 0, i: 0, mode: 'anom', speed: 1 };
@@ -133,7 +145,60 @@
 
   // ---- trend map + significance dots + opposite trends ------------------------
 
+  function loadGlobal(pm) {
+    if (!globalCache[pm]) {
+      globalCache[pm] = fetch('data/global/' + pm + '.json').then(function (r) {
+        if (!r.ok) throw new Error(T('The whole-globe map could not be loaded.'));
+        return r.json();
+      });
+      globalCache[pm].catch(function () { delete globalCache[pm]; });
+    }
+    return globalCache[pm];
+  }
+
+  /** The whole-globe trend map: pre-built 5° blocks, same tests as everywhere else. */
+  function showGlobalTrend() {
+    var my = token, vr = TD.variable(TD.state.v), pm = TD.prm(vr);
+    TD.globe.flyTo(TD.state.lat, TD.state.lon, 180, 1300, 1);
+    if (!GLOBAL_READY[pm]) {
+      panel.innerHTML = '<div class="lp-head"><strong>' + esc(T('Trend map')) + '</strong><span>' + esc(TD.vname(vr)) + '</span></div>' + scopeCtl() +
+        '<p class="lp-note">' + esc(T('The whole-globe map is ready for air temperature and rain. Choose one of those, or switch back to this area.')) + '</p>';
+      return;
+    }
+    busy(T('Trend map'), T('Loading the whole-globe map…'));
+    loadGlobal(pm).then(function (d) {
+      if (my !== token) return;
+      loadKey = trendKey();
+      var F = {}; d.fields.forEach(function (f, i) { F[f] = i; });
+      var cells = d.cells;
+      var lim = percentile(cells.map(function (c) { return Math.abs(c[F.ratePerDecade]); }), 0.95) || 1;
+      var list = cells.map(function (c) {
+        var t = Math.max(-1, Math.min(1, c[F.ratePerDecade] / lim));
+        return { lon0: c[F.lon0], lon1: c[F.lon0] + d.block, lat0: c[F.lat0], lat1: c[F.lat0] + d.block,
+          fill: d3.interpolateRdBu(0.5 - t / 2), opacity: 0.82, dot: !!c[F.significant] };
+      });
+      TD.globe.setCellStyle(CELLS.mode, CELLS.alpha);
+      TD.globe.setCells(list);
+      TD.globe.setMarks(null);
+      var up = 0, dn = 0;
+      cells.forEach(function (c) { if (c[F.significant]) { if (c[F.ratePerDecade] > 0) up++; else if (c[F.ratePerDecade] < 0) dn++; } });
+      var s = TD.state;
+      var html = '<div class="lp-head"><strong>' + esc(T('Trend map')) + '</strong><span>' + esc(TD.vname(vr)) + ', ' + d.start + '–' + d.end + '</span></div>';
+      html += scopeCtl() + cellCtl();
+      html += '<div class="lp-scale"><span>' + esc(TD.withUnit(TD.signed(-lim, 2), vr.unit)) + '</span><i class="lp-ramp lp-ramp-div"></i><span>' +
+        esc(TD.withUnit(TD.signed(lim, 2), vr.unit)) + '</span></div>';
+      html += '<p class="lp-key"><span class="lp-dot"></span>' + esc(T('Dot: significant after correcting for testing many cells at once (Benjamini–Hochberg false discovery rate, 5%). Red: going up, blue: going down, per decade.')) + '</p>';
+      html += '<p class="lp-note">' + esc(T('{s} of {n} areas of {b}° × {b}° show a significant trend: {u} rising, {d} falling.',
+        { s: up + dn, n: cells.length, b: d.block, u: up, d: dn })) + '</p>';
+      html += '<p class="lp-note muted-light">' + esc(T('Pre-built from NASA POWER: every grid cell, yearly averages, grouped into {b}° areas and tested with the same statistics as the rest of the site. It always covers the whole year, {a}–{z}.', { b: d.block, a: d.start, z: d.end })) +
+        ((s.y0 !== d.start || s.y1 !== d.end || s.month) ? ' ' + esc(T('Your chosen period or month applies to “This area” only.')) : '') + '</p>';
+      html += '<p class="lp-hint">' + esc(T('Click anywhere on the globe to open that spot’s full chart.')) + '</p>';
+      panel.innerHTML = html;
+    }).catch(function (e) { if (my === token) fail(T('Trend map'), e.message); });
+  }
+
   function showTrend() {
+    if (SCOPE === 'globe') return showGlobalTrend();
     var my = token, vr = TD.variable(TD.state.v);
     busy(T('Trend map'), T('Testing every grid cell in a {b}° box around this place…', { b: BOX }));
     TD.globe.flyTo(TD.state.lat, TD.state.lon, BOX, 1300, zoomFor());
@@ -164,7 +229,7 @@
       var dn = ok.filter(function (c) { return c.fdr && c.stats.sen.slope < 0; });
       var html = '<div class="lp-head"><strong>' + esc(T('Trend map')) + '</strong><span>' + esc(TD.vname(vr)) + ', ' +
         TD.state.y0 + '–' + TD.state.y1 + (TD.state.month ? ', ' + esc(T(TD.MONTHS[TD.state.month])) : '') + '</span></div>';
-      html += boxCtl() + cellCtl();
+      html += scopeCtl() + boxCtl() + cellCtl();
       html += '<div class="lp-scale"><span>' + esc(TD.withUnit(TD.signed(-lim, 2), vr.unit)) + '</span><i class="lp-ramp lp-ramp-div"></i><span>' +
         esc(TD.withUnit(TD.signed(lim, 2), vr.unit)) + '</span></div>';
       html += '<p class="lp-key"><span class="lp-dot"></span>' + esc(T('Dot: significant after correcting for testing many cells at once (Benjamini–Hochberg false discovery rate, 5%). Red: going up, blue: going down, per decade.')) + '</p>';
@@ -483,6 +548,14 @@
       TD.apply({ lat: pts[0].lat, lon: pts[0].lon, size: 0, keepYears: true, keepMonth: true,
         compare: 'pt:' + pts[1].lat.toFixed(2) + ',' + pts[1].lon.toFixed(2) });
     }, true);
+    // Trend map area: this area or the whole globe
+    panel.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-scope]');
+      if (!b || b.getAttribute('data-scope') === SCOPE) return;
+      SCOPE = b.getAttribute('data-scope');
+      try { localStorage.setItem('td-mapscope', SCOPE); } catch (err) { /* private mode */ }
+      setLayer('trend');
+    });
     // Grid look: crisp cells or smooth, and opacity. Redraws only; nothing is reloaded.
     panel.addEventListener('click', function (e) {
       var b = e.target.closest('[data-cm]');
@@ -513,7 +586,8 @@
     });
     // When the case changes, refresh map layers that depend on it.
     document.addEventListener('td:result', function () {
-      if ((active === 'trend' || active === 'lapse' || active === 'wind') && loadKey && loadKey !== gridKey()) setLayer(active);
+      var key = active === 'trend' ? trendKey() : gridKey();
+      if ((active === 'trend' || active === 'lapse' || active === 'wind') && loadKey && loadKey !== key) setLayer(active);
     });
     document.addEventListener('td:lang', function () { if (active) setLayer(active); });
   }

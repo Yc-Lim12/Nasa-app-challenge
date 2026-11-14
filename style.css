@@ -804,6 +804,8 @@ button.spot-row:focus-visible { outline: 2px solid var(--accent); outline-offset
 .lp-seg { display: inline-flex; gap: 2px; padding: 2px; border-radius: 9px; background: rgb(255 255 255 / 0.08); }
 .lp-seg button { padding: 4px 9px; border: 0; border-radius: 7px; cursor: pointer; background: transparent; color: #d2d2d7; font-size: 12px; font-weight: 500; }
 .lp-seg button[aria-pressed="true"] { color: #fff; font-weight: 600; }
+.lp-scope { display: flex; margin: 2px 0 10px; }
+.lp-scope button { flex: 1; }
 .lp-seg:not(.has-thumb) button[aria-pressed="true"] { background: rgb(255 255 255 / 0.2); }
 .lp-months { margin-bottom: 8px; }
 

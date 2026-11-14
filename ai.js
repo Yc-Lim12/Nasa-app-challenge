@@ -87,7 +87,7 @@
     var total = amount(f.total_change_along_trend, f.unit, dp), dec = amount(f.sen_slope_per_decade, f.unit, dp + 1);
 
     // 1. what happened
-    out.push({ title: L('In short'), text: flat
+    out.push({ kind: 'short', title: L('In short'), text: flat
       ? L('Over ' + years + ' years (' + f.first_year + '–' + f.last_year + '), ' + name + ' around ' + place + ' has stayed about the same.',
           'Dalam ' + years + ' tahun (' + f.first_year + '–' + f.last_year + '), ' + name + ' di sekitar ' + place + ' kekal hampir sama.')
       : L('Over ' + years + ' years (' + f.first_year + '–' + f.last_year + '), ' + name + ' around ' + place + ' has gone ' + (up ? 'up' : 'down') +
@@ -107,11 +107,11 @@
       real = L('Not proven. The normal ups and downs from one year to the next are bigger than this trend, so it could easily be chance (' + oneIn(p) + ').',
         'Belum terbukti. Turun naik biasa dari tahun ke tahun lebih besar daripada tren ini, jadi ia mungkin sekadar kebetulan (' + oneIn(p) + ').');
     }
-    out.push({ title: L('Is the change real?'), text: real });
+    out.push({ kind: 'real', title: L('Is the change real?'), text: real });
 
     // 3. how big compared with the wobble
     var r2 = Math.round(f.r_squared * 100);
-    out.push({ title: L('Trend vs. normal variation'), text:
+    out.push({ kind: 'wiggle', title: L('Trend vs. normal variation'), text:
       L('The steady trend explains about ' + r2 + '% of the differences between years. The other ' + (100 - r2) + '% is ordinary year-to-year variation (weather, El Niño and so on).',
         'Tren yang stabil menjelaskan kira-kira ' + r2 + '% perbezaan antara tahun. Baki ' + (100 - r2) + '% ialah turun naik biasa dari tahun ke tahun (cuaca, El Niño dan sebagainya).') });
 
@@ -128,10 +128,10 @@
         (mon ? 'Bulan bersebelahan kelihatan serupa, jadi ' + nPts + ' nilai bulanan' : 'Setiap tahun hampir sama dengan tahun sebelumnya, jadi ' + nPts + ' tahun') +
         ' dikira sebagai kira-kira ' + f.effective_sample_size + ' nilai bebas sahaja. Ujian telah diselaraskan untuk ini.'));
     }
-    if (warn.length) out.push({ title: L('Be careful'), text: warn.join(' ') });
+    if (warn.length) out.push({ kind: 'careful', title: L('Be careful'), text: warn.join(' ') });
 
     // 5. what the tests are
-    out.push({ title: L('The two tests, in one line each'), text:
+    out.push({ kind: 'tests', title: L('The two tests, in one line each'), text:
       L('Mann-Kendall asks: are later years mostly higher (or lower) than earlier ones? Sen’s slope is the typical change per year, worked out so that one freak year barely moves it.') });
     return out;
   }
@@ -235,13 +235,24 @@
 
   // ---- "Explain simply" card in the case file ----------------------------------------
 
+  // small line icons (currentColor), so the AI parts need no emoji or image files
+  var ICON = {
+    spark: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z" fill="currentColor"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" fill="currentColor"/></svg>',
+    chat: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
+    short: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9V16h7v-2.1A6 6 0 0 0 12 3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    real: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m8 12.5 3 3 5-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    wiggle: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 14c2-4 4-4 6 0s4 4 6 0 4-4 6 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M3 19 21 7" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="2 3" stroke-linecap="round"/></svg>',
+    careful: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 2.5 20h19z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 10v4M12 17v.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+    tests: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3M7.5 14h9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+  };
+
   function buildExplainUI() {
     var verdict = $('verdict');
     if (!verdict || $('ai-explain-btn')) return;
     var bar = document.createElement('div');
     bar.className = 'ai-bar';
     bar.innerHTML = '<button type="button" class="ai-btn" id="ai-explain-btn" aria-expanded="false" aria-controls="ai-explain">' +
-      '<span aria-hidden="true">✨</span> <span class="ai-btn-label"></span></button>' +
+      ICON.spark + '<span class="ai-btn-label"></span></button>' +
       '<button type="button" class="ai-link" id="ai-ask-btn"></button>';
     var card = document.createElement('section');
     card.className = 'ai-card'; card.id = 'ai-explain'; card.hidden = true;
@@ -260,15 +271,17 @@
   function labelExplain() {
     var b = document.querySelector('#ai-explain-btn .ai-btn-label');
     if (b) b.textContent = L('Explain this simply');
-    var a = $('ai-ask-btn'); if (a) a.textContent = L('Ask AI a question →');
+    var a = $('ai-ask-btn'); if (a) a.innerHTML = ICON.chat + '<span>' + esc(L('Ask AI a question')) + '</span>';
   }
   function fillExplain() {
     var card = $('ai-explain');
     if (!card || !res) return;
     var items = safeExplain(res);
     if (!items) { card.innerHTML = '<p class="ai-note">' + esc(L('I could not read the numbers for this case. Try another place or period, then ask again.')) + '</p>'; return; }
-    var html = '<h3>' + esc(L('In plain words')) + '</h3><dl>' + items.map(function (x) {
-      return '<div><dt>' + esc(x.title) + '</dt><dd>' + esc(x.text) + '</dd></div>';
+    var html = '<header class="ai-card-head"><span class="ai-card-ico">' + ICON.spark + '</span><h3>' + esc(L('In plain words')) + '</h3>' +
+      '<span class="ai-tag">' + esc(apiKey() ? 'OpenAI' : L('built-in')) + '</span></header><dl>' + items.map(function (x) {
+      return '<div class="ai-item ai-k-' + (x.kind || 'short') + '"><span class="ai-ico">' + (ICON[x.kind] || ICON.short) + '</span>' +
+        '<div><dt>' + esc(x.title) + '</dt><dd>' + esc(x.text) + '</dd></div></div>';
     }).join('') + '</dl>';
     html += apiKey()
       ? '<div class="ai-more"><button type="button" class="ai-btn ai-btn-sm" id="ai-deeper">' + esc(L('Get an AI explanation')) + '</button><div class="ai-deeper-out" id="ai-deeper-out"></div></div>'
@@ -295,12 +308,12 @@
     var fab = document.createElement('button');
     fab.type = 'button'; fab.className = 'ai-fab'; fab.id = 'ai-fab';
     fab.setAttribute('aria-controls', 'ai-chat'); fab.setAttribute('aria-expanded', 'false');
-    fab.innerHTML = '<span aria-hidden="true">✨</span><span class="ai-fab-label"></span>';
+    fab.innerHTML = ICON.spark + '<span class="ai-fab-label"></span>';
     var box = document.createElement('section');
     box.className = 'ai-chat'; box.id = 'ai-chat'; box.hidden = true;
     box.setAttribute('role', 'dialog'); box.setAttribute('aria-labelledby', 'ai-chat-title');
     box.innerHTML =
-      '<header class="ai-chat-head"><strong id="ai-chat-title"></strong><span class="ai-mode" id="ai-mode"></span>' +
+      '<header class="ai-chat-head"><span class="ai-avatar">' + ICON.spark + '</span><strong id="ai-chat-title"></strong><span class="ai-mode" id="ai-mode"></span>' +
         '<button type="button" class="ai-icon" id="ai-gear" aria-expanded="false" aria-controls="ai-settings">⚙</button>' +
         '<button type="button" class="ai-icon" id="ai-close">✕</button></header>' +
       '<form class="ai-settings" id="ai-settings" hidden>' +
@@ -413,6 +426,10 @@
 
   // Other parts of the page (the question wizard) can open the chat with a question.
   window.TDAI = {
+    settings: function () {
+      openChat();
+      var s = $('ai-settings'); if (s && s.hidden) $('ai-gear').click();
+    },
     hasKey: function () { return !!apiKey(); },
     ask: function (q) { openChat(); if (!busy) send(q); }
   };

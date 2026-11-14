@@ -349,9 +349,22 @@
       ' in every month for ' + n + ' grid cell(s): open ocean, left out of the average. Raw NASA response:', json);
   }
 
+  // NASA POWER's sunlight and cloud values come from GEWEX SRB before 2001 and from CERES
+  // SYN1deg after. The two do not match (cloud cover over Kuala Lumpur jumps from about 75%
+  // to 85% in 2001), which the trend tests would report as a real change, so these
+  // variables start in 2001. Haze (AOD_55) has no values before 2001 anyway.
+  var SPLICED_FROM = { ALLSKY_SFC_SW_DWN: 2001, CLOUD_AMT: 2001 };
+  function trimSpliced(param, table) {
+    var from = SPLICED_FROM[param];
+    if (!from) return table;
+    var out = {};
+    for (var k in table) if (+k.slice(0, 4) >= from) out[k] = table[k];
+    return out;
+  }
+
   function monthlyTable(json, param) {
     if (json.properties) {
-      var pt = json.properties.parameter[param] || {};
+      var pt = trimSpliced(param, json.properties.parameter[param] || {});
       if (isOceanFill(param, pt)) { logOcean(param, 1, json); return { table: {}, cells: 0, ocean: 1 }; }
       return { table: pt, cells: 1, ocean: 0 };
     }
@@ -359,7 +372,7 @@
     var sum = {}, wsum = {}, ocean = 0, land = 0;
     feats.forEach(function (f) {
       var w = Math.cos(f.geometry.coordinates[1] * Math.PI / 180);
-      var t = f.properties.parameter[param] || {};
+      var t = trimSpliced(param, f.properties.parameter[param] || {});
       if (isOceanFill(param, t)) { ocean++; return; }
       land++;
       for (var k in t) {
@@ -552,7 +565,11 @@
     var o = res.stats.ols, w = Math.abs(o.slope);
     if (!w || !o.residualSE) return null;
     var phi = clamp(o.lag1, -0.5, 0.9);
-    var nStar = Math.pow((3.3 * o.residualSE / w) * Math.sqrt((1 + phi) / (1 - phi)), 2 / 3);
+    // Weatherhead's 3.3 is for monthly data (noise of single months). Yearly means have
+    // twelve times fewer points a year, which multiplies the factor by sqrt(12); without
+    // it the answer is about 2.3 times too short (checked by simulation with stats.js).
+    var perYear = res.step === 'month' ? 1 : Math.sqrt(12);
+    var nStar = Math.pow((3.3 * perYear * o.residualSE / w) * Math.sqrt((1 + phi) / (1 - phi)), 2 / 3);
     // the formula gives years; monthly data has twelve points a year
     var have = res.step === 'month' ? res.years[res.years.length - 1] - res.years[0] + 1 / 12 : o.n;
     return { total: Math.ceil(nStar), more: Math.ceil(nStar - have) };
@@ -604,8 +621,11 @@
     yrs.forEach(function (x) { if (lead.indexOf(x) < 0 && trail.indexOf(x) < 0) mid.push(x); });
     var parts = [];
     var range = function (a) { return a.length > 1 ? a[0] + '–' + a[a.length - 1] : String(a[0]); };
+    var splicedFrom = res.variable && SPLICED_FROM[prm(res.variable)];
     if (lead.length) {
-      if (lead.length === 1 && res.month === 15 && lead[0] === FIRST_YEAR && !monthly) {
+      if (splicedFrom && lead[lead.length - 1] === splicedFrom - 1) {
+        parts.push(T('{y} left out: before {f} this variable comes from a different satellite dataset (GEWEX SRB) that does not match the later one (CERES), and the jump between them would look like a trend.', { y: range(lead), f: splicedFrom }));
+      } else if (lead.length === 1 && res.month === 15 && lead[0] === FIRST_YEAR && !monthly) {
         parts.push(T('{y} left out: December to February needs the December before, which is before the record starts.', { y: lead[0] }));
       } else {
         parts.push(T('No data for {y} here.', { y: range(lead) }));
@@ -712,7 +732,8 @@
     var dirCls = st.direction === 'up' ? 'is-up' : st.direction === 'down' ? 'is-down' : '';
     var lineAt = function (x) { return st.ols.intercept + st.ols.slope * x; };
     var x0 = res.years[0], x1 = res.years[n - 1];
-    tiles += tile(T('Rate of change'), esc(withUnit(signed(st.ols.slope * 10, 2), vr.unit)) + perDec,
+    // the headline rate is Sen's slope (its own tile below); this one is the straight line's
+    tiles += tile(T('Straight-line rate'), esc(withUnit(signed(st.ols.slope * 10, 2), vr.unit)) + perDec,
       esc(T('Slope of the straight line through the points. With 95% confidence the true rate is between {a} and {b}.',
         { a: signed(st.ols.ciLow * 10, 2), b: withUnit(signed(st.ols.ciHigh * 10, 2), vr.unit) })), 0,
       vizRange(st.ols.ciLow * 10, st.ols.ciHigh * 10, st.ols.slope * 10, vr.unit), dirCls);
@@ -1587,9 +1608,10 @@
     T: T, S: S, state: state, view: view, VARIABLES: VARIABLES, PLACES: PLACES, MONTHS: MONTHS, TOPICS: TOPICS,
     FIRST_YEAR: FIRST_YEAR, LAST_YEAR: LAST_YEAR, MIN_YEARS: MIN_YEARS,
     variable: variable, place: place, prm: prm, vname: vname, box: box, urlFor: urlFor, fetchJson: fetchJson,
-    monthlyTable: monthlyTable, yearlySeries: yearlySeries, loadSeries: loadSeries, partMonths: partMonths,
+    monthlyTable: monthlyTable, trimSpliced: trimSpliced, yearlySeries: yearlySeries, loadSeries: loadSeries, partMonths: partMonths,
     seriesOf: seriesOf, monthlyAnomalies: monthlyAnomalies, isOceanFill: isOceanFill,
-    raw: function (url) { return cache[url]; },   // debugging: the raw NASA answer behind a URL regionOf: regionOf, splitArea: splitArea, whenLabel: whenLabel,
+    regionOf: regionOf, splitArea: splitArea, whenLabel: whenLabel,
+    raw: function (url) { return cache[url]; },   // debugging: the raw NASA answer behind a URL
     esc: esc, withUnit: withUnit, signed: signed, sig: sig, fmtP: fmtP, pEquals: pEquals, coordLabel: coordLabel, capFirst: capFirst,
     toast: toast, apply: apply, investigate: investigate, openStep: openStep,
     get globe() { return globe; }, get current() { return current; },

@@ -746,6 +746,9 @@
     'Slope 95% CI, adjusted (drawn as the band)': 'Selang keyakinan 95% cerun, dilaraskan (dilukis sebagai jalur)',
     'p adjusted for year-to-year memory (used for the verdict)': 'p dilaraskan untuk ingatan dari tahun ke tahun (digunakan untuk keputusan)',
     'Period · values used': 'Tempoh · nilai digunakan', '{k} years with missing months': '{k} tahun dengan bulan yang hilang',
+    'Trend from each start year: with {a}–{b} there is only one possible start year, because a trend needs at least {n} years.':
+      'Tren dari setiap tahun mula: bagi {a}–{b} hanya ada satu tahun mula yang mungkin, kerana tren memerlukan sekurang-kurangnya {n} tahun.',
+    'Back to the full record': 'Kembali ke rekod penuh',
     'At this spot': 'Di lokasi ini', 'No data here': 'Tiada data di sini',
     'One grid cell, yearly averages from NASA POWER. Pick one to open the full case: chart, tests and evidence.':
       'Satu sel grid, purata tahunan daripada NASA POWER. Pilih satu untuk membuka kes penuh: carta, ujian dan bukti.',

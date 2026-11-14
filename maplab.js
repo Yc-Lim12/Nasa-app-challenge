@@ -231,8 +231,9 @@
         });
       }
       var rLo = percentile(raw, 0.02), rHi = percentile(raw, 0.98), aLim = percentile(anom, 0.97) || 1;
-      var vr = g.vr, wet = vr.topic === 'water' || vr.topic === 'soil';
-      var seq = wet ? d3.interpolateYlGnBu : (vr.topic === 'heat' ? function (t) { return d3.interpolateRdYlBu(1 - t); } : d3.interpolateViridis);
+      // any temperature (including sea surface temperature, filed under Water) uses the heat colours
+      var vr = g.vr, hot = vr.topic === 'heat' || vr.unit === '°C', wet = !hot && (vr.topic === 'water' || vr.topic === 'soil');
+      var seq = wet ? d3.interpolateYlGnBu : (hot ? function (t) { return d3.interpolateRdYlBu(1 - t); } : d3.interpolateViridis);
 
       TD.globe.setCellStyle(CELLS.mode, CELLS.alpha);
       TD.globe.setCells(g.cells.map(function (c) { var b = cellBounds(c); b.fill = 'transparent'; b.opacity = 0.85; return b; }));
@@ -258,7 +259,7 @@
         return lapse.mode === 'anom'
           ? '<div class="lp-scale"><span>' + esc(TD.withUnit(TD.signed(-aLim, 2), u)) + '</span><i class="lp-ramp lp-ramp-div"></i><span>' + esc(TD.withUnit(TD.signed(aLim, 2), u)) + '</span></div>' +
             '<p class="lp-key">' + esc(T('Colour shows how unusual each month was for that spot: red above its normal, blue below.')) + '</p>'
-          : '<div class="lp-scale"><span>' + esc(TD.withUnit(rLo.toFixed(vr.dp), u)) + '</span><i class="lp-ramp ' + (wet ? 'lp-ramp-wet' : vr.topic === 'heat' ? 'lp-ramp-heat' : 'lp-ramp-seq') + '"></i><span>' +
+          : '<div class="lp-scale"><span>' + esc(TD.withUnit(rLo.toFixed(vr.dp), u)) + '</span><i class="lp-ramp ' + (wet ? 'lp-ramp-wet' : hot ? 'lp-ramp-heat' : 'lp-ramp-seq') + '"></i><span>' +
             esc(TD.withUnit(rHi.toFixed(vr.dp), u)) + '</span></div>';
       }
       function draw() {

@@ -72,11 +72,11 @@
     var gBord = svg.append('path').attr('class', 'g-border');
     // Night side: 20 faint layers 1° apart, so dusk fades in gradually (too finely to
     // see steps) instead of showing hard stripes. Together they darken the deep night
-    // side by about 55%.
+    // side by about 40%, light enough that the filled polar-night area stays readable.
     var NIGHT_RADII = [];
     for (var nr = 96; nr > 76; nr--) NIGHT_RADII.push(nr);
     var gNights = NIGHT_RADII.map(function () {
-      return svg.append('path').attr('class', 'g-night').attr('fill-opacity', 0.039);
+      return svg.append('path').attr('class', 'g-night').attr('fill-opacity', 0.025);
     });
     var gShade = svg.append('path').attr('class', 'g-overlay').attr('fill', 'url(#' + uid + 'shade)');
     var gShine = svg.append('path').attr('class', 'g-overlay').attr('fill', 'url(#' + uid + 'shine)');
@@ -122,8 +122,8 @@
       var on = basemap === 'live' && fillUsed;
       fillEl.style('display', on ? null : 'none')
         .text(!on ? '' : iceUsed
-          ? trG('Grey areas: no satellite photo (polar night or no pass yet). NASA Blue Marble shown, with sea ice from {d} (NASA GHRSST).').replace('{d}', ICE.date)
-          : trG('Grey areas: no satellite photo (polar night or no pass yet). NASA Blue Marble shown.'));
+          ? trG('Grey areas: no satellite photo, or too dark to see (polar night, low sun or no pass yet). NASA Blue Marble shown, with sea ice from {d} (NASA GHRSST).').replace('{d}', ICE.date)
+          : trG('Grey areas: no satellite photo, or too dark to see (polar night, low sun or no pass yet). NASA Blue Marble shown.'));
     }
     document.addEventListener('td:lang', function () {
       showFillNote(); updateSun();
@@ -634,7 +634,9 @@
     // The blend is worked out once for the whole picture (not tile by tile, which would
     // leave seams), on a coarse grid of 8 x 8-pixel cells so it needs little memory,
     // and fades over about FILL_DEG degrees: the clouds thin out into the patch.
-    var FILL_DEG = 6, CELL = 8, CPT = 512 / CELL;   // CPT: grid cells along one tile side
+    var FILL_DEG = 12, CELL = 8, CPT = 512 / CELL;   // CPT: grid cells along one tile side
+    var DIM_LUM = 60;                  // photo pixels darker than this, near a gap, are partly filled
+    var ICE_RGB = [205, 215, 228];     // sea ice colour on the fill: soft blue-white
     function isHole(d, k) { return d[k] < 9 && d[k + 1] < 9 && d[k + 2] < 9; }
 
     /** Paste one daily tile and add up, per grid cell, how much of it has no photo. */
@@ -715,15 +717,22 @@
               var ww = (w[ya + xa] * (1 - fx) + w[ya + xb] * fx) * (1 - fy) + (w[yb + xa] * (1 - fx) + w[yb + xb] * fx) * fy;
               // ww is about 0.5 at the rim: doubled, the fade starts at 1 there (no step)
               m = Math.min(1, ww * 2);
-              if (m <= 0.002) continue;
               m = m * m * (3 - 2 * m);   // ease in and out
+              // Near the gap the photo is often only dim (low sun, twilight): treat it as
+              // partly missing, more so the darker it is (fully at the black limit of 9,
+              // not at all from 60). Only close to a gap, so dark open sea elsewhere in
+              // the daytime photo is left alone.
+              var lum = 0.3 * d[k] + 0.59 * d[k + 1] + 0.11 * d[k + 2];
+              if (lum < DIM_LUM) m = Math.max(m, Math.min(1, (DIM_LUM - lum) / (DIM_LUM - 9)) * Math.min(1, ww * 4));
+              if (m <= 0.002) continue;
             }
             var g = 0.3 * b[k] + 0.59 * b[k + 1] + 0.11 * b[k + 2];
             var ic = ice && ice[k + 3] > 128 ? iceCover(ice[k], ice[k + 1], ice[k + 2]) * 0.88 : 0;   // today's ice cover
             if (ic) iceUsed = true;
             for (var c = 0; c < 3; c++) {
               var f = (g + (b[k + c] - g) * 0.7) * 0.9;          // Blue Marble: 70% colour, 90% brightness
-              f = f * (1 - ic) + 235 * ic;                        // ice in near-white
+              // sea ice: soft blue-white, keeping 15% of the Blue Marble texture underneath
+              f = f * (1 - ic) + (ICE_RGB[c] * 0.85 + g * 0.15) * ic;
               d[k + c] = d[k + c] * (1 - m) + f * m;
             }
           }

@@ -1,0 +1,1 @@
+{"param":"PRECTOTCORR","start":1981,"end":2025,"block":5,"nlat":36,"nlon":72,"months":540,"scale":100,"missing":-32768,"layout":"Int16, little-endian, index = (row * nlon + col) * months + month; row 0 = 90°S-85°S, col 0 = 180°W-175°W"}

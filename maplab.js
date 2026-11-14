@@ -37,6 +37,23 @@
       '<label class="lp-alpha"><span>' + esc(T('Opacity')) + '</span><input type="range" id="lp-alpha" min="20" max="100" step="5" value="' +
       Math.round(CELLS.alpha * 100) + '" aria-label="' + esc(T('Opacity')) + '"></label></div>';
   }
+  // Trend map area: the live box around the place, or the whole globe. The globe can't be
+  // asked for live (648 NASA POWER boxes, about 2 GB), so it is pre-built for a few
+  // variables by tools/build_global_trends.mjs into data/global/<PARAM>.json.
+  var GLOBAL_READY = { T2M: true, PRECTOTCORR: true };
+  // The whole globe is the default; a viewer who picks "This area" keeps that choice.
+  var SCOPE = 'globe', globalCache = {};
+  try { if (localStorage.getItem('td-mapscope') === 'box') SCOPE = 'box'; } catch (err) { /* private mode */ }
+  function globeReady() { return !!GLOBAL_READY[TD.prm(TD.variable(TD.state.v))]; }
+  function scopeCtl() {
+    return '<div class="lp-seg lp-scope" role="group" aria-label="' + esc(T('Map area')) + '">' +
+      '<button type="button" data-scope="box" aria-pressed="' + (SCOPE === 'box') + '">' + esc(T('This area')) + '</button>' +
+      '<button type="button" data-scope="globe" aria-pressed="' + (SCOPE === 'globe') + '">' + esc(T('Whole globe')) + '</button></div>';
+  }
+  function scopeKey() {
+    var s = TD.state;
+    return SCOPE === 'globe' && globeReady() ? ['globe', s.v, s.y0, s.y1, s.month].join('|') : gridKey();
+  }
   var TD, panel, active = '', loadKey = '', token = 0;
   var grid = null;           // { key, cells, dlon, dlat, vr }
   var lapse = { timer: 0, i: 0, mode: 'anom', speed: 1 };
@@ -136,7 +153,61 @@
 
   // ---- trend map + significance dots + opposite trends ------------------------
 
+  function loadGlobal(pm) {
+    if (!globalCache[pm]) {
+      globalCache[pm] = fetch('data/global/' + pm + '.json').then(function (r) {
+        if (!r.ok) throw new Error(T('The whole-globe map could not be loaded.'));
+        return r.json();
+      });
+      globalCache[pm].catch(function () { delete globalCache[pm]; });
+    }
+    return globalCache[pm];
+  }
+
+  /** The whole-globe trend map: pre-built 5° blocks, same tests as everywhere else. */
+  function showGlobalTrend() {
+    var my = token, vr = TD.variable(TD.state.v), pm = TD.prm(vr);
+    TD.globe.flyTo(TD.state.lat, TD.state.lon, 180, 1300, 1);
+    if (!GLOBAL_READY[pm]) {
+      panel.innerHTML = '<div class="lp-head"><strong>' + esc(T('Trend map')) + '</strong><span>' + esc(TD.vname(vr)) + '</span></div>' + scopeCtl() +
+        '<p class="lp-note">' + esc(T('The whole-globe map is ready for air temperature and rain. Choose one of those, or switch back to this area.')) + '</p>';
+      return;
+    }
+    busy(T('Trend map'), T('Loading the whole-globe map…'));
+    loadGlobal(pm).then(function (d) {
+      if (my !== token) return;
+      loadKey = scopeKey();
+      var F = {}; d.fields.forEach(function (f, i) { F[f] = i; });
+      var cells = d.cells;
+      var lim = percentile(cells.map(function (c) { return Math.abs(c[F.ratePerDecade]); }), 0.95) || 1;
+      var list = cells.map(function (c) {
+        var t = Math.max(-1, Math.min(1, c[F.ratePerDecade] / lim));
+        return { lon0: c[F.lon0], lon1: c[F.lon0] + d.block, lat0: c[F.lat0], lat1: c[F.lat0] + d.block,
+          fill: d3.interpolateRdBu(0.5 - t / 2), opacity: 0.82, dot: !!c[F.significant] };
+      });
+      TD.globe.setCellStyle(CELLS.mode, CELLS.alpha);
+      TD.globe.setCells(list);
+      TD.globe.setMarks(null);
+      var up = 0, dn = 0;
+      cells.forEach(function (c) { if (c[F.significant]) { if (c[F.ratePerDecade] > 0) up++; else if (c[F.ratePerDecade] < 0) dn++; } });
+      var s = TD.state;
+      var html = '<div class="lp-head"><strong>' + esc(T('Trend map')) + '</strong><span>' + esc(TD.vname(vr)) + ', ' + d.start + '–' + d.end + '</span></div>';
+      html += scopeCtl() + cellCtl();
+      html += '<div class="lp-scale"><span>' + esc(TD.withUnit(TD.signed(-lim, 2), vr.unit)) + '</span><i class="lp-ramp lp-ramp-div"></i><span>' +
+        esc(TD.withUnit(TD.signed(lim, 2), vr.unit)) + '</span></div>';
+      html += '<p class="lp-key"><span class="lp-dot"></span>' + esc(T('Dot: significant after correcting for testing many cells at once (Benjamini–Hochberg false discovery rate, 5%). Red: going up, blue: going down, per decade.')) + '</p>';
+      html += '<p class="lp-note">' + esc(T('{s} of {n} areas of {b}° × {b}° show a significant trend: {u} rising, {d} falling.',
+        { s: up + dn, n: cells.length, b: d.block, u: up, d: dn })) + '</p>';
+      html += '<p class="lp-note muted-light">' + esc(T('Pre-built from NASA POWER: every grid cell, yearly averages, grouped into {b}° areas and tested with the same statistics as the rest of the site. It always covers the whole year, {a}–{z}.', { b: d.block, a: d.start, z: d.end })) +
+        ((s.y0 !== d.start || s.y1 !== d.end || s.month) ? ' ' + esc(T('Your chosen period or month applies to “This area” only.')) : '') + '</p>';
+      html += '<p class="lp-hint">' + esc(T('Click anywhere on the globe to open that spot’s full chart.')) + '</p>';
+      panel.innerHTML = html;
+    }).catch(function (e) { if (my === token) fail(T('Trend map'), e.message); });
+  }
+
   function showTrend() {
+    // variables without a pre-built whole-globe map fall back to the live area
+    if (SCOPE === 'globe' && globeReady()) return showGlobalTrend();
     var my = token, vr = TD.variable(TD.state.v);
     busy(T('Trend map'), T('Testing every grid cell in a {b}° box around this place…', { b: BOX }));
     TD.globe.flyTo(TD.state.lat, TD.state.lon, BOX, 1300, zoomFor());
@@ -167,7 +238,8 @@
       var dn = ok.filter(function (c) { return c.fdr && c.stats.sen.slope < 0; });
       var html = '<div class="lp-head"><strong>' + esc(T('Trend map')) + '</strong><span>' + esc(TD.vname(vr)) + ', ' +
         TD.state.y0 + '–' + TD.state.y1 + (TD.state.month ? ', ' + esc(T(TD.MONTHS[TD.state.month])) : '') + '</span></div>';
-      html += boxCtl() + cellCtl();
+      html += scopeCtl() + boxCtl() + cellCtl();
+      if (SCOPE === 'globe') html += '<p class="lp-note muted-light">' + esc(T('The whole-globe map is ready for air temperature and rain, so this variable shows the area around the place.')) + '</p>';
       html += '<div class="lp-scale"><span>' + esc(TD.withUnit(TD.signed(-lim, 2), vr.unit)) + '</span><i class="lp-ramp lp-ramp-div"></i><span>' +
         esc(TD.withUnit(TD.signed(lim, 2), vr.unit)) + '</span></div>';
       html += '<p class="lp-key"><span class="lp-dot"></span>' + esc(T('Dot: significant after correcting for testing many cells at once (Benjamini–Hochberg false discovery rate, 5%). Red: going up, blue: going down, per decade.')) + '</p>';
@@ -202,53 +274,112 @@
 
   // ---- timelapse ---------------------------------------------------------------
 
+  // Every block's average for every month, pre-built (see tools/build_global_trends.mjs)
+  var monthlyCache = {};
+  function loadGlobalMonthly(pm) {
+    if (!monthlyCache[pm]) {
+      var get = function (url, how) {
+        return fetch(url).then(function (r) {
+          if (!r.ok) throw new Error(T('The whole-globe map could not be loaded.'));
+          return r[how]();
+        });
+      };
+      monthlyCache[pm] = Promise.all([get('data/global/' + pm + '_monthly.json', 'json'), get('data/global/' + pm + '_monthly.bin', 'arrayBuffer')])
+        .then(function (res) {
+          var h = res[0], a = new Int16Array(res[1]), cells = [];
+          for (var row = 0; row < h.nlat; row++) for (var col = 0; col < h.nlon; col++) {
+            var base = (row * h.nlon + col) * h.months, any = false;
+            for (var i = 0; i < h.months && !any; i++) any = a[base + i] !== h.missing;
+            if (!any) continue;
+            var lat0 = -90 + row * h.block, lon0 = -180 + col * h.block;
+            cells.push({ lat0: lat0, lat1: lat0 + h.block, lon0: lon0, lon1: lon0 + h.block, base: base });
+          }
+          return { h: h, a: a, cells: cells };
+        });
+      monthlyCache[pm].catch(function () { delete monthlyCache[pm]; });
+    }
+    return monthlyCache[pm];
+  }
+
+  /**
+   * What the timelapse plays: the whole globe (pre-built 5° areas) or the live box
+   * around the place. Either way: cell outlines, and get(j, 'YYYYMM') = value or NaN.
+   */
+  function lapseSource() {
+    var vr = TD.variable(TD.state.v), pm = TD.prm(vr);
+    if (SCOPE === 'globe' && globeReady()) {
+      return loadGlobalMonthly(pm).then(function (gm) {
+        var h = gm.h;
+        return { key: scopeKey(), vr: vr, globe: true, cells: gm.cells,
+          get: function (j, k) {
+            var mi = (+k.slice(0, 4) - h.start) * 12 + (+k.slice(4) - 1);
+            if (mi < 0 || mi >= h.months) return NaN;
+            var v = gm.a[gm.cells[j].base + mi];
+            return v === h.missing ? NaN : v / h.scale;
+          } };
+      });
+    }
+    return loadGrid().then(function (g) {
+      return { key: g.key, vr: g.vr, globe: false, cells: g.cells.map(function (c) { return cellBounds(c); }),
+        get: function (j, k) {
+          var v = g.cells[j].table[k];
+          return v === undefined || v === null || v < -900 ? NaN : v;
+        } };
+    });
+  }
+
   function showLapse(startFrame) {
-    var my = token;
-    busy(T('Timelapse'), T('Loading every month in a {b}° box around this place…', { b: BOX }));
-    TD.globe.flyTo(TD.state.lat, TD.state.lon, BOX, 1300, zoomFor());
-    loadGrid().then(function (g) {
+    var my = token, wholeGlobe = SCOPE === 'globe' && globeReady();
+    busy(T('Timelapse'), wholeGlobe ? T('Loading every month for the whole globe…') : T('Loading every month in a {b}° box around this place…', { b: BOX }));
+    if (wholeGlobe) TD.globe.flyTo(TD.state.lat, TD.state.lon, 180, 1300, 1);
+    else TD.globe.flyTo(TD.state.lat, TD.state.lon, BOX, 1300, zoomFor());
+    lapseSource().then(function (src) {
       if (my !== token) return;
-      loadKey = g.key;
-      var s = TD.state, frames = [];
+      loadKey = src.key;
+      var s = TD.state, frames = [], n = src.cells.length, j;
       var keep = TD.partMonths(s.month);
       for (var y = s.y0; y <= s.y1; y++) for (var m = 1; m <= 12; m++) {
         if (keep.indexOf(m) < 0) continue;
         frames.push(y + (m < 10 ? '0' : '') + m);
       }
       // each cell's normal for every calendar month
-      g.cells.forEach(function (c) {
-        var sum = {}, n = {};
+      var normal = [];
+      for (j = 0; j < n; j++) {
+        var sum = {}, cnt = {};
         frames.forEach(function (k) {
-          var v = c.table[k]; if (v === undefined || v === null || v < -900) return;
-          var mm = k.slice(4); sum[mm] = (sum[mm] || 0) + v; n[mm] = (n[mm] || 0) + 1;
+          var v = src.get(j, k); if (isNaN(v)) return;
+          var mm = k.slice(4); sum[mm] = (sum[mm] || 0) + v; cnt[mm] = (cnt[mm] || 0) + 1;
         });
-        c.normal = {};
-        for (var mm in sum) c.normal[mm] = sum[mm] / n[mm];
-      });
+        var nm = {};
+        for (var mm in sum) nm[mm] = sum[mm] / cnt[mm];
+        normal.push(nm);
+      }
       var raw = [], anom = [];
       for (var i = 0; i < frames.length; i += Math.max(1, Math.floor(frames.length / 120))) {
-        g.cells.forEach(function (c) {
-          var v = c.table[frames[i]];
-          if (v === undefined || v === null || v < -900) return;
-          raw.push(v); anom.push(Math.abs(v - c.normal[frames[i].slice(4)]));
-        });
+        for (j = 0; j < n; j++) {
+          var v = src.get(j, frames[i]);
+          if (isNaN(v)) continue;
+          raw.push(v); anom.push(Math.abs(v - normal[j][frames[i].slice(4)]));
+        }
       }
       var rLo = percentile(raw, 0.02), rHi = percentile(raw, 0.98), aLim = percentile(anom, 0.97) || 1;
       // any temperature (including sea surface temperature, filed under Water) uses the heat colours
-      var vr = g.vr, hot = vr.topic === 'heat' || vr.unit === '°C', wet = !hot && (vr.topic === 'water' || vr.topic === 'soil');
+      var vr = src.vr, hot = vr.topic === 'heat' || vr.unit === '°C', wet = !hot && (vr.topic === 'water' || vr.topic === 'soil');
       var seq = wet ? d3.interpolateYlGnBu : (hot ? function (t) { return d3.interpolateRdYlBu(1 - t); } : d3.interpolateViridis);
 
       TD.globe.setCellStyle(CELLS.mode, CELLS.alpha);
-      TD.globe.setCells(g.cells.map(function (c) { var b = cellBounds(c); b.fill = 'transparent'; b.opacity = 0.85; return b; }));
+      TD.globe.setCells(src.cells.map(function (c) {
+        return { lon0: c.lon0, lon1: c.lon1, lat0: c.lat0, lat1: c.lat1, fill: 'transparent', opacity: 0.85 };
+      }));
 
       function paint(i) {
         lapse.i = i;
-        var k = frames[i];
+        var k = frames[i], mm = k.slice(4);
         TD.globe.recolorCells(function (b, j) {
-          var c = g.cells[j], v = c.table[k];
-          if (v === undefined || v === null || v < -900) return 'transparent';
+          var v = src.get(j, k);
+          if (isNaN(v)) return 'transparent';
           if (lapse.mode === 'anom') {
-            var t = Math.max(-1, Math.min(1, (v - c.normal[k.slice(4)]) / aLim));
+            var t = Math.max(-1, Math.min(1, (v - normal[j][mm]) / aLim));
             return d3.interpolateRdBu(0.5 - t / 2);
           }
           return seq(Math.max(0, Math.min(1, (v - rLo) / ((rHi - rLo) || 1))));
@@ -267,14 +398,16 @@
       }
       function draw() {
         panel.innerHTML = '<div class="lp-head"><strong>' + esc(T('Timelapse')) + '</strong><span>' + esc(TD.vname(vr)) + '</span></div>' +
-          boxCtl() + cellCtl() +
+          scopeCtl() + (src.globe ? '' : boxCtl()) + cellCtl() +
           '<div class="lp-player"><button type="button" class="lp-play" id="lp-play" aria-label="' + esc(T('Play')) + '">' + (lapse.timer ? '❚❚' : '▶') + '</button>' +
           '<input type="range" id="lp-slider" min="0" max="' + (frames.length - 1) + '" value="' + lapse.i + '" aria-label="' + esc(T('Month')) + '">' +
           '<output id="lp-when" class="lp-when"></output></div>' +
           '<div class="lp-row"><div class="lp-seg" id="lp-mode"><button type="button" data-m="anom" aria-pressed="' + (lapse.mode === 'anom') + '">' + esc(T('Difference from normal')) + '</button>' +
           '<button type="button" data-m="raw" aria-pressed="' + (lapse.mode === 'raw') + '">' + esc(T('Monthly values')) + '</button></div>' +
           '<div class="lp-seg" id="lp-speed">' + [1, 2, 4].map(function (sp) { return '<button type="button" data-s="' + sp + '" aria-pressed="' + (lapse.speed === sp) + '">' + sp + '×</button>'; }).join('') + '</div></div>' +
-          legend();
+          legend() +
+          (src.globe ? '<p class="lp-note muted-light">' + esc(T('Whole globe: the average of every NASA POWER grid cell in each 5° area, month by month, pre-built for this site.')) + '</p>'
+            : SCOPE === 'globe' ? '<p class="lp-note muted-light">' + esc(T('The whole-globe map is ready for air temperature and rain, so this variable shows the area around the place.')) + '</p>' : '');
         paint(lapse.i);
       }
       function play(on) {
@@ -817,6 +950,14 @@
       TD.apply({ lat: pts[0].lat, lon: pts[0].lon, size: 0, keepYears: true, keepMonth: true,
         compare: 'pt:' + pts[1].lat.toFixed(2) + ',' + pts[1].lon.toFixed(2) });
     }, true);
+    // Trend map area: this area or the whole globe
+    panel.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-scope]');
+      if (!b || b.getAttribute('data-scope') === SCOPE) return;
+      SCOPE = b.getAttribute('data-scope');
+      try { localStorage.setItem('td-mapscope', SCOPE); } catch (err) { /* private mode */ }
+      setLayer(active);
+    });
     // Grid look: crisp cells or smooth, and opacity. Redraws only; nothing is reloaded.
     panel.addEventListener('click', function (e) {
       var b = e.target.closest('[data-cm]');
@@ -847,7 +988,8 @@
     });
     // When the case changes, refresh map layers that depend on it.
     document.addEventListener('td:result', function () {
-      if ((active === 'trend' || active === 'lapse' || active === 'wind') && loadKey && loadKey !== gridKey()) setLayer(active);
+      var key = active === 'trend' || active === 'lapse' ? scopeKey() : gridKey();
+      if ((active === 'trend' || active === 'lapse' || active === 'wind') && loadKey && loadKey !== key) setLayer(active);
     });
     document.addEventListener('td:lang', function () { if (active) setLayer(active); });
   }

@@ -1435,6 +1435,7 @@
   var ICON_MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"/></svg>';
   function syncThemeButton() {
     var dark = isDark(), b = $('theme');
+    if (!b) return;   // theme now lives in the Settings panel (settings.js)
     b.innerHTML = dark ? ICON_SUN : ICON_MOON;
     b.setAttribute('aria-label', dark ? 'Switch to light theme' : 'Switch to dark theme');
     b.title = b.getAttribute('aria-label');
@@ -1481,7 +1482,7 @@
     syncViewControls();
     syncThemeButton();
 
-    $('theme').addEventListener('click', toggleTheme);
+    if ($('theme')) $('theme').addEventListener('click', toggleTheme);
     $('locate').addEventListener('click', locate);
     $('topics').addEventListener('click', function (e) {
       var t = e.target.getAttribute('data-topic');

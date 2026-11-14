@@ -88,7 +88,7 @@
     var cbase = cmp && view.anom ? S.mean(cmp.values) : 0;
     var cvals = cmp ? cmp.values.map(function (v) { return v - cbase; }) : [];
     var cols = cmp ? cmp.stats.ols : null;
-    var smooth = view.smooth ? runningMean(vals, 5) : null;
+    var smooth = view.smooth ? runningMean(yrs, vals, 5) : null;
 
     var W = Math.max(300, host.clientWidth), narrow = W < 560, H = narrow ? 300 : 380;
     var STRIPE = 14;
@@ -97,8 +97,15 @@
 
     function trendAt(x) { return ols.intercept + ols.slope * x - base; }
     function ctrendAt(x) { return cols.intercept + cols.slope * x - cbase; }
+    // Half-width of the 95% confidence band: where the true trend line probably is.
+    //   t * s * sqrt(1/n + (x - mean x)^2 / Sxx)
     function half(x) {
       return ols.tCrit * ols.residualSE * Math.sqrt(1 / ols.n + Math.pow(x - ols.meanX, 2) / ols.sxx);
+    }
+    // Half-width of the 95% prediction band: where a single future year would probably land.
+    // Same formula with an extra 1 under the root for the year-to-year scatter.
+    function predHalf(x) {
+      return ols.tCrit * ols.residualSE * Math.sqrt(1 + 1 / ols.n + Math.pow(x - ols.meanX, 2) / ols.sxx);
     }
     var a0 = yrs[0], a1 = yrs[yrs.length - 1];
     var FUT = view.future ? 10 : 0, f1 = a1 + FUT;
@@ -107,9 +114,10 @@
 
     var all = vals.concat(cvals);
     var lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
-    [a0, a1, f1].forEach(function (x) {
+    [a0, a1].forEach(function (x) {
       lo = Math.min(lo, trendAt(x) - half(x)); hi = Math.max(hi, trendAt(x) + half(x));
     });
+    if (FUT) { lo = Math.min(lo, trendAt(f1) - predHalf(f1)); hi = Math.max(hi, trendAt(f1) + predHalf(f1)); }
     if (cmp) [cmp.years[0], cmp.years[cmp.years.length - 1]].forEach(function (x) {
       lo = Math.min(lo, ctrendAt(x)); hi = Math.max(hi, ctrendAt(x));
     });
@@ -158,10 +166,12 @@
     }
     svg.appendChild(svgEl('polygon', { points: up.concat(dn).join(' '), class: 'band' }));
 
+    // Lift the pen at missing values and at skipped years, so a gap shows as a gap.
     function pathOf(xs, ys) {
       var d = '', pen = false;
       for (var k = 0; k < xs.length; k++) {
         if (ys[k] === null) { pen = false; continue; }
+        if (k > 0 && xs[k] - xs[k - 1] > 1) pen = false;
         d += (pen ? 'L' : 'M') + sx(xs[k]).toFixed(1) + ' ' + sy(ys[k]).toFixed(1);
         pen = true;
       }
@@ -182,20 +192,20 @@
     if (smooth) { smoothPath = svgEl('path', { d: pathOf(yrs, smooth), class: 'smooth' }); svg.appendChild(smoothPath); }
     svg.appendChild(svgEl('line', { x1: sx(a0), y1: sy(trendAt(a0)), x2: sx(a1), y2: sy(trendAt(a1)), class: 'trend' }));
 
-    // "If the trend continues": the same straight line carried 10 years past the data
+    // "If the trend continues": the same straight line carried 10 years past the data.
+    // The band here is the prediction band, because a future year scatters like past years did.
     if (FUT) {
       var fu = [], fd = [];
       for (var fi = 0; fi <= 20; fi++) {
         var fx = a1 + FUT * fi / 20;
-        fu.push(sx(fx).toFixed(1) + ',' + sy(trendAt(fx) + half(fx)).toFixed(1));
-        fd.unshift(sx(fx).toFixed(1) + ',' + sy(trendAt(fx) - half(fx)).toFixed(1));
+        fu.push(sx(fx).toFixed(1) + ',' + sy(trendAt(fx) + predHalf(fx)).toFixed(1));
+        fd.unshift(sx(fx).toFixed(1) + ',' + sy(trendAt(fx) - predHalf(fx)).toFixed(1));
       }
       svg.appendChild(svgEl('polygon', { points: fu.concat(fd).join(' '), class: 'band future-band' }));
       svg.appendChild(svgEl('line', { x1: sx(a1), y1: sy(trendAt(a1)), x2: sx(f1), y2: sy(trendAt(f1)), class: 'future' }));
       svg.appendChild(svgEl('line', { x1: sx(a1), x2: sx(a1), y1: m.t, y2: m.t + ih, class: 'nowline' }));
-      var fl = svgEl('text', { x: sx(f1) - 4, y: sy(trendAt(f1)) + (ols.slope >= 0 ? 18 : -10), 'text-anchor': 'end', class: 'future-label' },
-        T('If the trend continues'));
-      svg.appendChild(fl);
+      // No text label inside the chart: it covered data points on small screens.
+      // The legend says "If the trend continues" and wide screens also get "Trend, extended" in the margin.
     }
 
     // one-off spikes, ringed and labelled
@@ -262,7 +272,9 @@
         (cmp ? esc(res.short) + ': ' : '') +
         esc(view.anom ? fmtAnom(vals[k], vr) + ' vs average' : fmtValue(vals[k], vr)) +
         (view.anom ? ' <em>(' + esc(fmtValue(res.values[k], vr)) + ')</em>' : '') + '</span>';
-      html += '<span><i class="key key-trend"></i>' + esc(view.anom ? fmtAnom(trendAt(yy), vr) : fmtValue(trendAt(yy), vr)) + ' on the trend line</span>';
+      var show = function (v) { return view.anom ? fmtAnom(v, vr) : fmtValue(v, vr); };
+      html += '<span><i class="key key-trend"></i>' + esc(show(trendAt(yy))) + ' on the trend line</span>';
+      html += '<span><i class="key key-band"></i>95% band: ' + esc(show(trendAt(yy) - half(yy))) + ' to ' + esc(show(trendAt(yy) + half(yy))) + '</span>';
       if (smooth && smooth[k] !== null) html += '<span><i class="key key-smooth"></i>' + esc(view.anom ? fmtAnom(smooth[k], vr) : fmtValue(smooth[k], vr)) + ' 5-year average</span>';
       var ci = cmp ? cmp.years.indexOf(yy) : -1;
       if (ci >= 0) {
@@ -328,9 +340,12 @@
 
     // legend and hint
     var lg = '<span><i class="key key-series"></i>' + esc(cmp ? res.short : 'Yearly value') + '</span>' +
-      '<span><i class="key key-trend"></i>Trend line</span><span><i class="key key-band"></i>95% confidence band</span>';
+      '<span title="Straight line fitted by least squares"><i class="key key-trend"></i>Trend line</span>' +
+      '<span title="Where the true trend line probably lies (95% confidence). Single years scatter much more widely, so most dots sit outside it.">' +
+      '<i class="key key-band"></i>95% confidence band</span>';
     if (smooth) lg += '<span><i class="key key-smooth"></i>' + T('5-year average') + '</span>';
-    if (FUT) lg += '<span><i class="key key-future"></i>' + T('If the trend continues') + '</span>';
+    if (FUT) lg += '<span title="The trend line carried 10 years on. The shaded area is where a single year would probably land (95% prediction band), if nothing about the trend changes. It is not a forecast.">' +
+      '<i class="key key-future"></i>' + T('If the trend continues') + '</span>';
     if (cmp) lg += '<span><i class="key key-cmp"></i>' + esc(cmp.short) + '</span>';
     $('legend').innerHTML = lg;
     $('chart-hint').textContent = 'Drag across the chart to test only those years. Stripes: ' + sc.loName +

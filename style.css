@@ -453,6 +453,24 @@ td { font-size: 14px; }
 .about-var strong { color: var(--ink); font-weight: 600; }
 .about-var .muted { display: block; margin-top: 6px; font-size: 12px; }
 
+/* "At this spot" card, shown after a click on the globe */
+.spot { background: var(--panel); border-radius: var(--r-card); padding: 20px 18px 16px; margin-bottom: 14px; scroll-margin-top: 90px; }
+.spot-title { font-size: 19px; line-height: 1.2; margin-bottom: 12px; }
+.spot-title span { font-weight: 500; color: var(--ink-3); font-size: 15px; }
+.spot-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.spot-row { width: 100%; display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: baseline;
+  padding: 10px 12px; border: 0; border-radius: var(--r-ctl); background: var(--fill-2); color: var(--ink);
+  font: inherit; text-align: left; cursor: pointer; }
+button.spot-row:hover { background: var(--hover); box-shadow: inset 0 0 0 1px var(--line); }
+button.spot-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.spot-topic { font-size: 12px; font-weight: 600; color: var(--ink-3); grid-column: 1; }
+.spot-var { font-weight: 600; grid-column: 1; }
+.spot-val { grid-column: 2; grid-row: 1 / span 2; align-self: center; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.spot-val small { font-weight: 400; color: var(--ink-3); }
+.spot-trend { grid-column: 1 / -1; font-size: 13px; color: var(--ink-2); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.spot-empty { cursor: default; opacity: 0.6; }
+.spot-note { margin-top: 10px; font-size: 13px; color: var(--ink-3); }
+
 /* sections */
 .block { margin-top: 14px; padding: 24px 22px; }
 .block h3 { font-size: 24px; line-height: 1.17; letter-spacing: var(--trk-24); margin-bottom: 16px; }
@@ -832,7 +850,6 @@ td { font-size: 14px; }
 .chart .future { stroke: var(--series-2); stroke-width: 2; stroke-dasharray: 2 5; stroke-linecap: round; }
 .chart .future-band { opacity: 0.07; }
 .chart .nowline { stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 3; }
-.chart .future-label { fill: var(--series-2); font: 600 11px var(--font); }
 .chart .spike { fill: none; stroke: var(--warn-ink); stroke-width: 1.75; }
 .chart .spike-label { fill: var(--warn-ink); font: 600 11px var(--font); }
 .key-future { border-top-style: dotted; border-color: var(--series-2); }

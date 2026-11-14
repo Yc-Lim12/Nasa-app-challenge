@@ -249,23 +249,28 @@
     return { table: out, cells: feats.length };
   }
 
+  function daysInMonth(y, m) { return new Date(y, m, 0).getDate(); }
+
   /**
    * One value per year: the mean of all twelve months, one chosen month, or a
    * three-month season (a negative month means that month of the year before).
+   * Months are weighted by their number of days, the same way NASA POWER
+   * computes its own annual value (so February counts a little less).
    */
   function yearlySeries(table, y0, y1, month) {
     var years = [], values = [];
     var ms = !month ? partMonths(0) : SEASONS[month] || [month];
     for (var y = y0; y <= y1; y++) {
-      var s = 0, ok = true;
+      var s = 0, days = 0, ok = true;
       for (var i = 0; i < ms.length; i++) {
         var m = Math.abs(ms[i]), yy = ms[i] < 0 ? y - 1 : y;
         var x = table[yy + (m < 10 ? '0' : '') + m];
         if (x === undefined || x === null || x < FILL) { ok = false; break; }
-        s += x;
+        s += x * daysInMonth(yy, m);
+        days += daysInMonth(yy, m);
       }
       if (!ok) continue;
-      years.push(y); values.push(s / ms.length);
+      years.push(y); values.push(s / days);
     }
     return { years: years, values: values };
   }
@@ -281,11 +286,14 @@
     });
   }
 
-  /** Centred 5-year running mean; null where the window is incomplete. */
-  function runningMean(vals, k) {
+  /**
+   * Centred k-year running mean; null where the window is incomplete.
+   * A window that spans a skipped year is incomplete too.
+   */
+  function runningMean(years, vals, k) {
     var h = Math.floor(k / 2), out = [];
     for (var i = 0; i < vals.length; i++) {
-      if (i < h || i >= vals.length - h) { out.push(null); continue; }
+      if (i < h || i >= vals.length - h || years[i + h] - years[i - h] !== 2 * h) { out.push(null); continue; }
       var s = 0;
       for (var j = i - h; j <= i + h; j++) s += vals[j];
       out.push(s / k);
@@ -831,6 +839,69 @@
     readForm(); updateMap(false);
   }
 
+  // ---- "At this spot": one quick reading per topic after a click on the globe ----
+
+  // One variable stands in for each topic. The full list is still in the case settings.
+  var SPOT_VARS = ['T2M', 'PRECTOTCORR', 'GWETROOT', 'CLOUD_AMT', 'AOD_55'];
+  var spotRun = 0;
+
+  function topicLabel(id) {
+    for (var i = 0; i < TOPICS.length; i++) if (TOPICS[i].id === id) return T(TOPICS[i].label);
+    return id;
+  }
+
+  function showSpot(lat, lon) {
+    var run = ++spotRun, box = $('spot');
+    var head = '<h2 class="spot-title">' + esc(T('At this spot')) + ' <span>' + esc(coordLabel(lat, lon)) + '</span></h2>';
+    box.innerHTML = head + '<p class="spot-note">' + esc(T('Asking NASA…')) + '</p>';
+    box.hidden = false;
+
+    // One request for all five variables, for the single grid cell that was clicked.
+    var url = urlFor(SPOT_VARS.join(','), lat, lon, 0);
+    fetchJson(url).then(function (json) {
+      if (run !== spotRun) return;               // a newer click has taken over
+      var rows = SPOT_VARS.map(function (id) {
+        var vr = variable(id);
+        var ser = yearlySeries(monthlyTable(json, id).table, FIRST_YEAR, LAST_YEAR, 0);
+        return { vr: vr, ser: ser, st: ser.years.length >= MIN_YEARS ? S.analyze(ser.years, ser.values) : null };
+      });
+      box.innerHTML = head + '<ul class="spot-list">' + rows.map(spotRow).join('') + '</ul>' +
+        '<p class="spot-note">' + esc(T('One grid cell, yearly averages from NASA POWER. Pick one to open the full case: chart, tests and evidence.')) + '</p>';
+    }).catch(function (e) {
+      if (run !== spotRun) return;
+      box.innerHTML = head + '<p class="spot-note">' + esc(e.message) + '</p>';
+    });
+  }
+
+  function spotRow(r) {
+    var vr = r.vr, label = '<span class="spot-topic">' + esc(topicLabel(vr.topic)) + '</span>' +
+      '<span class="spot-var">' + esc(vname(vr)) + '</span>';
+    if (!r.ser.years.length) {
+      return '<li><div class="spot-row spot-empty">' + label + '<span class="spot-val">' + esc(T('No data here')) + '</span></div></li>';
+    }
+    var last = r.ser.years.length - 1;
+    var value = '<span class="spot-val">' + esc(fmtValue(r.ser.values[last], vr)) + ' <small>' + r.ser.years[last] + '</small></span>';
+    var trend = '';
+    if (r.st) {
+      var arrow = r.st.direction === 'up' ? '↑ ' : (r.st.direction === 'down' ? '↓ ' : '');
+      trend = '<span class="spot-trend">' + esc(arrow + ratePhrase(r.st, vr)) +
+        ' <span class="badge badge-small badge-' + verdictClass(r.st.verdict) + '">' + esc(T(verdictLabel(r.st.verdict))) + '</span></span>';
+    }
+    return '<li><button type="button" class="spot-row" data-var="' + vr.id + '">' + label + value + trend + '</button></li>';
+  }
+
+  // Picking a row makes it the case: same spot, that variable, then run it.
+  function initSpot() {
+    $('spot').addEventListener('click', function (e) {
+      var row = e.target.closest('button[data-var]');
+      if (!row) return;
+      var vr = variable(row.getAttribute('data-var'));
+      state.topic = vr.topic; state.v = vr.id;
+      renderVariables();
+      investigate({ scroll: true });
+    });
+  }
+
   function initMap() {
     if (!window.TDGlobe || !window.d3) { $('map').hidden = true; return; }
     globe = window.TDGlobe.create($('map'), {
@@ -839,9 +910,15 @@
       onStyle: function (name) { toast(T(name)); },
       onPick: function (lat, lon) {
         setCustom(lat, lon);
-        if (current) scheduleLive(500); else investigate({ scroll: wideScreen() });
+        // The current variable runs as before (its result shows in the card on the globe),
+        // and the case file opens with a reading of every topic so the user can switch.
+        showSpot(lat, lon);
+        if (window.TDPanel) window.TDPanel.open();
+        if (!wideScreen()) $('spot').scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' });
+        if (current) scheduleLive(500); else investigate({ scroll: false });
       },
       onPlace: function (id) {
+        spotRun++; $('spot').hidden = true;      // the spot card belongs to a clicked point, not a named place
         var s = $('place');
         s.value = id;
         s.dispatchEvent(new Event('change', { bubbles: true }));
@@ -927,9 +1004,11 @@
   function downloadCsv() {
     if (!current) return;
     var vr = current.variable, ols = current.stats.ols;
-    var lines = ['year,' + vr.id + (vr.unit ? ' (' + vr.unit + ')' : '') + ',trend_line'];
+    var lines = ['year,' + vr.id + (vr.unit ? ' (' + vr.unit + ')' : '') + ',trend_line,band_low_95,band_high_95'];
     current.years.forEach(function (y, i) {
-      lines.push(y + ',' + current.values[i].toFixed(4) + ',' + (ols.intercept + ols.slope * y).toFixed(4));
+      var fit = ols.intercept + ols.slope * y;
+      var h = ols.tCrit * ols.residualSE * Math.sqrt(1 / ols.n + Math.pow(y - ols.meanX, 2) / ols.sxx);
+      lines.push(y + ',' + current.values[i].toFixed(4) + ',' + fit.toFixed(4) + ',' + (fit - h).toFixed(4) + ',' + (fit + h).toFixed(4));
     });
     var a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([lines.join('\n') + '\n'], { type: 'text/csv' }));
@@ -1005,6 +1084,7 @@
     buildForm();
     var fromLink = readHash();
     initMap();
+    initSpot();
     writeForm();
     syncViewControls();
     syncThemeButton();

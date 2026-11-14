@@ -212,7 +212,7 @@
         { y: sy(trendAt(f1)), t: T(FUT ? 'Trend, extended' : 'Trend line'), c: 'endlabel' }
       ];
       if (smooth) {
-        for (var s = smooth.length - 1; s >= 0; s--) if (smooth[s] !== null) { labels.push({ y: sy(smooth[s]), t: '5-year average', c: 'endlabel' }); break; }
+        for (var s = smooth.length - 1; s >= 0; s--) if (smooth[s] !== null) { labels.push({ y: sy(smooth[s]), t: T('5-year average'), c: 'endlabel' }); break; }
       }
       if (cmp) labels.push({ y: sy(cvals[cvals.length - 1]), t: cmp.short, c: 'endlabel l-cmp' });
       spread(labels, 15, m.t + 4, m.t + ih);
@@ -261,10 +261,10 @@
       dot.setAttribute('cx', cx); dot.setAttribute('cy', cy); dot.setAttribute('visibility', 'visible');
       var html = '<strong>' + esc(whenLabel(yy)) + '</strong><span><i class="key key-series"></i>' +
         (cmp ? esc(res.short) + ': ' : '') +
-        esc(view.anom ? fmtAnom(vals[k], vr) + ' vs average' : fmtValue(vals[k], vr)) +
+        esc(view.anom ? T('{x} vs average', { x: fmtAnom(vals[k], vr) }) : fmtValue(vals[k], vr)) +
         (view.anom ? ' <em>(' + esc(fmtValue(res.values[k], vr)) + ')</em>' : '') + '</span>';
-      html += '<span><i class="key key-trend"></i>' + esc(view.anom ? fmtAnom(trendAt(yy), vr) : fmtValue(trendAt(yy), vr)) + ' on the trend line</span>';
-      if (smooth && smooth[k] !== null) html += '<span><i class="key key-smooth"></i>' + esc(view.anom ? fmtAnom(smooth[k], vr) : fmtValue(smooth[k], vr)) + ' 5-year average</span>';
+      html += '<span><i class="key key-trend"></i>' + esc(T('{x} on the trend line', { x: view.anom ? fmtAnom(trendAt(yy), vr) : fmtValue(trendAt(yy), vr) })) + '</span>';
+      if (smooth && smooth[k] !== null) html += '<span><i class="key key-smooth"></i>' + esc(view.anom ? fmtAnom(smooth[k], vr) : fmtValue(smooth[k], vr)) + ' ' + esc(T('5-year average')) + '</span>';
       var ci = cmp ? cmp.years.indexOf(yy) : -1;
       if (ci >= 0) {
         cdot.setAttribute('cx', cx); cdot.setAttribute('cy', sy(cvals[ci])); cdot.setAttribute('visibility', 'visible');
@@ -309,7 +309,7 @@
       var ya = yearAt(Math.min(d.x, px)), yb = yearAt(Math.max(d.x, px));
       hide();
       if (yb - ya + 1 >= MIN_YEARS) setPeriod(ya, yb);
-      else toast('Pick at least ' + MIN_YEARS + ' years to test a trend.');
+      else toast(T('Pick at least {n} years to test a trend.', { n: MIN_YEARS }));
     }
     hit.addEventListener('pointerup', function (e) { endDrag(e, false); });
     hit.addEventListener('pointercancel', function (e) { endDrag(e, true); hide(); });
@@ -329,13 +329,13 @@
 
     // legend and hint
     var lg = '<span><i class="key key-series"></i>' + esc(cmp ? res.short : T(monthly ? 'Each month minus its normal' : 'Yearly value')) + '</span>' +
-      '<span><i class="key key-trend"></i>Trend line</span><span><i class="key key-band"></i>95% confidence band</span>';
+      '<span><i class="key key-trend"></i>' + esc(T('Trend line')) + '</span><span><i class="key key-band"></i>' + esc(T('95% confidence band')) + '</span>';
     if (smooth) lg += '<span><i class="key key-smooth"></i>' + T('5-year average') + '</span>';
     if (FUT) lg += '<span><i class="key key-future"></i>' + T('If the trend continues') + '</span>';
     if (cmp) lg += '<span><i class="key key-cmp"></i>' + esc(cmp.short) + '</span>';
     $('legend').innerHTML = lg;
-    $('chart-hint').textContent = 'Drag across the chart to test only those years. Stripes: ' + sc.loName +
-      ' years were below the average, ' + sc.hiName + ' years above.';
+    $('chart-hint').textContent = T('Drag across the chart to test only those years. Stripes: {lo} years were below the average, {hi} years above.',
+      { lo: T(sc.loName), hi: T(sc.hiName) });
   }
 
   // ---- months panel --------------------------------------------------------
@@ -352,17 +352,19 @@
     }
     var valid = rows.filter(function (r) { return r.st; });
     if (!valid.length) {
-      $('season-note').textContent = 'There is not enough monthly data here to test each month.';
+      $('season-note').textContent = T('There is not enough monthly data here to test each month.');
       return;
     }
     var sigs = valid.filter(function (r) { return r.st.verdict === 'significant'; });
     if (sigs.length) {
       sigs.sort(function (a, b) { return Math.abs(b.st.sen.slope) - Math.abs(a.st.sen.slope); });
       var top = sigs[0];
-      $('season-note').innerHTML = '<strong>' + sigs.length + ' of ' + valid.length + '</strong> months show a significant trend. The biggest is <strong>' +
-        MONTHS[top.m] + '</strong>, ' + (top.st.direction === 'up' ? 'rising' : 'falling') + ' by about ' + esc(ratePhrase(top.st, vr)) + '.';
+      $('season-note').innerHTML = T(top.st.direction === 'up'
+        ? '<strong>{n} of {m}</strong> months show a significant trend. The biggest is <strong>{month}</strong>, rising by about {rate}.'
+        : '<strong>{n} of {m}</strong> months show a significant trend. The biggest is <strong>{month}</strong>, falling by about {rate}.',
+        { n: sigs.length, m: valid.length, month: esc(T(MONTHS[top.m])), rate: esc(ratePhrase(top.st, vr)) });
     } else {
-      $('season-note').textContent = 'No single month shows a statistically significant trend here.';
+      $('season-note').textContent = T('No single month shows a statistically significant trend here.');
     }
 
     if (!maxAbs) maxAbs = 1;
@@ -373,7 +375,7 @@
     function sy(v) { return mg.t + (lim - v) / (2 * lim) * ih; }
 
     var svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, width: W, height: H,
-      'aria-label': 'Trend per decade for each month of the year' });
+      'aria-label': T('Trend per decade for each month of the year') });
     yt.ticks.forEach(function (t) {
       if (Math.abs(t) > lim) return;
       svg.appendChild(svgEl('line', { x1: mg.l, x2: mg.l + iw, y1: sy(t), y2: sy(t), class: 'grid' }));
@@ -387,7 +389,7 @@
     var tip = makeTip(host);
     rows.forEach(function (r, i) {
       var cx = mg.l + bw * (i + 0.5), on = res.month === r.m;
-      var label = MONTHS[r.m] + ': ' + (r.st ? ratePhrase(r.st, vr) + ', ' + verdictLabel(r.st.verdict).toLowerCase() : 'not enough data');
+      var label = T(MONTHS[r.m]) + ': ' + (r.st ? ratePhrase(r.st, vr) + ', ' + verdictLabel(r.st.verdict).toLowerCase() : T('not enough data'));
       var g = svgEl('g', { class: 'mgroup' + (on ? ' on' : ''), tabindex: 0, role: 'button', 'aria-label': label, 'aria-pressed': on ? 'true' : 'false' });
       g.appendChild(svgEl('rect', { x: mg.l + bw * i + 1, y: mg.t, width: bw - 2, height: ih, rx: 6, class: 'mcol' }));
       var barTop = mg.t + ih / 2;
@@ -398,11 +400,11 @@
           class: 'mbar mbar-' + r.st.verdict + (v < 0 ? ' mbar-neg' : ''), style: '--i:' + i }));
       }
       g.appendChild(svgEl('text', { x: cx, y: H - 8, 'text-anchor': 'middle', class: 'tick' + (on ? ' tick-on' : '') },
-        narrow ? MONTH_SHORT[i].charAt(0) : MONTH_SHORT[i]));
+        narrow ? T(MONTH_SHORT[i]).charAt(0) : T(MONTH_SHORT[i])));
       function showTip() {
-        var html = '<strong>' + MONTHS[r.m] + '</strong>' + (r.st
+        var html = '<strong>' + esc(T(MONTHS[r.m])) + '</strong>' + (r.st
           ? '<span>' + esc(ratePhrase(r.st, vr)) + '</span><span>' + verdictLabel(r.st.verdict) + ', ' + esc(pEquals(r.st.mk.pAdj)) + '</span>'
-          : '<span>Not enough data</span>') + '<span><em>' + (on ? 'Click to go back to the whole year' : 'Click to investigate this month') + '</em></span>';
+          : '<span>' + esc(T('Not enough data')) + '</span>') + '<span><em>' + esc(T(on ? 'Click to go back to the whole year' : 'Click to investigate this month')) + '</em></span>';
         tip.show(html, cx, barTop, svg, W);
       }
       g.addEventListener('pointerenter', showTip);

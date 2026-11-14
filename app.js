@@ -187,7 +187,7 @@
 
   function withUnit(text, unit) {
     if (!unit) return text;
-    return unit === '%' ? text + '%' : text + ' ' + unit;
+    return unit === '%' ? text + '%' : text + ' ' + T(unit);   // T(): mm/day -> mm/hari in BM
   }
   function fmtValue(v, vr) { return withUnit(v.toFixed(vr.dp), vr.unit); }
   function fmtAnom(v, vr) { return withUnit((v < 0 ? '−' : '+') + Math.abs(v).toFixed(vr.dp), vr.unit); }
@@ -200,13 +200,14 @@
   function fmtP(p) { return p < 0.001 ? '< 0.001' : p.toFixed(3); }
   function pEquals(p) { return p < 0.001 ? 'p < 0.001' : 'p = ' + p.toFixed(3); }
   function coordLabel(lat, lon) {
-    return Math.abs(lat).toFixed(1) + '°' + (lat >= 0 ? 'N' : 'S') + ', ' +
-      Math.abs(lon).toFixed(1) + '°' + (lon >= 0 ? 'E' : 'W');
+    var bm = !!(window.TDi18n && window.TDi18n.lang === 'bm');   // Malay: U(tara), S(elatan), T(imur), B(arat)
+    return Math.abs(lat).toFixed(1) + '°' + (lat >= 0 ? (bm ? 'U' : 'N') : 'S') + ', ' +
+      Math.abs(lon).toFixed(1) + '°' + (lon >= 0 ? (bm ? 'T' : 'E') : (bm ? 'B' : 'W'));
   }
   function capFirst(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
-  function verdictLabel(v) { return v === 'significant' ? 'Significant' : (v === 'borderline' ? 'Borderline' : 'No clear trend'); }
+  function verdictLabel(v) { return T(v === 'significant' ? 'Significant' : (v === 'borderline' ? 'Borderline' : 'No clear trend')); }
   function verdictClass(v) { return v === 'significant' ? 'sig' : (v === 'borderline' ? 'border' : 'none'); }
-  function ratePhrase(st, vr) { return withUnit(signed(st.sen.slope * 10, 2), vr.unit) + ' per decade'; }
+  function ratePhrase(st, vr) { return T('{x} per decade', { x: withUnit(signed(st.sen.slope * 10, 2), vr.unit) }); }
 
   // ---- data ----------------------------------------------------------------
 
@@ -498,7 +499,7 @@
   function setPeriod(a, b) {
     $('y0').value = a; $('y1').value = b;
     investigate({ scroll: false });
-    toast('Testing ' + a + '–' + b + ' only.');
+    toast(T('Testing {a}–{b} only.', { a: a, b: b }));
   }
 
   // ---- results -------------------------------------------------------------
@@ -682,9 +683,10 @@
     badge.textContent = v.badge; badge.className = 'badge badge-' + v.cls;
     replay($('verdict'));
 
-    $('chart-title').textContent = vname(vr) + (vr.unit ? ' (' + vr.unit + ')' : '') + ', ' +
+    $('chart-title').textContent = vname(vr) + (vr.unit ? ' (' + T(vr.unit) + ')' : '') + ', ' +
       (monthly ? T('each month minus its normal') + (res.month ? ' (' + T(MONTHS[res.month]) + ')' : '')
-        : T(res.month ? '{month} average' : 'yearly average', { month: T(MONTHS[res.month]) })) + ', ' + T(res.placeName);
+        : T(res.month ? '{month} average' : 'yearly average', { month: T(MONTHS[res.month]) })) + ', ' +
+      (res.placeId === 'custom' ? coordLabel(res.lat, res.lon) : T(res.placeName));
     $('empty').hidden = true;
     $('result').hidden = false;
     $('live-hint').hidden = false;
@@ -693,7 +695,7 @@
 
     var full = res.y0 === FIRST_YEAR && res.y1 === LAST_YEAR;
     $('reset-years').hidden = full;
-    $('reset-years').textContent = 'Back to the full record (' + FIRST_YEAR + '–' + LAST_YEAR + ')';
+    $('reset-years').textContent = T('Back to the full record ({a}–{b})', { a: FIRST_YEAR, b: LAST_YEAR });
 
     var total = st.ols.slope * (res.years[n - 1] - res.years[0]);
     var nYears = yearCount(res);
@@ -773,7 +775,7 @@
       return '<tr><td>' + whenLabel(y) + '</td><td>' + res.values[i].toFixed(vr.dp) + '</td><td>' +
         (st.ols.intercept + st.ols.slope * y).toFixed(vr.dp) + '</td></tr>';
     }).join('');
-    $('table-unit').textContent = vr.unit ? ' (' + vr.unit + ')' : '';
+    $('table-unit').textContent = vr.unit ? ' (' + T(vr.unit) + ')' : '';
 
     drawSeason(res);
     fillCompare(res);
@@ -1096,7 +1098,7 @@
     if (!list.some(function (v) { return v.id === state.v; })) state.v = list[0].id;
     $('variables').innerHTML = list.map(function (v) {
       return '<label class="var' + (v.id === state.v ? ' var-on' : '') + '"><input type="radio" name="var" value="' + v.id + '"' +
-        (v.id === state.v ? ' checked' : '') + '><span class="var-name">' + esc(vname(v)) + (v.unit ? ' <small>' + esc(v.unit) + '</small>' : '') +
+        (v.id === state.v ? ' checked' : '') + '><span class="var-name">' + esc(vname(v)) + (v.unit ? ' <small>' + esc(T(v.unit)) + '</small>' : '') +
         '</span><span class="var-def">' + esc(T(v.def)) + '</span></label>';
     }).join('');
     Array.prototype.forEach.call(document.querySelectorAll('.chip'), function (c) {
@@ -1297,10 +1299,10 @@
 
   function copyLink() {
     var url = location.href;
-    var done = function () { toast('Link copied. Anyone who opens it sees this case.'); };
+    var done = function () { toast(T('Link copied. Anyone who opens it sees this case.')); };
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(url).then(done, function () { toast('Copy the link from the address bar.'); });
-    } else toast('Copy the link from the address bar.');
+      navigator.clipboard.writeText(url).then(done, function () { toast(T('Copy the link from the address bar.')); });
+    } else toast(T('Copy the link from the address bar.'));
   }
 
   // ---- small UI pieces -----------------------------------------------------
@@ -1342,18 +1344,18 @@
   }
 
   function locate() {
-    if (!navigator.geolocation) { toast('Your browser cannot share its location.'); return; }
+    if (!navigator.geolocation) { toast(T('Your browser cannot share its location.')); return; }
     var b = $('locate');
-    b.disabled = true; b.textContent = 'finding you…';
+    b.disabled = true; b.textContent = T('finding you…');
     navigator.geolocation.getCurrentPosition(function (pos) {
-      b.disabled = false; b.textContent = 'use my location';
+      b.disabled = false; b.textContent = T('use my location');
       setCustom(pos.coords.latitude, pos.coords.longitude);
       updateMap(true);
-      toast('Moved to ' + coordLabel(state.lat, state.lon) + '.');
+      toast(T('Moved to {x}.', { x: coordLabel(state.lat, state.lon) }));
       scheduleLive(100);
     }, function () {
-      b.disabled = false; b.textContent = 'use my location';
-      toast('Could not get your location. Click the map instead.');
+      b.disabled = false; b.textContent = T('use my location');
+      toast(T('Could not get your location. Click the map instead.'));
     }, { timeout: 10000, maximumAge: 600000 });
   }
 

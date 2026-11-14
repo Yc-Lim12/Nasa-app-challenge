@@ -611,7 +611,7 @@ td { font-size: 14px; }
   box-shadow: 0 0 0 0.5px rgb(255 255 255 / 0.14), 0 12px 32px rgb(0 0 0 / 0.5);
   transform-origin: left center; animation: tag .3s var(--ease-out) both;
 }
-.g-badge::before { content: ""; position: absolute; top: 50%; left: -20px; width: 20px; height: 1px; background: rgb(255 255 255 / 0.5); }
+.g-badge::before { content: ""; position: absolute; top: calc(50% + var(--dy, 0px)); left: -20px; width: 20px; height: 1px; background: rgb(255 255 255 / 0.5); }
 .g-badge.flip { transform: translate(calc(-100% - 24px), -50%); transform-origin: right center; }
 .g-badge.flip::before { left: auto; right: -20px; }
 .g-badge strong { display: block; font-size: 15px; font-weight: 600; line-height: 1.25; letter-spacing: -0.01em; }
@@ -622,6 +622,25 @@ td { font-size: 14px; }
 .g-badge.border em { color: #ffd60a; background: rgb(255 214 10 / 0.16); }
 .g-badge.none em { color: #a1a1a6; background: rgb(255 255 255 / 0.1); }
 .g-badge.loading span::after { content: ""; display: inline-block; width: 1.2em; overflow: hidden; vertical-align: bottom; animation: dots 1.2s steps(4) infinite; }
+/* the badge as an info card: place, result, a small chart and a way into the case file */
+.g-badge-place { display: block; margin-bottom: 3px; font-size: 11.5px; font-weight: 500; color: #a1a1a6; letter-spacing: 0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-card { width: 230px; }
+.g-spark { display: block; width: 100%; height: 44px; margin-top: 10px; overflow: visible; }
+.g-spark-line { fill: none; stroke: rgb(255 255 255 / 0.85); stroke-width: 1.5; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.g-spark-trend { fill: none; stroke: #ff9f0a; stroke-width: 2; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.g-card.sig .g-spark-trend { stroke: #64d2ff; }
+.g-card.none .g-spark-trend { stroke: #a1a1a6; stroke-dasharray: 4 3; }
+.g-spark-years { display: flex; justify-content: space-between; margin-top: 2px; font-size: 10.5px; color: #8e8e93; font-variant-numeric: tabular-nums; }
+.g-spark-years i { font-style: normal; }
+.g-card em { margin-top: 8px; }
+.g-go {
+  display: block; width: 100%; margin-top: 10px; height: 34px; border: 0; border-radius: 10px; cursor: pointer; pointer-events: auto;
+  font: inherit; font-size: 13.5px; font-weight: 600; color: #fff; background: #0a84ff; transition: background-color .15s, transform var(--press);
+}
+.g-go:hover { background: #0077ed; }
+.g-go:active { transform: scale(0.97); }
+.g-go:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.globe-moving .g-badge { backdrop-filter: none; -webkit-backdrop-filter: none; }
 @keyframes dots { from { width: 0; } to { width: 1.2em; } }
 @keyframes tag { from { opacity: 0; scale: 0.92; } }
 
@@ -646,6 +665,8 @@ td { font-size: 14px; }
   .g-ctrls { bottom: 140px; right: 16px; }
   .g-readout { top: auto; bottom: 140px; right: auto; left: 20px; text-align: left; }
   .g-badge { max-width: min(58vw, 230px); min-width: 0; }
+  .g-card { width: min(58vw, 210px); padding: 10px 12px; }
+  .g-spark { height: 34px; margin-top: 8px; }
 }
 
 @media (max-width: 520px) {

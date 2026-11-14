@@ -1318,8 +1318,25 @@
     if (!res) { globe.setBadge(null); return; }
     var st = res.stats, vr = res.variable;
     var arrow = st.direction === 'up' ? '↑ ' : (st.direction === 'down' ? '↓ ' : '');
-    globe.setBadge({ title: vname(vr), cls: verdictClass(st.verdict),
-      text: arrow + T('{x} per decade', { x: withUnit(signed(st.sen.slope * 10, 2), vr.unit) }), note: T(verdictLabel(st.verdict)) });
+    var y0 = res.years[0], y1 = res.years[res.years.length - 1];
+    var line = function (x) { return st.sen.intercept + st.sen.slope * x; };
+    globe.setBadge({
+      place: (res.placeId === 'custom' ? coordLabel(res.lat, res.lon) : T(res.short || res.placeName)) +
+        (res.month ? ' · ' + T(MONTHS[res.month]) : ''),
+      title: vname(vr), cls: verdictClass(st.verdict),
+      text: arrow + T('{x} per decade', { x: withUnit(signed(st.sen.slope * 10, 2), vr.unit) }), note: T(verdictLabel(st.verdict)),
+      spark: { values: res.values, trend: [line(y0), line(y1)], from: y0, to: y1 },
+      action: { label: T('See the full case') + ' ›', run: openCase }
+    });
+  }
+
+  /** Show the full result: pull out the case file sheet, or scroll to it on a phone. */
+  function openCase() {
+    var app = document.querySelector('.app'), tab = $('panel-open');
+    if (wideScreen() && tab && !(app && app.classList.contains('panel-open'))) { tab.click(); return; }
+    var r = $('result'), panel = $('case-panel');
+    if (wideScreen() && panel) panel.scrollTo({ top: Math.max(0, r.offsetTop - 64), behavior: REDUCED ? 'auto' : 'smooth' });
+    else r.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' });
   }
 
   function selectionFor(lat, lon, size, placeId) {

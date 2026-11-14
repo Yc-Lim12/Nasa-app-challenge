@@ -292,17 +292,49 @@
       if (!show) { badgeEl.style('display', 'none'); return; }
       var xy = proj([sel.lon, sel.lat]);
       var r = node.getBoundingClientRect(), sx = r.width / W || 1;
-      badgeEl.style('display', null).style('left', xy[0] * sx + 'px').style('top', xy[1] * sx + 'px')
+      var y = xy[1] * sx;
+      badgeEl.style('display', null).style('left', xy[0] * sx + 'px')
         .classed('flip', xy[0] > (W - inset) * (W - inset < 600 ? 0.5 : 0.62));
+      // keep a tall card on screen; the connector line still points at the place
+      if (badgeH === null) badgeH = badgeEl.node().offsetHeight;
+      var half = badgeH / 2 + 12, top = Math.max(half, Math.min(r.height - half, y));
+      badgeEl.style('top', top + 'px').style('--dy', (y - top) + 'px');
+    }
+    var badgeH = null;   // measured once per badge, not on every frame
+
+    /** A small chart of the yearly values and their trend line, inside the badge. */
+    function sparkline(sp) {
+      var w = 200, h = 44, pad = 3, v = sp.values, n = v.length;
+      if (n < 2) return;
+      var lo = d3.min(v.concat(sp.trend)), hi = d3.max(v.concat(sp.trend)), span = hi - lo || 1;
+      var X = function (i) { return pad + (w - 2 * pad) * i / (n - 1); };
+      var Y = function (y) { return h - pad - (h - 2 * pad) * (y - lo) / span; };
+      var svg = badgeEl.append('svg').attr('class', 'g-spark').attr('viewBox', '0 0 ' + w + ' ' + h)
+        .attr('preserveAspectRatio', 'none').attr('aria-hidden', 'true');
+      svg.append('path').attr('class', 'g-spark-line')
+        .attr('d', v.map(function (y, i) { return (i ? 'L' : 'M') + X(i).toFixed(1) + ',' + Y(y).toFixed(1); }).join(''));
+      svg.append('path').attr('class', 'g-spark-trend')
+        .attr('d', 'M' + X(0) + ',' + Y(sp.trend[0]).toFixed(1) + 'L' + X(n - 1) + ',' + Y(sp.trend[1]).toFixed(1));
+      if (sp.from) {
+        var lab = badgeEl.append('div').attr('class', 'g-spark-years');
+        lab.append('i').text(sp.from); lab.append('i').text(sp.to);
+      }
     }
 
     function setBadge(b) {
-      badge = b;
+      badge = b; badgeH = null;
       if (b) {
-        badgeEl.attr('class', 'g-badge ' + (b.cls || '')).html('');
+        badgeEl.attr('class', 'g-badge ' + (b.cls || '') + (b.spark ? ' g-card' : '')).html('');
+        if (b.place) badgeEl.append('small').attr('class', 'g-badge-place').text(b.place);
         if (b.title) badgeEl.append('strong').text(b.title);
         badgeEl.append('span').text(b.text || '');
+        if (b.spark) sparkline(b.spark);
         if (b.note) badgeEl.append('em').text(b.note);
+        if (b.action) {
+          badgeEl.append('button').attr('type', 'button').attr('class', 'g-go').text(b.action.label)
+            .on('pointerdown', function (e) { e.stopPropagation(); })
+            .on('click', function (e) { e.stopPropagation(); b.action.run(); });
+        }
         // restart the entrance animation
         var n = badgeEl.node(); n.style.animation = 'none'; void n.offsetWidth; n.style.animation = '';
       }

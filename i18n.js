@@ -73,7 +73,7 @@
     'Significant': 'Signifikan', 'No clear trend': 'Tiada tren jelas',
 
     // ---- evidence tiles ----
-    'per decade': 'sedekad', 'Rate of change': 'Kadar perubahan', 'Total change': 'Jumlah perubahan',
+    'per decade': 'sedekad', 'Rate of change': 'Kadar perubahan', 'Straight-line rate': 'Kadar garis lurus', 'Total change': 'Jumlah perubahan',
     'Slope of the straight line through the points. With 95% confidence the true rate is between {a} and {b}.':
       'Kecerunan garis lurus melalui titik-titik. Dengan keyakinan 95%, kadar sebenar adalah antara {a} dan {b}.',
     'Along the trend line from {a} to {b} ({n} years of data).': 'Sepanjang garis tren dari {a} hingga {b} ({n} tahun data).',
@@ -226,8 +226,8 @@
     '{n} open-ocean cells were left out: NASA POWER has no soil there.': '{n} sel lautan terbuka tidak dimasukkan: NASA POWER tiada data tanah di sana.',
     'How to use': 'Cara guna', 'New here?': 'Baru di sini?', 'Show me': 'Tunjukkan', 'No thanks': 'Tidak, terima kasih', 'Close tour': 'Tutup lawatan',
     'Take a one-minute tour of what to click and what each part shows.': 'Ikuti lawatan seminit tentang apa yang perlu diklik dan apa yang ditunjukkan setiap bahagian.',
-    'The globe': 'Glob', 'Ask a question': 'Tanya soalan', 'Not sure what to test?': 'Tidak pasti apa yang hendak diuji?', 'Map layers': 'Lapisan peta',
-    'The answer': 'Jawapan', 'The chart': 'Carta', 'The evidence': 'Bukti', 'Change the case': 'Ubah kes', 'Ask AI': 'Tanya AI',
+    'The globe': 'Glob', 'Not sure what to test?': 'Tidak pasti apa yang hendak diuji?', 'Map layers': 'Lapisan peta',
+    'The answer': 'Jawapan', 'The chart': 'Carta', 'Change the case': 'Ubah kes',
     'Drag to spin the Earth, scroll or pinch to zoom. Click any place to test it: forty years of NASA data are fetched for that spot.':
       'Seret untuk memutar Bumi, tatal atau cubit untuk zum. Klik mana-mana tempat untuk mengujinya: empat puluh tahun data NASA diambil untuk tempat itu.',
     'Or type a question in plain words, such as “Is Penang getting rainier?” or “Is the Arctic warming since 2000?”. It sets up the case for you.':
@@ -248,6 +248,19 @@
       'Apa, di mana dan bila: pemboleh ubah, tempat dan kawasan, tahun, musim atau bulan, dan satu nilai setahun atau setiap bulan.',
     'Explains the result in plain words and answers questions about it. It works without an account; an OpenAI key in its settings gives longer answers.':
       'Menerangkan keputusan dalam bahasa mudah dan menjawab soalan tentangnya. Ia berfungsi tanpa akaun; kunci OpenAI dalam tetapannya memberi jawapan lebih panjang.',
+    'Ask AI a question': 'Tanya AI satu soalan',
+    '95% range from {a} to {b}': 'Julat 95% dari {a} hingga {b}', '95% range': 'Julat 95%', 'significant below 0.05': 'signifikan bawah 0.05',
+    'Kendall’s tau {t}: how steadily it goes one way': 'Tau Kendall {t}: sejauh mana ia konsisten ke satu arah',
+    '{r}% of the variation explained by the line': '{r}% variasi diterangkan oleh garis', '{a} of {b} years so far': '{a} daripada {b} tahun setakat ini',
+    'Settings': 'Tetapan', 'Appearance': 'Paparan', 'Light': 'Cerah', 'Dark': 'Gelap', 'Auto': 'Auto', 'Language': 'Bahasa', 'Map style': 'Gaya peta',
+    'Satellite': 'Satelit', 'Latest satellite pass': 'Laluan satelit terkini', 'Dark map': 'Peta gelap', 'Help': 'Bantuan', 'Close': 'Tutup',
+    'Show the tour again': 'Tunjukkan lawatan semula', 'How the maths works (Methods)': 'Cara matematik berfungsi (Kaedah)', 'AI settings (OpenAI key)': 'Tetapan AI (kunci OpenAI)',
+    'Satellite is a cloud-free NASA picture. Latest satellite pass is yesterday’s real view, clouds included.': 'Satelit ialah gambar NASA tanpa awan. Laluan satelit terkini ialah pandangan sebenar semalam, termasuk awan.',
+    '“Explain this simply” puts the result in plain words. “Ask AI a question” opens a chat about it. It works without an account; an OpenAI key in Settings gives longer answers.':
+      '“Terangkan dengan mudah” menerangkan keputusan dalam bahasa mudah. “Tanya AI satu soalan” membuka sembang tentangnya. Ia berfungsi tanpa akaun; kunci OpenAI dalam Tetapan memberi jawapan lebih panjang.',
+    'Light or dark, English or Bahasa Malaysia, the map style, and this tour again.': 'Cerah atau gelap, Bahasa Inggeris atau Bahasa Malaysia, gaya peta, dan lawatan ini semula.',
+    'For a chosen place, variable and period, Trend Detective turns NASA’s monthly data into one value per year (the mean of the twelve months weighted by their number of days, as NASA POWER computes its own annual values; one chosen month; or a three-month season, also weighted by days; December to February takes December from the year before) and asks: is there a steady rise or fall, how fast is it, and could it be chance?':
+      'Untuk tempat, pemboleh ubah dan tempoh yang dipilih, Trend Detective menukar data bulanan NASA kepada satu nilai setahun (purata dua belas bulan ditimbang mengikut bilangan hari, seperti NASA POWER mengira nilai tahunannya sendiri; satu bulan yang dipilih; atau musim tiga bulan, juga ditimbang mengikut hari; Disember hingga Februari mengambil Disember tahun sebelumnya) dan bertanya: adakah terdapat kenaikan atau penurunan yang konsisten, berapa cepat, dan mungkinkah ia kebetulan?',
     'Grid cells': 'Sel grid', 'Smooth': 'Licin', 'Opacity': 'Kelegapan', 'How to draw the grid': 'Cara melukis grid',
     'Guided stories': 'Kisah berpandu', 'World story': 'Kisah dunia',
     'Wildfire smoke over Wisconsin': 'Asap kebakaran hutan di Wisconsin', 'Summer haze far from the fires': 'Jerebu musim panas jauh dari kebakaran',
@@ -567,6 +580,12 @@
       'Apa yang diukur oleh aplikasi ini',
     'For a chosen place, variable and period, Trend Detective turns NASA’s monthly data into one value per year (the mean of the twelve months, one chosen month, or a three-month season; December to February takes December from the year before) and asks: is there a steady rise or fall, how fast is it, and could it be chance?':
       'Bagi tempat, pemboleh ubah dan tempoh yang dipilih, Trend Detective menukar data bulanan NASA kepada satu nilai setahun (purata dua belas bulan, satu bulan yang dipilih, atau satu musim tiga bulan; Disember hingga Februari mengambil Disember daripada tahun sebelumnya) dan bertanya: adakah terdapat kenaikan atau penurunan yang konsisten, berapa cepat ia berlaku, dan mungkinkah ia hanya kebetulan?',
+    'For a chosen place, variable and period, Trend Detective turns NASA’s monthly data into one value per year (the mean of the twelve months weighted by their number of days, as NASA POWER computes its own annual values; one chosen month; or a three-month season, also weighted by days; December to February takes December from the year before) and asks: is there a steady rise or fall, how fast is it, and could it be chance?':
+      'Bagi tempat, pemboleh ubah dan tempoh yang dipilih, Trend Detective menukar data bulanan NASA kepada satu nilai setahun (purata dua belas bulan yang diberi pemberat mengikut bilangan hari, seperti cara NASA POWER mengira nilai tahunannya sendiri; satu bulan yang dipilih; atau satu musim tiga bulan, juga diberi pemberat mengikut hari; Disember hingga Februari mengambil Disember daripada tahun sebelumnya) dan bertanya: adakah terdapat kenaikan atau penurunan yang konsisten, berapa cepat ia berlaku, dan mungkinkah ia hanya kebetulan?',
+    '{y} left out: before {f} this variable comes from a different satellite dataset (GEWEX SRB) that does not match the later one (CERES), and the jump between them would look like a trend.':
+      '{y} tidak digunakan: sebelum {f} pemboleh ubah ini datang daripada set data satelit yang berbeza (GEWEX SRB) yang tidak sepadan dengan set data kemudian (CERES), dan lonjakan antara keduanya akan kelihatan seperti tren.',
+    '<strong>Sunlight and cloud cover start in 2001.</strong> The two datasets do not match where they join: over Kuala Lumpur, cloud cover jumps from about 75% to 85% in 2001. A trend test across the join would report that jump as a trend, so these two variables use CERES only, from 2001.':
+      '<strong>Cahaya matahari dan litupan awan bermula pada 2001.</strong> Kedua-dua set data tidak sepadan di titik sambungannya: di atas Kuala Lumpur, litupan awan melonjak daripada kira-kira 75% kepada 85% pada 2001. Ujian tren merentasi sambungan itu akan melaporkan lonjakan tersebut sebagai tren, jadi kedua-dua pemboleh ubah ini hanya menggunakan CERES, dari 2001.',
     'Data sources':
       'Sumber data',
     '<strong>NASA POWER</strong> (Prediction Of Worldwide Energy Resources), NASA Langley Research Center, monthly API, 1981 onwards. <a href="https://power.larc.nasa.gov/" target="_blank" rel="noopener">power.larc.nasa.gov</a>':
@@ -658,7 +677,100 @@
     'July': 'Julai', 'August': 'Ogos', 'October': 'Oktober', 'December': 'Disember',
     'Seasons': 'Musim', 'One month': 'Satu bulan',
     'June to August': 'Jun hingga Ogos', 'September to November': 'September hingga November',
-    'December to February': 'Disember hingga Februari', 'March to May': 'Mac hingga Mei'
+    'December to February': 'Disember hingga Februari', 'March to May': 'Mac hingga Mei',
+    'Mar': 'Mac', 'Aug': 'Ogo', 'Oct': 'Okt', 'Dec': 'Dis',
+
+    // ---- scientific chart: reference period, tooltip, legend, drag ----
+    '{a}–{b} average': 'purata {a}–{b}', 'average of {a}–{b}': 'purata {a}–{b}',
+    'Difference from the {ref}': 'Beza daripada {ref}', 'Start year': 'Tahun mula',
+    'Shift after {y} (Pettitt {p})': 'Anjakan selepas {y} (Pettitt {p})',
+    '{v} vs the {ref}': '{v} berbanding {ref}', '{v} on the trend line': '{v} pada garis tren',
+    '95% band: {a} to {b}': 'Jalur 95%: {a} hingga {b}', '{v} on the Sen line': '{v} pada garis Sen',
+    'Residual: {v}': 'Baki: {v}', '{v} 5-year average': '{v} purata 5 tahun',
+    '{n} years.': '{n} tahun.', 'Let go to test this period.': 'Lepaskan untuk menguji tempoh ini.',
+    'Pick at least {n} years.': 'Pilih sekurang-kurangnya {n} tahun.',
+    'Pick at least {n} years to test a trend.': 'Pilih sekurang-kurangnya {n} tahun untuk menguji tren.',
+    '95% prediction interval': 'Selang ramalan 95%', 'Change point': 'Titik perubahan',
+    'Straight line fitted by least squares': 'Garis lurus yang dipadankan dengan kaedah kuasa dua terkecil',
+    'Where the true trend line probably lies (95% confidence). Single years scatter much more widely, so most dots sit outside it.':
+      'Kedudukan sebenar garis tren yang paling mungkin (keyakinan 95%). Setiap tahun bertaburan lebih luas, jadi kebanyakan titik berada di luarnya.',
+    'Where single years are expected to fall (95% prediction interval). About 1 year in 20 should land outside it.':
+      'Julat yang dijangka bagi setiap tahun (selang ramalan 95%). Kira-kira 1 daripada 20 tahun dijangka berada di luarnya.',
+    'Theil–Sen line: the median of the slopes between every pair of years. Robust to outliers; pairs with the Mann–Kendall test.':
+      'Garis Theil–Sen: median cerun antara setiap pasangan tahun. Tidak mudah terjejas oleh nilai luar biasa; digunakan bersama ujian Mann–Kendall.',
+    'Pettitt (1979) test: the most likely point where the values shift, with the mean before and after. A steady trend can also trigger it.':
+      'Ujian Pettitt (1979): titik yang paling mungkin berlaku anjakan nilai, dengan purata sebelum dan selepasnya. Tren yang mantap juga boleh mencetuskannya.',
+    'The trend line carried 10 years on. The shaded area is where a single year would probably land (95% prediction band), if nothing about the trend changes. It is not a forecast.':
+      'Garis tren dilanjutkan 10 tahun. Kawasan berlorek ialah julat yang mungkin bagi satu tahun (jalur ramalan 95%) jika tren tidak berubah. Ini bukan ramalan.',
+    'Drag across the chart to test only those years. Stripes: {lo} years were below the {ref}, {hi} years above.':
+      'Seret merentasi carta untuk menguji tahun-tahun itu sahaja. Jalur: tahun {lo} di bawah {ref}, tahun {hi} di atasnya.',
+
+    // ---- residuals and trend-vs-start-year panels ----
+    'Residuals: observed minus trend line': 'Baki: nilai cerapan tolak garis tren',
+    'Trend from each start year to {y}': 'Tren dari setiap tahun mula hingga {y}',
+    '{s} of {n} start years give a 95% interval that excludes zero. Click a bar to test that period.':
+      '{s} daripada {n} tahun mula memberi selang 95% yang tidak merangkumi sifar. Klik bar untuk menguji tempoh itu.',
+    'From {a} to {b} ({n} years): {s} {u}per decade, 95% CI [{lo}, {hi}]. Click to test this period.':
+      'Dari {a} hingga {b} ({n} tahun): {s} {u}sedekad, SK 95% [{lo}, {hi}]. Klik untuk menguji tempoh ini.',
+
+    // ---- statistical summary table ----
+    'Statistical summary': 'Ringkasan statistik',
+    'Linear regression (ordinary least squares)': 'Regresi linear (kuasa dua terkecil biasa)',
+    'Slope ± standard error': 'Cerun ± ralat piawai', '95% confidence interval': 'Selang keyakinan 95%',
+    'R² · residual standard deviation': 'R² · sisihan piawai baki',
+    'Autocorrelation of the residuals': 'Autokorelasi baki',
+    'Lag-1 autocorrelation r₁ · Durbin–Watson d': 'Autokorelasi lat-1 r₁ · Durbin–Watson d',
+    'Effective sample size n_eff (Santer et al. 2000)': 'Saiz sampel berkesan n_eff (Santer et al. 2000)',
+    'Slope 95% CI, adjusted': 'Selang keyakinan 95% cerun, dilaraskan', 't-test p, adjusted': 'Nilai p ujian-t, dilaraskan',
+    'Mann–Kendall trend test': 'Ujian tren Mann–Kendall', 'Kendall’s τ · p': 'τ Kendall · p',
+    'Hamed–Rao modified p (autocorrelation)': 'p terubah suai Hamed–Rao (autokorelasi)',
+    'Theil–Sen estimator': 'Penganggar Theil–Sen', '95% confidence interval (Sen 1968)': 'Selang keyakinan 95% (Sen 1968)',
+    'Change point (Pettitt 1979)': 'Titik perubahan (Pettitt 1979)', 'Most likely shift': 'Anjakan paling mungkin',
+    'Mean before · after the shift': 'Purata sebelum · selepas anjakan',
+    'Reference for differences and stripes': 'Rujukan bagi beza dan jalur', 'Series': 'Siri', 'Location': 'Lokasi',
+    'Period · years used': 'Tempoh · tahun digunakan', 'Source': 'Sumber',
+    '{a} of {n} years': '{a} daripada {n} tahun', 'too few effective years': 'terlalu sedikit tahun berkesan',
+    'corrected variance not positive': 'varians terlaras tidak positif', 'lags {l}': 'lat {l}', 'no significant lags': 'tiada lat yang signifikan',
+    'between {a} and {b}': 'antara {a} dan {b}', 'none (all values equal)': 'tiada (semua nilai sama)',
+    'significant, drawn on the chart': 'signifikan, dilukis pada carta', 'not significant': 'tidak signifikan',
+    '{ref} (WMO climate normal; {n} of 30 years with data)': '{ref} (normal iklim WMO; {n} daripada 30 tahun ada data)',
+    '{ref} (fewer than {m} of the 1991–2020 years have data)': '{ref} (kurang daripada {m} tahun 1991–2020 ada data)',
+    'NASA POWER monthly {p}, {part}': 'NASA POWER bulanan {p}, {part}', '{month} mean': 'purata {month}',
+    'annual mean (months weighted by days)': 'purata tahunan (bulan diberi pemberat mengikut bilangan hari)',
+    '{s}° box centred on {lat}°, {lon}° (area-weighted mean of {c} grid cells)': 'kotak {s}° berpusat di {lat}°, {lon}° (purata berpemberat luas bagi {c} sel grid)',
+    'single grid cell at {lat}°, {lon}°': 'satu sel grid di {lat}°, {lon}°', '{k} skipped: incomplete months': '{k} dilangkau: bulan tidak lengkap',
+    'Two-sided tests, α = 0.05. Per-decade values are the per-year slope × 10. The verdict above uses the Mann–Kendall p-value adjusted for year-to-year memory. A steady trend can also make the Pettitt test significant, so a change point is most convincing when the residuals jump at that year too.':
+      'Ujian dua hujung, α = 0.05. Nilai sedekad ialah cerun setahun × 10. Keputusan di atas menggunakan nilai p Mann–Kendall yang dilaraskan untuk ingatan dari tahun ke tahun. Tren yang mantap juga boleh menjadikan ujian Pettitt signifikan, jadi titik perubahan paling meyakinkan apabila baki turut melonjak pada tahun itu.',
+    'References:': 'Rujukan:',
+
+    // ---- months panel ----
+    'There is not enough monthly data here to test each month.': 'Data bulanan di sini tidak mencukupi untuk menguji setiap bulan.',
+    'No single month shows a statistically significant trend here.': 'Tiada bulan yang menunjukkan tren signifikan secara statistik di sini.',
+    '{s} months show a significant trend. The biggest is {m}, rising by about {rate}.': '{s} bulan menunjukkan tren signifikan. Yang terbesar ialah {m}, meningkat kira-kira {rate}.',
+    '{s} months show a significant trend. The biggest is {m}, falling by about {rate}.': '{s} bulan menunjukkan tren signifikan. Yang terbesar ialah {m}, menurun kira-kira {rate}.',
+    '{a} of {b}': '{a} daripada {b}', 'Not enough data': 'Data tidak mencukupi',
+    'Click to go back to the whole year': 'Klik untuk kembali ke sepanjang tahun', 'Click to investigate this month': 'Klik untuk menyiasat bulan ini',
+
+    // ---- "At this spot" card, trend-map correction, two variables, failed case ----
+    'average of each calendar month, {a}–{b}': 'purata setiap bulan kalendar, {a}–{b}',
+    'Where the true trend line probably lies (95% confidence, allowing for year-to-year memory). Single values scatter much more widely, so most dots sit outside it.':
+      'Kedudukan sebenar garis tren yang paling mungkin (keyakinan 95%, mengambil kira ingatan dari tahun ke tahun). Setiap nilai bertaburan lebih luas, jadi kebanyakan titik berada di luarnya.',
+    'each month minus its calendar-month average': 'setiap bulan tolak purata bulan kalendarnya',
+    'Lag-1 r used, with small-sample correction': 'r lat-1 yang digunakan, dengan pembetulan sampel kecil',
+    'Effective sample size n_eff': 'Saiz sampel berkesan n_eff', '{a} of {n} values': '{a} daripada {n} nilai',
+    'Slope 95% CI, adjusted (drawn as the band)': 'Selang keyakinan 95% cerun, dilaraskan (dilukis sebagai jalur)',
+    'p adjusted for year-to-year memory (used for the verdict)': 'p dilaraskan untuk ingatan dari tahun ke tahun (digunakan untuk keputusan)',
+    'Period · values used': 'Tempoh · nilai digunakan', '{k} years with missing months': '{k} tahun dengan bulan yang hilang',
+    'At this spot': 'Di lokasi ini', 'No data here': 'Tiada data di sini',
+    'One grid cell, yearly averages from NASA POWER. Pick one to open the full case: chart, tests and evidence.':
+      'Satu sel grid, purata tahunan daripada NASA POWER. Pilih satu untuk membuka kes penuh: carta, ujian dan bukti.',
+    'Dot: significant after correcting for testing many cells at once (Benjamini–Hochberg false discovery rate, 5%). Red: going up, blue: going down, per decade.':
+      'Titik: signifikan selepas pembetulan kerana banyak sel diuji serentak (kadar penemuan palsu Benjamini–Hochberg, 5%). Merah: meningkat, biru: menurun, sedekad.',
+    '{r} pass p < 0.05 on their own; the correction keeps {s}.': '{r} lulus p < 0.05 secara berasingan; pembetulan mengekalkan {s}.',
+    'After removing both long-term trends, the link turns the other way ({s}, r = {r}): a year with more {a} than usual tends to have less {b}. The first link came from both rising or falling over the same years.':
+      'Selepas kedua-dua tren jangka panjang dibuang, hubungan itu berbalik arah ({s}, r = {r}): tahun dengan {a} lebih tinggi daripada biasa cenderung mempunyai {b} lebih rendah. Hubungan pertama datang daripada kedua-duanya meningkat atau menurun dalam tahun yang sama.',
+    'After removing both long-term trends, the link turns the other way ({s}, r = {r}): a year with more {a} than usual tends to have more {b}. The first link came from both rising or falling over the same years.':
+      'Selepas kedua-dua tren jangka panjang dibuang, hubungan itu berbalik arah ({s}, r = {r}): tahun dengan {a} lebih tinggi daripada biasa cenderung mempunyai {b} lebih tinggi juga. Hubungan pertama datang daripada kedua-duanya meningkat atau menurun dalam tahun yang sama.',
   };
 
   var lang = 'en';

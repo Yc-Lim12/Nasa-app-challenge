@@ -55,7 +55,13 @@ test('yearlySeries averages all twelve months for a full year', () => {
   );
   const result = TD.yearlySeries(months, 2020, 2020, 0);
   assert.deepEqual(Array.from(result.years), [2020]);
-  assert.deepEqual(Array.from(result.values), [6.5]);
+  // Months are weighted by their number of days, as NASA POWER does for its own annual
+  // value (checked against POWER's published annual figures). 2020 is a leap year:
+  // (1·31 + 2·29 + 3·31 + 4·30 + 5·31 + 6·30 + 7·31 + 8·31 + 9·30 + 10·31 + 11·30 + 12·31) / 366
+  const days = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  const expected = days.reduce((s, d, i) => s + (i + 1) * d, 0) / 366;
+  assert.ok(Math.abs(result.values[0] - expected) < 1e-12);
+  assert.ok(Math.abs(result.values[0] - 6.5136612) < 1e-7);
 });
 
 test('yearlySeries returns the selected month, not the annual mean', () => {
@@ -67,13 +73,15 @@ test('yearlySeries returns the selected month, not the annual mean', () => {
 test('yearlySeries averages a three-month season', () => {
   const result = TD.yearlySeries({ 202006: 3, 202007: 6, 202008: 9 }, 2020, 2020, 13);
   assert.deepEqual(Array.from(result.years), [2020]);
-  assert.deepEqual(Array.from(result.values), [6]);
+  // weighted by days: (3·30 + 6·31 + 9·31) / 92
+  assert.ok(Math.abs(result.values[0] - 555 / 92) < 1e-12);
 });
 
 test('December-to-February season uses December from the prior year', () => {
   const result = TD.yearlySeries({ 202012: 12, 202101: 1, 202102: 2 }, 2021, 2021, 15);
   assert.deepEqual(Array.from(result.years), [2021]);
-  assert.deepEqual(Array.from(result.values), [5]);
+  // December 2020 (31 days), January 2021 (31), February 2021 (28): (12·31 + 1·31 + 2·28) / 90
+  assert.ok(Math.abs(result.values[0] - 459 / 90) < 1e-12);
 });
 
 test('missing NASA fill values do not enter averages and incomplete years are skipped', () => {
@@ -125,11 +133,16 @@ test('CSV download contains the correct year, observation and trend values', asy
     variable: { id: 'T2M', unit: '°C' },
     years: [2000, 2010],
     values: [10, 20],
-    stats: { ols: { intercept: -1990, slope: 1 } }
+    // a perfect fit (residual SE 0), so the band and prediction interval equal the line
+    stats: { ols: { intercept: -1990, slope: 1, n: 2, meanX: 2005, sxx: 50, residualSE: 0, tCrit: 2, tCritPlain: 2, resid: [0, 0] },
+      sen: { intercept: -1990, slope: 1 } }
   });
   hooks.downloadCsv();
   const csv = await getDownloadedBlob().text();
-  assert.equal(csv, '"year","T2M (°C)","trend_line"\n"2000","10.0000","10.0000"\n"2010","20.0000","20.0000"\n');
+  assert.equal(csv,
+    '"year","T2M (°C)","trend_line","band_low_95","band_high_95","prediction_low_95","prediction_high_95","residual","sen_line"\n' +
+    '"2000","10.0000","10.0000","10.0000","10.0000","10.0000","10.0000","0.0000","10.0000"\n' +
+    '"2010","20.0000","20.0000","20.0000","20.0000","20.0000","20.0000","0.0000","20.0000"\n');
 });
 
 test('open-ocean topsoil wetness (NASA gives 1 in every month) is left out, not averaged', () => {

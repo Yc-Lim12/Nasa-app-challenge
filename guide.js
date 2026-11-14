@@ -33,8 +33,10 @@
       text: 'The numbers behind the verdict: rate per decade, total change, the two tests (Mann-Kendall and t-test) and how many years a test would need.' },
     { target: '#settings', prep: 'case', title: 'Change the case',
       text: 'What, where and when: the variable, the place and area, the years, a season or a month, and one value per year or every month.' },
-    { target: '#ai-fab', title: 'Ask AI',
-      text: 'Explains the result in plain words and answers questions about it. It works without an account; an OpenAI key in its settings gives longer answers.' }
+    { target: '.ai-bar', prep: 'case', title: 'Ask AI',
+      text: '“Explain this simply” puts the result in plain words. “Ask AI a question” opens a chat about it. It works without an account; an OpenAI key in Settings gives longer answers.' },
+    { target: '#st-open', title: 'Settings',
+      text: 'Light or dark, English or Bahasa Malaysia, the map style, and this tour again.' }
   ];
 
   var i = 0, box, ring, bubble, lastFocus = null, running = false;
@@ -82,13 +84,14 @@
     bubble.style.top = Math.max(12, Math.min(vh - bh - 12, y)) + 'px';
   }
 
+  var showToken = 0;   // only the latest step may draw itself (an older one may finish loading later)
   function show(n) {
     i = Math.max(0, Math.min(STEPS.length - 1, n));
-    var step = STEPS[i];
+    var step = STEPS[i], my = ++showToken;
     bubble.classList.add('loading');
     var ready = step.prep === 'case' ? ensureCase().then(openCase) : Promise.resolve();
     ready.then(function () {
-      if (!running) return;
+      if (!running || my !== showToken) return;
       var el = targetEl(step);
       if (el) el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' });
       bubble.innerHTML =
@@ -148,15 +151,19 @@
       var b = e.target.closest('[data-gd]');
       if (!b) return;
       var a = b.getAttribute('data-gd');
+      // While a step is still loading its example case, the old bubble is on screen: pressing
+      // Next or Back there would skip a step, so wait. "Close tour" always works.
+      if ((a === 'next' || a === 'back') && bubble.classList.contains('loading')) return;
       if (a === 'next') { if (i < STEPS.length - 1) show(i + 1); else end(); }
       else if (a === 'back') show(i - 1);
       else end();
     });
     document.addEventListener('keydown', function (e) {
       if (!running) return;
+      var loading = bubble.classList.contains('loading');
       if (e.key === 'Escape') end();
-      else if (e.key === 'ArrowRight') show(i + 1);
-      else if (e.key === 'ArrowLeft') show(i - 1);
+      else if (e.key === 'ArrowRight' && !loading) show(i + 1);
+      else if (e.key === 'ArrowLeft' && !loading) show(i - 1);
       else if (e.key === 'Tab') {      // keep focus inside the bubble
         var f = bubble.querySelectorAll('button');
         if (!f.length) return;

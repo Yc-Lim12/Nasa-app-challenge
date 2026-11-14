@@ -81,13 +81,18 @@
       <p class="brief" id="brief"></p>
     </section>
 
+    <!-- Filled in when someone clicks the globe: a quick reading of each topic at that spot. -->
+    <section class="spot" id="spot" hidden aria-live="polite"></section>
+
     <details class="settings" id="settings" open>
       <summary>
         <span class="settings-title" data-i18n>Case settings</span>
         <span class="settings-hint" data-i18n>What, where and when</span>
       </summary>
 
-      <form class="case" id="case-form" aria-label="Case settings">
+      <!-- novalidate: app.js keeps every value in range itself (e.g. latitude 95 becomes 89.5). The browser's
+           own check blocked "Investigate" with a warning hidden inside the folded settings. -->
+      <form class="case" id="case-form" aria-label="Case settings" novalidate>
         <ol class="steps">
           <li id="step-what">
             <h2 data-i18n>What to investigate</h2>
@@ -170,11 +175,14 @@
             <label class="inline-field"><span data-i18n>Compare with</span> <select id="compare"></select></label>
           </div>
           <div id="chart" class="chart"></div>
+          <div id="resid" class="chart chart-resid"></div>
+          <div id="sens" class="chart chart-sens"></div>
           <div class="chart-foot">
             <p class="hint" id="chart-hint"></p>
             <button type="button" class="link" id="reset-years" hidden></button>
           </div>
           <p class="compare-note" id="compare-note" hidden></p>
+          <section class="stats-summary" id="stats-summary" aria-label="Statistical summary"></section>
           <details class="table-view">
             <summary data-i18n>Show the numbers as a table</summary>
             <div class="table-scroll">
@@ -281,7 +289,7 @@
 
     <section>
       <h3 data-i18n>What the app measures</h3>
-      <p data-i18n>For a chosen place, variable and period, Trend Detective turns NASA’s monthly data into one value per year (the mean of the twelve months, one chosen month, or a three-month season; December to February takes December from the year before) and asks: is there a steady rise or fall, how fast is it, and could it be chance?</p>
+      <p data-i18n>For a chosen place, variable and period, Trend Detective turns NASA’s monthly data into one value per year (the mean of the twelve months weighted by their number of days, as NASA POWER computes its own annual values; one chosen month; or a three-month season, also weighted by days; December to February takes December from the year before) and asks: is there a steady rise or fall, how fast is it, and could it be chance?</p>
     </section>
 
     <section>
@@ -290,6 +298,7 @@
         <li data-i18n><strong>NASA POWER</strong> (Prediction Of Worldwide Energy Resources), NASA Langley Research Center, monthly API, 1981 onwards. <a href="https://power.larc.nasa.gov/" target="_blank" rel="noopener">power.larc.nasa.gov</a></li>
         <li data-i18n><strong>MERRA-2 reanalysis</strong> for temperature, rain, soil wetness, evaporation, humidity, water vapour, snow, wind and ozone. Gelaro, R., et al. (2017). The Modern-Era Retrospective Analysis for Research and Applications, Version 2 (MERRA-2). <em>Journal of Climate</em>, 30(14), 5419–5454.</li>
         <li data-i18n><strong>CERES SYN1deg</strong> (from 2001) and <strong>GEWEX SRB</strong> (before 2001) for sunlight, cloud and aerosol. Doelling, D. R., et al. (2013). Geostationary enhanced temporal interpolation for CERES flux products. <em>Journal of Atmospheric and Oceanic Technology</em>, 30(6), 1072–1090.</li>
+        <li data-i18n><strong>Sunlight and cloud cover start in 2001.</strong> The two datasets do not match where they join: over Kuala Lumpur, cloud cover jumps from about 75% to 85% in 2001. A trend test across the join would report that jump as a trend, so these two variables use CERES only, from 2001.</li>
         <li data-i18n><strong>Satellite pictures on the globe</strong>: NASA Blue Marble (shaded relief and bathymetry, NASA Earth Observatory) and the daily true-colour image from the VIIRS instrument on NOAA-20, both delivered by NASA GIBS. They are pictures for viewing, not data for trend tests. The layers button on the globe switches between them and the plain dark map.</li>
         <li data-i18n><strong>GPM IMERG</strong> half-hourly precipitation rate, shown in “Rain now”, delivered as images by NASA GIBS (Global Imagery Browse Services). These are pictures for viewing, not data for trend tests.</li>
         <li data-i18n>Sea surface temperature is MERRA-2 surface skin temperature over water, which MERRA-2 takes from observed sea temperatures.</li>
@@ -364,6 +373,7 @@
 <script src="ai.js"></script>
 <script src="wizard.js"></script>
 <script src="guide.js"></script>
+<script src="settings.js"></script>
 <script src="polish.js"></script>
 </body>
 </html>

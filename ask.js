@@ -71,6 +71,7 @@
   ];
 
   var TD;
+  var waiting = null;   // the listener waiting for the current question's answer
   function $(id) { return document.getElementById(id); }
   function T(s, v) { return TD.T(s, v); }
   function esc(s) { return TD.esc(s); }
@@ -148,11 +149,16 @@
     if (cfg.keepPlace) { delete cfg.keepPlace; }
     cfg.compare = '';
     if (window.TDStories) window.TDStories.exit();
-    document.addEventListener('td:result', function once() {
-      document.removeEventListener('td:result', once);
+    // Only one question waits for an answer at a time. Without this, asking twice in a row
+    // (or after a question that failed) left an extra listener and printed the answer twice.
+    if (waiting) document.removeEventListener('td:result', waiting);
+    waiting = function () {
+      document.removeEventListener('td:result', waiting);
+      waiting = null;
       var head = $('verdict-head').textContent;
       outEl.innerHTML += '<span class="ask-answer">' + esc(head) + '</span>';
-    });
+    };
+    document.addEventListener('td:result', waiting);
     TD.apply(cfg);
   }
 

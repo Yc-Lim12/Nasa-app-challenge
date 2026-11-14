@@ -78,6 +78,9 @@
       if (focus) (open ? close : tab).focus({ preventScroll: true });
     }
 
+    // Lets app.js open the sheet at the top (used after a click on the globe).
+    window.TDPanel = { open: function () { panel.scrollTop = 0; set(true, true, false); } };
+
     tab.addEventListener('click', function () {
       // open at the answer if there is one, otherwise at the top
       var res = document.getElementById('result');

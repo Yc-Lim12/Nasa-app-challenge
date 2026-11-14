@@ -77,8 +77,11 @@ Then set `REPO_URL` at the top of `app.js` so the footer links to the repository
 - Temperature, precipitation, soil wetness, evaporation, humidity, wind and ozone come from
   the **MERRA-2** reanalysis (NASA Global Modeling and Assimilation Office).
 - Sunlight, cloud cover and aerosol optical depth come from **CERES SYN1deg** and **GEWEX SRB**.
+  The two do not match where they join in 2001 (cloud cover over Kuala Lumpur jumps from about
+  75% to 85%), so sunlight and cloud cover are tested from 2001 only; aerosol starts in 2001 anyway.
 
-Monthly values are averaged into one value per year (or one chosen month per year). For a
+Monthly values are averaged into one value per year, weighting each month by its number of days
+as NASA POWER does for its own annual values (or one chosen month per year). For a
 box, grid cells are averaged with cos(latitude) weights. Years with any missing month are skipped.
 
 ## Method

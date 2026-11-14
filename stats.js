@@ -88,7 +88,8 @@
 
   /** Two-sided p-value for a standard normal z score. */
   function normPValue(z) {
-    return erfc(Math.abs(z) / Math.SQRT2);
+    // erfc's tiny approximation error can push p a hair above 1 at z = 0
+    return Math.min(1, erfc(Math.abs(z) / Math.SQRT2));
   }
 
   function mean(a) {
@@ -224,8 +225,10 @@
     var df = n - 2;
     var residualSE = Math.sqrt(sse / df);     // typical distance from the line
     var se = residualSE / Math.sqrt(sxx);     // standard error of the slope
-    var t = slope / se;
-    var p = tPValue(t, df);
+    // A perfectly straight series (e.g. snow depth that is 0 every year) has se = 0:
+    // then t is 0 for a flat line (p = 1) and infinite for a sloped one (p = 0), not 0/0.
+    var t = se === 0 ? (slope === 0 ? 0 : Infinity) : slope / se;
+    var p = se === 0 && slope === 0 ? 1 : tPValue(t, df);
     var r2 = syy === 0 ? 0 : 1 - sse / syy;   // share of the variation the line explains
 
     // Memory: correlation between each residual and the next one
@@ -246,14 +249,22 @@
     var nEff = n * (1 - r) / (1 + r);
     var dfAdj = Math.max(nEff - 2, 1);
     var seAdj = se * Math.sqrt(df / dfAdj);
-    var pAdj = tPValue(slope / seAdj, dfAdj);
+    var pAdj = se === 0 ? p : tPValue(slope / seAdj, dfAdj);
 
     // 95% range of the slope, from the memory-adjusted uncertainty.
     // tCrit is scaled so that tCrit * se = (critical t) * seAdj.
-    var tCrit = tCritical(0.95, dfAdj) * seAdj / se;
+    // seAdj / se is just sqrt(df / dfAdj); written that way it stays finite when se = 0
+    var tCrit = tCritical(0.95, dfAdj) * Math.sqrt(df / dfAdj);
+
+    // Added for the chart's diagnostics (does not change any result above):
+    // the plain critical t for n - 2, used for the prediction interval of single years,
+    // and the Durbin-Watson statistic of the residuals.
+    var dsq = 0;
+    for (i = 1; i < n; i++) dsq += (resid[i] - resid[i - 1]) * (resid[i] - resid[i - 1]);
     return {
       n: n, slope: slope, intercept: intercept, se: se, t: t, df: df, p: p, r2: r2,
       residualSE: residualSE, meanX: mx, sxx: sxx,
+      resid: resid, dw: sse === 0 ? null : dsq / sse, tCritPlain: tCritical(0.95, df),
       lag1: lag1, lag1Adj: r, nEff: nEff, dfAdj: dfAdj, seAdj: seAdj, pAdj: pAdj,
       tCrit: tCrit, ciLow: slope - tCrit * se, ciHigh: slope + tCrit * se
     };
@@ -284,6 +295,70 @@
     return sig;
   }
 
+  // ---- extra diagnostics for the chart (added by step 4; they do not change the verdict) ----
+
+  var Z975 = 1.959963984540054;   // standard normal quantile for a two-sided 95% interval
+
+  /** Ranks 1..n, tied values sharing their average rank. */
+  function ranks(a) {
+    var idx = [], i;
+    for (i = 0; i < a.length; i++) idx.push(i);
+    idx.sort(function (p, q) { return a[p] - a[q]; });
+    var r = new Array(a.length);
+    i = 0;
+    while (i < idx.length) {
+      var j = i;
+      while (j + 1 < idx.length && a[idx[j + 1]] === a[idx[i]]) j++;
+      for (var k = i; k <= j; k++) r[idx[k]] = (i + j) / 2 + 1;
+      i = j + 1;
+    }
+    return r;
+  }
+
+  /**
+   * Mann-Kendall with the Hamed and Rao (1998) variance correction for autocorrelation,
+   * shown as a second opinion next to the memory-adjusted p used for the verdict.
+   * The series is detrended with Sen's slope and ranked; every lag whose autocorrelation of
+   * the ranks is outside ±1.96/√n inflates Var(S). Matches pymannkendall's
+   * hamed_rao_modification_test. p is null if the correction makes the variance non-positive.
+   */
+  function hamedRao(x, y, mk, slope) {
+    var n = y.length, k;
+    // years counted from the first one (1, 2, 3 …): the same detrending, without rounding
+    // that can swap two nearly equal values when ranked
+    var r = ranks(y.map(function (v, idx) { return v - slope * (x[idx] - x[0] + 1); }));
+    var m = mean(r), d = r.map(function (v) { return v - m; });
+    var acov = function (lag) { var s = 0; for (var t = 0; t + lag < n; t++) s += d[t] * d[t + lag]; return s / n; };
+    var c0 = acov(0), bound = Z975 / Math.sqrt(n), sum = 0, lags = [];
+    for (k = 1; k < n; k++) {
+      var rk = acov(k) / c0;
+      if (rk > bound || rk < -bound) { sum += (n - k) * (n - k - 1) * (n - k - 2) * rk; lags.push(k); }
+    }
+    var factor = 1 + 2 / (n * (n - 1) * (n - 2)) * sum;
+    var varS = mk.varS * factor;
+    if (!(varS > 0)) return { factor: factor, varS: varS, z: null, p: null, lags: lags };
+    var z = mk.S > 0 ? (mk.S - 1) / Math.sqrt(varS) : (mk.S < 0 ? (mk.S + 1) / Math.sqrt(varS) : 0);
+    return { factor: factor, varS: varS, z: z, p: normPValue(z), lags: lags };
+  }
+
+  /**
+   * Pettitt (1979) change-point test: is there one point where the values shift up or down?
+   * With ranks r, U_t = 2(r_1 + … + r_t) − t(n + 1) for t = 1 … n−1, and K = max |U_t|.
+   * The shift comes after the first `at` values. p ≈ 2 exp(−6K² / (n³ + n²)), capped at 1.
+   * A steady trend also gives a large K, so read it alongside the trend tests.
+   */
+  function pettitt(y) {
+    var n = y.length, r = ranks(y), sum = 0, K = 0, at = 0;
+    for (var t = 1; t < n; t++) {
+      sum += r[t - 1];
+      var U = Math.abs(2 * sum - t * (n + 1));
+      if (U > K) { K = U; at = t; }
+    }
+    var p = Math.min(1, 2 * Math.exp(-6 * K * K / (n * n * n + n * n)));
+    return { K: K, at: at, p: p,
+      meanBefore: at ? mean(y.slice(0, at)) : null, meanAfter: at ? mean(y.slice(at)) : null };
+  }
+
   /**
    * Everything for one place and one variable.
    * verdict: 'significant' (p < 0.05), 'borderline' (p < 0.10), 'none',
@@ -304,14 +379,17 @@
     return {
       n: n, slopePerDecade: sen.slope * 10, p: p, verdict: verdict,
       direction: sen.slope > 0 ? 'up' : (sen.slope < 0 ? 'down' : 'flat'),
-      years: c.years, values: c.values, mk: mk, sen: sen, ols: ols
+      years: c.years, values: c.values, mk: mk, sen: sen, ols: ols,
+      // extra diagnostics for the chart; they do not change the verdict
+      hr: hamedRao(c.years, c.values, mk, sen.slope), cp: pettitt(c.values)
     };
   }
 
   var api = {
     tPValue: tPValue, tCritical: tCritical, normPValue: normPValue, mean: mean, median: median,
     clean: clean, mannKendall: mannKendall, senSlope: senSlope,
-    linearRegression: linearRegression, fdr: fdr, analyze: analyze
+    linearRegression: linearRegression, fdr: fdr, analyze: analyze,
+    ranks: ranks, hamedRao: hamedRao, pettitt: pettitt
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.TDStats = api;

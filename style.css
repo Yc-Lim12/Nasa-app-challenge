@@ -1079,7 +1079,8 @@ button.spot-row:focus-visible { outline: 2px solid var(--accent); outline-offset
   .app.panel-open .layers, .app.panel-open .g-ctrls, .app.panel-open .stage .g-readout { translate: calc(-1 * var(--panel-w)) 0; }
   .app.panel-open .stage-head { right: calc(var(--panel-w) + 24px); }
 }
-@media (min-width: 961px) and (max-width: 1439px) {
+/* the layer bar (six layers) needs the space next to the title while the case file is open */
+@media (min-width: 961px) and (max-width: 1599px) {
   .app.panel-open .stage-brand { display: none; }
   .app.panel-open .stage-head { top: 76px; }
 }

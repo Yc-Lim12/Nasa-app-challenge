@@ -400,18 +400,108 @@
 
   // ---- whole world: NASA GIBS monthly maps, one picture per year ------------------
   // Ready-made global MERRA-2 pictures from NASA GIBS (the same model behind most of
-  // the app's variables), fetched at the model's own resolution (720 x 360) and
-  // painted on the globe. For viewing only: the trend tests use NASA POWER numbers.
+  // the app's variables), painted on the globe. MERRA-2 itself is about 0.5° (~50 km);
+  // the pictures are fetched at twice that (1440 x 720) so the blending between data
+  // points is smooth, and kept compressed: only the frame on screen is unpacked.
+  // For viewing only: the trend tests use NASA POWER numbers.
+  // NASA's colour scales for these two layers (GIBS colormaps), as colour -> value, so a
+  // picture can be turned back into numbers for the "difference from normal" view.
+  // The first and last colours are open-ended ("below -53 °C", "above 18 mm/day"), so
+  // those pixels have no exact value and are left out of the differences.
+  var WORLD_SCALE = {
+    T2M: { hex: '5e4fa23288bd348abb368dba398fb93b92b83d95b74097b6429ab5449db4479fb349a2b24ca5b14ea7af50aaae53acad55afac57b2ab5ab4aa5cb7a95ebaa861bca763bfa666c2a569c3a46cc4a46fc5a472c6a475c8a478c9a47bcaa47fcba482cda485cea488cfa48bd0a48ed1a491d3a495d4a498d5a49bd6a49ed8a4a1d9a4a4daa4a7dba4abdda4addea3b0dfa2b3e0a2b5e1a1b8e2a1bbe3a0bde4a0c0e59fc3e69fc5e79ec8e99ecbea9dcdeb9cd0ec9cd3ed9bd5ee9bd8ef9adbf09addf199e0f299e3f398e6f598e7f599e8f59be9f69deaf69febf7a0ecf7a2edf8a4eff8a6f0f9a7f1f9a9f2faabf3faadf4faaff5fbb0f7fbb2f8fcb4f9fcb6fafdb7fbfdb9fcfebbfdfebdffffbffefdbcfefcbafefab7fef9b5fef7b3fef6b0fef5aefef3acfef2a9fef0a7feefa5feeea2feeca0feeb9dfee99bfee899fee796fee594fee492fee28ffee18dfee08bfddd89fddb87fdd985fdd683fdd481fdd27ffdd07dfdcd7bfdcb79fdc977fdc776fdc474fdc272fdc070fdbd6efdbb6cfdb96afdb768fdb466fdb264fdb062fdae61fcab5ffca85efba55cfba25bfa9f5afa9c58fa9957f99656f99354f89053f88d52f88a50f7874ff7844df6814cf67e4bf67b49f57848f57547f47245f46f44f46d43f26a43f16844ef6644ee6445ec6245eb6046ea5e46e85b47e75947e55748e45549e35349e1514ae04f4ade4c4bdd4a4bdc484cda464cd9444dd7424dd6404ed53e4fd23b4ecf384dcd354d9e0142', vals: [-53.37, -53.15, -52.65, -51.65, -51.15, -51.15, -50.65, -49.65, -49.15, -49.15, -48.65, -47.65, -47.15, -47.15, -46.65, -45.65, -45.15, -45.15, -44.65, -43.65, -43.15, -43.15, -42.65, -41.65, -41.15, -41.15, -40.65, -39.65, -39.15, -39.15, -38.65, -37.65, -37.15, -37.15, -36.65, -35.65, -35.15, -35.15, -34.65, -33.65, -33.15, -33.15, -32.65, -31.65, -31.15, -31.15, -30.65, -29.65, -29.15, -29.15, -28.65, -27.65, -27.15, -27.15, -26.65, -25.65, -25.15, -25.15, -24.65, -23.65, -23.15, -23.15, -22.65, -21.65, -21.15, -21.15, -20.65, -19.65, -19.15, -19.15, -18.65, -17.65, -17.15, -17.15, -16.65, -15.65, -15.15, -15.15, -14.65, -13.65, -13.15, -13.15, -12.65, -11.65, -11.15, -11.15, -10.65, -9.65, -9.15, -9.15, -8.65, -7.65, -7.15, -7.15, -6.65, -5.65, -5.15, -5.15, -4.65, -3.65, -3.15, -3.15, -2.65, -1.65, -1.15, -1.15, -0.65, 0.35, 0.85, 0.85, 1.35, 2.35, 2.85, 2.85, 3.35, 4.35, 4.85, 4.85, 5.35, 6.35, 6.85, 6.85, 7.35, 8.35, 8.85, 8.85, 9.35, 10.35, 10.85, 10.85, 11.35, 12.35, 12.85, 12.85, 13.35, 14.35, 14.85, 14.85, 15.35, 16.35, 16.85, 16.85, 17.35, 18.35, 18.85, 18.85, 19.35, 20.35, 20.85, 20.85, 21.35, 22.35, 22.85, 22.85, 23.35, 24.35, 24.85, 24.85, 25.35, 26.35, 26.85, 26.85, 27.35, 28.35, 28.85, 28.85, 29.35, 30.35, 30.85, 30.85, 31.35, 32.35, 32.85, 32.85, 33.35, 34.35, 34.85, 34.85, 35.35, 36.35, 36.85, 36.85], unit: '°C', lim: 3 },
+    PRECTOTCORR: { hex: 'f7fcfde5f5f9e4f4f8e3f4f7e2f4f7e2f3f6e1f3f6e0f3f5e0f3f5dff2f4def2f4ddf2f3ddf2f3dcf1f2dbf1f1dbf1f1daf1f0d9f0f0d8f0efd8f0efd7f0eed6efeed6efedd5efedd4efecd3eeebd3eeebd2eeead1eeead1ede9d0ede9cfede8ceede8ceece7cdece7ccece6ccece6caebe5c9eae4c7eae3c6e9e2c4e9e1c3e8e1c1e8e0c0e7dfbee6debde6ddbbe5dcbae5dcb9e4dbb7e4dab6e3d9b4e2d8b3e2d7b1e1d7b0e1d6aee0d5ade0d4abdfd3aaded2a9ded2a7ddd1a6ddd0a4dccfa3dccea1dbcda0dacd9edacc9dd9cb9bd9ca9ad8c999d8c997d7c796d6c694d6c593d5c491d4c390d4c28ed3c18dd2c08bd2bf8ad1be88d0bd87d0bb85cfba84ceb982ceb881cdb77fcdb67eccb57ccbb47bcbb379cab278c9b176c9af75c8ae73c7ad72c7ac70c6ab6fc5aa6dc5a96cc4a86ac3a769c3a667c2a566c2a464c1a263c0a162c0a061bf9e60bf9d5fbe9c5ebe9a5dbd995cbc985bbc965abb9559bb9458ba9257ba9156b99055b88e54b88d52b78c51b78b50b6894fb6884eb5874db4854cb4844bb3834ab38149b28048b27f47b17d46b07c45b07b44af7943af7842ae7741ae7640ad743fac733eab713daa703ca96f3ba86d3ba76c3aa66a39a56938a46837a36636a26535a16335a062349f61339e5f329d5e319c5c309b5b2f9a5a2f99582e98572d97552c96542b95532a945129935029924e28914d27904c268f4a258e49248d47238c46238b45228a442189432088421f87421e86411d85401c85401b843f1a833e19823d18813d17803c167f3b157f3b147e3a137d39127c38117b38107a370f79360e79360d78350c77340b76330a753309743208733107733106723005712f04702e036f2e026e2d016d2c006d2c00441b', vals: [-0.004, 0.043, 0.13, 0.216, 0.302, 0.389, 0.475, 0.562, 0.648, 0.734, 0.821, 0.907, 0.994, 1.08, 1.166, 1.253, 1.339, 1.426, 1.512, 1.598, 1.685, 1.771, 1.858, 1.944, 2.03, 2.117, 2.203, 2.29, 2.376, 2.462, 2.549, 2.635, 2.722, 2.808, 2.894, 2.981, 3.067, 3.154, 3.24, 3.326, 3.413, 3.499, 3.586, 3.672, 3.758, 3.845, 3.931, 4.018, 4.104, 4.19, 4.277, 4.363, 4.45, 4.536, 4.622, 4.709, 4.795, 4.882, 4.968, 5.054, 5.141, 5.227, 5.314, 5.4, 5.486, 5.573, 5.659, 5.746, 5.832, 5.918, 6.005, 6.091, 6.178, 6.264, 6.35, 6.437, 6.523, 6.61, 6.696, 6.782, 6.869, 6.955, 7.042, 7.128, 7.214, 7.301, 7.387, 7.474, 7.56, 7.646, 7.733, 7.819, 7.906, 7.992, 8.078, 8.165, 8.251, 8.338, 8.424, 8.51, 8.597, 8.683, 8.77, 8.856, 8.942, 9.029, 9.115, 9.202, 9.288, 9.374, 9.461, 9.547, 9.634, 9.72, 9.806, 9.893, 9.979, 10.066, 10.152, 10.238, 10.325, 10.411, 10.498, 10.584, 10.67, 10.757, 10.843, 10.93, 11.016, 11.102, 11.189, 11.275, 11.362, 11.448, 11.534, 11.621, 11.707, 11.794, 11.88, 11.966, 12.053, 12.139, 12.226, 12.312, 12.398, 12.485, 12.571, 12.658, 12.744, 12.83, 12.917, 13.003, 13.09, 13.176, 13.262, 13.349, 13.435, 13.522, 13.608, 13.694, 13.781, 13.867, 13.954, 14.04, 14.126, 14.213, 14.299, 14.386, 14.472, 14.558, 14.645, 14.731, 14.818, 14.904, 14.99, 15.077, 15.163, 15.25, 15.336, 15.422, 15.509, 15.595, 15.682, 15.768, 15.854, 15.941, 16.027, 16.114, 16.2, 16.286, 16.373, 16.459, 16.546, 16.632, 16.718, 16.805, 16.891, 16.978, 17.064, 17.15, 17.237, 17.323, 17.41, 17.496, 17.582, 17.669, 17.755, 17.842, 17.928, 18.014, 18.101, 18.144], unit: 'mm/day', lim: 3 }
+  };
   var WORLD = {
     T2M: { layer: 'MERRA2_2m_Air_Temperature_Assimilated_Monthly', name: 'Air temperature', lo: '−53 °C', hi: '+37 °C',
       stops: ['#5e4fa2', '#66c2a5', '#abdda4', '#e7f599', '#fefdbc', '#fddb87', '#fba55c', '#ef6644', '#9e0142'] },
     PRECTOTCORR: { layer: 'MERRA2_Precipitation_Bias_Corrected_Monthly', name: 'Rain and snowfall', lo: '0', hi: '18+ mm/day',
       stops: ['#f7fcfd', '#d3eeeb', '#b3e2d7', '#8dd2c0', '#64c1a2', '#49b280', '#319c5c', '#19823d', '#00441b'] }
   };
-  var WW = 720, WH = 360, WORLD_FIRST = 1980;
+  var WW = 1440, WH = 720, WORLD_FIRST = 1980, worldCanvas = null;
   var GIBS_WORLD = 'https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&CRS=EPSG:4326' +
     '&BBOX=-90,-180,90,180&WIDTH=' + WW + '&HEIGHT=' + WH + '&FORMAT=image/png&STYLES=';
-  var world = { v: 'T2M', month: 7, key: '', frames: null, timer: 0, i: 0 };
+  var world = { v: 'T2M', month: 7, key: '', frames: null, timer: 0, i: 0, mode: 'anom', anom: null };
+  var AW = 720, AH = 360;            // grid for the differences: MERRA-2's own 0.5° spacing
+
+  /** colour (r, g, b) -> value, exact for NASA's palette; NaN for the open-ended ends */
+  function scaleLookup(v) {
+    var sc = WORLD_SCALE[v];
+    if (sc.map) return sc.map;
+    var m = {}, n = sc.vals.length;
+    for (var i = 0; i < n; i++) {
+      var c = parseInt(sc.hex.substr(i * 6, 6), 16);
+      if (m[c] === undefined) m[c] = (i === 0 || i === n - 1) ? NaN : sc.vals[i];
+    }
+    sc.map = m;
+    return m;
+  }
+  /** One frame as numbers on the 0.5° grid (every second pixel of the 1440 x 720 picture). */
+  function decodeFrame(img, v) {
+    var c = document.createElement('canvas'); c.width = WW; c.height = WH;
+    var x = c.getContext('2d', { willReadFrequently: true });
+    x.drawImage(img, 0, 0);                       // 1:1, so the palette colours stay exact
+    var d = x.getImageData(0, 0, WW, WH).data, map = scaleLookup(v), out = new Float32Array(AW * AH);
+    for (var j = 0; j < AH; j++) {
+      for (var i = 0; i < AW; i++) {
+        var o = ((j * 2 + 1) * WW + i * 2 + 1) * 4, val = NaN;
+        if (d[o + 3] > 200) {
+          val = map[(d[o] << 16) | (d[o + 1] << 8) | d[o + 2]];
+          if (val === undefined) val = NaN;      // not a palette colour: leave it out
+        }
+        out[j * AW + i] = val;
+      }
+    }
+    return out;
+  }
+  /**
+   * Differences from each spot's 1981-2010 average for the chosen month, and the
+   * global mean difference per year (weighted by cos(latitude), the area of a cell).
+   */
+  function buildAnomalies(frames, v) {
+    var vals = frames.map(function (f) { return decodeFrame(f.img, v); });
+    var N = AW * AH, sum = new Float32Array(N), cnt = new Uint8Array(N), k, i;
+    frames.forEach(function (f, fi) {
+      if (f.year < 1981 || f.year > 2010) return;
+      var a = vals[fi];
+      for (k = 0; k < N; k++) if (a[k] === a[k]) { sum[k] += a[k]; cnt[k]++; }
+    });
+    var cosw = new Float32Array(AH);
+    for (i = 0; i < AH; i++) cosw[i] = Math.cos((90 - (i + 0.5) * 180 / AH) * Math.PI / 180);
+    var global = [];
+    vals.forEach(function (a) {
+      var s = 0, w = 0;
+      for (k = 0; k < N; k++) {
+        if (cnt[k] >= 20 && a[k] === a[k]) { a[k] -= sum[k] / cnt[k]; s += a[k] * cosw[(k / AW) | 0]; w += cosw[(k / AW) | 0]; }
+        else a[k] = NaN;
+      }
+      global.push(w ? s / w : NaN);
+    });
+    return { vals: vals, global: global };
+  }
+  // diverging colours, precomputed: red warmer / blue cooler; green wetter / brown drier
+  var ANOM_LUT = {};
+  function anomLut(v) {
+    if (ANOM_LUT[v]) return ANOM_LUT[v];
+    var lut = [];
+    for (var i = 0; i < 256; i++) {
+      var t = i / 255, c = d3.rgb(v === 'PRECTOTCORR' ? d3.interpolateBrBG(t) : d3.interpolateRdBu(1 - t));
+      lut.push([c.r, c.g, c.b]);
+    }
+    return (ANOM_LUT[v] = lut);
+  }
+  function anomAt(a, lut, lim, lon, lat) {
+    var fx = (lon + 180) / 360 * AW - 0.5, fy = (90 - lat) / 180 * AH - 0.5;
+    var x0 = Math.floor(fx), y0 = Math.max(0, Math.min(AH - 1, Math.floor(fy))), tx = fx - x0, ty = fy - y0;
+    var x1 = (x0 + 1 + AW) % AW, y1 = Math.min(AH - 1, y0 + 1);
+    x0 = (x0 + AW) % AW;
+    var p = [a[y0 * AW + x0], a[y0 * AW + x1], a[y1 * AW + x0], a[y1 * AW + x1]];
+    var w = [(1 - tx) * (1 - ty), tx * (1 - ty), (1 - tx) * ty, tx * ty], s = 0, ws = 0;
+    for (var i = 0; i < 4; i++) if (typeof p[i] === 'number' && p[i] === p[i]) { s += p[i] * w[i]; ws += w[i]; }
+    if (!(ws >= 0.5) || !isFinite(s)) return null;      // no difference here (no data, or a clipped value)
+    var t = Math.max(0, Math.min(1, (s / ws / lim + 1) / 2)), c = lut[Math.round(t * 255)];
+    return c ? [c[0], c[1], c[2], 225] : null;
+  }
 
   /** Colour of the world picture at (lon, lat), blended between pixels. */
   function worldAt(data, lon, lat) {
@@ -429,6 +519,16 @@
     if (a < 6) return null;
     return [r / a, g / a, b / a, Math.min(235, a)];
   }
+  /** Pixels of one frame, unpacked only when it is shown (one shared canvas). */
+  function unpack(img) {
+    try {
+      if (!worldCanvas) { worldCanvas = document.createElement('canvas'); worldCanvas.width = WW; worldCanvas.height = WH; }
+      var x = worldCanvas.getContext('2d', { willReadFrequently: true });
+      x.clearRect(0, 0, WW, WH);
+      x.drawImage(img, 0, 0, WW, WH);
+      return x.getImageData(0, 0, WW, WH).data;
+    } catch (err) { return null; }
+  }
   function worldUrl(v, year, month) {
     return GIBS_WORLD + '&LAYERS=' + WORLD[v].layer + '&TIME=' + year + '-' + (month < 10 ? '0' : '') + month + '-01';
   }
@@ -436,13 +536,7 @@
     return new Promise(function (resolve) {
       var img = new Image();
       img.crossOrigin = 'anonymous';
-      img.onload = function () {
-        try {
-          var c = document.createElement('canvas'); c.width = WW; c.height = WH;
-          var x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0, WW, WH);
-          resolve({ year: year, data: x.getImageData(0, 0, WW, WH).data });
-        } catch (err) { resolve(null); }
-      };
+      img.onload = function () { resolve({ year: year, img: img }); };
       img.onerror = function () { resolve(null); };
       img.src = worldUrl(v, year, month);
     });
@@ -488,22 +582,46 @@
     ready.then(function (frames) {
       if (my !== token) return;
       if (!frames.length) { fail(T('Whole world'), T('Could not load the world pictures from NASA GIBS. Try again later.')); return; }
+      if (world.key !== key || !world.anom) {
+        try { world.anom = buildAnomalies(frames, v); } catch (err) { world.anom = null; world.mode = 'values'; }
+      }
       world.frames = frames; world.key = key;
-      var g = TD.globe, info = WORLD[v];
+      var g = TD.globe, info = WORLD[v], anomOn = world.mode === 'anom' && !!world.anom, lim = WORLD_SCALE[v].lim;
+      var divStops = [0, 0.25, 0.5, 0.75, 1].map(function (t) { return v === 'PRECTOTCORR' ? d3.interpolateBrBG(t) : d3.interpolateRdBu(1 - t); });
       function paint(i) {
         world.i = i;
         var f = frames[i];
-        g.setRaster({ sample: function (lon, lat) { return worldAt(f.data, lon, lat); }, coast: true });
+        if (world.mode === 'anom' && world.anom) {
+          var grid = world.anom.vals[i], lut = anomLut(v), lim = WORLD_SCALE[v].lim;
+          g.setRaster({ sample: function (lon, lat) { return anomAt(grid, lut, lim, lon, lat); }, coast: true, fine: true });
+          var gm = world.anom.global[i], ge = $('lp-wglobal');
+          if (ge) ge.textContent = isFinite(gm) ? T('Whole world: {x} {u} vs 1981–2010', { x: (gm >= 0 ? '+' : '−') + Math.abs(gm).toFixed(2), u: WORLD_SCALE[v].unit }) : '';
+        } else {
+          var data = unpack(f.img);
+          if (!data) return;
+          g.setRaster({ sample: function (lon, lat) { return worldAt(data, lon, lat); }, coast: true, fine: true });
+        }
         var el = $('lp-when'); if (el) el.textContent = T(TD.MONTHS[month]) + ' ' + f.year;
         var sl = $('lp-slider'); if (sl && +sl.value !== i) sl.value = i;
-        var a = $('lp-wlink'); if (a) a.href = worviewUrl(v, f.year, month);
+        var link = $('lp-wlink'); if (link) link.href = worviewUrl(v, f.year, month);
       }
       panel.innerHTML = head + controls() +
         '<div class="lp-player"><button type="button" class="lp-play" id="lp-play">❚❚</button>' +
         '<input type="range" id="lp-slider" min="0" max="' + (frames.length - 1) + '" value="0" aria-label="' + esc(T('Year')) + '">' +
         '<output id="lp-when" class="lp-when"></output></div>' +
-        '<div class="lp-scale"><span>' + esc(info.lo) + '</span><i class="lp-ramp" style="background:linear-gradient(90deg,' + info.stops.join(',') + ')"></i><span>' + esc(info.hi) + '</span></div>' +
-        '<p class="lp-key">' + esc(T('One global NASA picture for every {month} since {y}. For viewing only: the trend tests use NASA POWER numbers for one place.', { month: T(TD.MONTHS[month]), y: WORLD_FIRST })) + '</p>' +
+        '<div class="lp-row"><div class="lp-seg" id="lp-wmode"><button type="button" data-wmode="anom" aria-pressed="' + anomOn + '"' + (world.anom ? '' : ' disabled') + '>' +
+          esc(T('Difference from normal')) + '</button><button type="button" data-wmode="values" aria-pressed="' + !anomOn + '">' + esc(T('Values')) + '</button></div></div>' +
+        (anomOn
+          ? '<p class="lp-wglobal" id="lp-wglobal"></p>' +
+            '<div class="lp-scale"><span>−' + lim + ' ' + esc(WORLD_SCALE[v].unit) + '</span><i class="lp-ramp" style="background:linear-gradient(90deg,' + divStops.join(',') + ')"></i><span>+' + lim + ' ' + esc(WORLD_SCALE[v].unit) + '</span></div>' +
+            '<p class="lp-key">' + esc(T(v === 'PRECTOTCORR'
+              ? 'Each {month} compared with the average {month} of 1981–2010 at the same spot: green wetter, brown drier.'
+              : 'Each {month} compared with the average {month} of 1981–2010 at the same spot: red warmer, blue cooler.', { month: T(TD.MONTHS[month]) })) + ' ' +
+              esc(T('Worked out from NASA’s pictures, so values are rounded to NASA’s colour steps. For viewing only: the trend tests use NASA POWER numbers.')) + ' ' +
+              esc(T(v === 'PRECTOTCORR' ? 'No colour: above 18 mm/day, beyond NASA’s colour scale, so the exact value is unknown.'
+                : 'No colour: hotter than 37 °C or colder than −53 °C, beyond NASA’s colour scale, so the exact value is unknown.')) + '</p>'
+          : '<div class="lp-scale"><span>' + esc(info.lo) + '</span><i class="lp-ramp" style="background:linear-gradient(90deg,' + info.stops.join(',') + ')"></i><span>' + esc(info.hi) + '</span></div>' +
+            '<p class="lp-key">' + esc(T('One global NASA picture for every {month} since {y}. For viewing only: the trend tests use NASA POWER numbers for one place.', { month: T(TD.MONTHS[month]), y: WORLD_FIRST })) + '</p>') +
         '<p class="lp-key"><a id="lp-wlink" class="lp-link" target="_blank" rel="noopener">' + esc(T('Explore more on NASA Worldview')) + ' ↗</a></p>';
       function play(on) {
         clearInterval(world.timer); world.timer = 0;
@@ -519,9 +637,10 @@
         var t = e.target.closest('button');
         if (!t) return;
         if (t.id === 'lp-play') { play(!world.timer); return; }
-        var nv = t.getAttribute('data-wv'), nm = t.getAttribute('data-wmo');
-        if (nv && nv !== world.v) { world.v = nv; setLayer('world'); }
-        else if (nm && +nm !== world.month) { world.month = +nm; setLayer('world'); }
+        var nv = t.getAttribute('data-wv'), nm = t.getAttribute('data-wmo'), md = t.getAttribute('data-wmode');
+        if (nv && nv !== world.v) { world.v = nv; world.anom = null; setLayer('world'); }
+        else if (nm && +nm !== world.month) { world.month = +nm; world.anom = null; setLayer('world'); }
+        else if (md && md !== world.mode) { world.mode = md; var at = world.i; setLayer('world'); world.i = at; }
       };
       panel.oninput = function (e) { if (e.target.id === 'lp-slider') { play(false); paint(+e.target.value); } };
     });
@@ -529,8 +648,8 @@
     panel.onclick = function (e) {
       var t = e.target.closest('button'); if (!t) return;
       var nv = t.getAttribute('data-wv'), nm = t.getAttribute('data-wmo');
-      if (nv && nv !== world.v) { world.v = nv; setLayer('world'); }
-      else if (nm && +nm !== world.month) { world.month = +nm; setLayer('world'); }
+      if (nv && nv !== world.v) { world.v = nv; world.anom = null; setLayer('world'); }
+      else if (nm && +nm !== world.month) { world.month = +nm; world.anom = null; setLayer('world'); }
     };
   }
 

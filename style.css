@@ -1506,3 +1506,5 @@ button, summary { -webkit-user-select: none; user-select: none; }
 /* whole-world layer: link to NASA Worldview */
 .lp-link { color: #64d2ff; text-decoration: none; font-weight: 600; }
 .lp-link:hover { text-decoration: underline; }
+
+.lp-wglobal { margin: 8px 0 2px; font-size: 15px; font-weight: 700; color: #f5f5f7; font-variant-numeric: tabular-nums; }

@@ -276,6 +276,12 @@
     'Explore more on NASA Worldview': 'Teroka lagi di NASA Worldview',
     'Trend map: the trend in every grid cell around the place (a dot means significant). Timelapse: every month, one after another. Rain now and Wind: current conditions. Whole world: NASA’s global monthly maps, one per year since 1980.':
       'Peta tren: tren dalam setiap sel grid di sekitar tempat itu (titik bermaksud signifikan). Selang masa: setiap bulan, satu demi satu. Hujan kini dan Angin: keadaan semasa. Seluruh dunia: peta bulanan global NASA, satu setahun sejak 1980.',
+    'Whole world: {x} {u} vs 1981–2010': 'Seluruh dunia: {x} {u} berbanding 1981–2010',
+    'Each {month} compared with the average {month} of 1981–2010 at the same spot: red warmer, blue cooler.': 'Setiap {month} dibandingkan dengan purata {month} 1981–2010 di tempat yang sama: merah lebih panas, biru lebih sejuk.',
+    'Each {month} compared with the average {month} of 1981–2010 at the same spot: green wetter, brown drier.': 'Setiap {month} dibandingkan dengan purata {month} 1981–2010 di tempat yang sama: hijau lebih basah, coklat lebih kering.',
+    'Worked out from NASA’s pictures, so values are rounded to NASA’s colour steps. For viewing only: the trend tests use NASA POWER numbers.': 'Dikira daripada gambar NASA, jadi nilai dibundarkan mengikut langkah warna NASA. Untuk tontonan sahaja: ujian tren menggunakan nombor NASA POWER.',
+    'No colour: above 18 mm/day, beyond NASA’s colour scale, so the exact value is unknown.': 'Tiada warna: melebihi 18 mm/hari, di luar skala warna NASA, jadi nilai tepat tidak diketahui.',
+    'No colour: hotter than 37 °C or colder than −53 °C, beyond NASA’s colour scale, so the exact value is unknown.': 'Tiada warna: lebih panas daripada 37 °C atau lebih sejuk daripada −53 °C, di luar skala warna NASA, jadi nilai tepat tidak diketahui.',
     'Grid cells': 'Sel grid', 'Smooth': 'Licin', 'Opacity': 'Kelegapan', 'How to draw the grid': 'Cara melukis grid',
     'Guided stories': 'Kisah berpandu', 'World story': 'Kisah dunia',
     'Wildfire smoke over Wisconsin': 'Asap kebakaran hutan di Wisconsin', 'Summer haze far from the fires': 'Jerebu musim panas jauh dari kebakaran',

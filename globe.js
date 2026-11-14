@@ -1068,7 +1068,8 @@
       var now = performance.now(), rapid = crisp && !moving && now - lastCellDraw < 250;
       lastCellDraw = now;
       if (rapid) { clearTimeout(cellSettle); cellSettle = setTimeout(queueRaster, 260); }
-      var step = moving ? 4 : crisp ? (rapid ? 2 : 1) : Math.max(1, 2 / dpr), w = Math.ceil(W / step), h = Math.ceil(H / step);
+      // a picture that asks for it (the whole-world layer) is drawn at full resolution at rest
+      var step = moving ? 4 : crisp ? (rapid ? 2 : 1) : (raster && raster.fine ? 1 : Math.max(1, 2 / dpr)), w = Math.ceil(W / step), h = Math.ceil(H / step);
       // screen pixels per degree near the centre; cell borders only once cells are big
       var ppd = R * k * Math.PI / 180;
       cellPx = crisp && !moving && cellGrid && Math.min(cellGrid.dlon, cellGrid.dlat) * ppd >= 14 ? ppd : 0;

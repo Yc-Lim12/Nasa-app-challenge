@@ -447,7 +447,14 @@
       var o = S.linearRegression(yrs.slice(i), vals.slice(i));
       pts.push({ from: from, n: last - from + 1, slope: o.slope * 10, lo: o.ciLow * 10, hi: o.ciHigh * 10 });
     }
-    if (pts.length < 2) return;
+    // With a short period (e.g. 2016–2025) only one start year can give the 10 years a trend
+    // needs. Say so instead of leaving an empty space, and offer the way back.
+    if (pts.length < 2) {
+      host.innerHTML = '<p class="sens-empty">' + esc(T('Trend from each start year: with {a}–{b} there is only one possible start year, because a trend needs at least {n} years.',
+        { a: Math.floor(yrs[0]), b: last, n: MIN_YEARS })) + ' <button type="button" class="link" data-sens-reset>' + esc(T('Back to the full record')) + '</button></p>';
+      host.querySelector('[data-sens-reset]').addEventListener('click', function () { var r = $('reset-years'); if (r) r.click(); });
+      return;
+    }
 
     var W = g.W, H = 204, m = { l: g.m.l, r: g.narrow ? 16 : 30, t: 42, b: 36 };
     var iw = W - m.l - m.r, ih = H - m.t - m.b, f0 = pts[0].from, f1 = pts[pts.length - 1].from;
@@ -490,7 +497,14 @@
       gEl.appendChild(svgEl('rect', { x: sx(p.from) - slot / 2, y: m.t, width: slot, height: ih, class: 'sens-hit' }));
       gEl.appendChild(svgEl('line', { x1: sx(p.from), x2: sx(p.from), y1: sy(p.lo), y2: sy(p.hi), class: 'sens-bar' + cls }));
       gEl.appendChild(svgEl('circle', { cx: sx(p.from), cy: sy(p.slope), r: 3, class: 'sens-pt' + cls }));
-      var go = function () { setPeriod(p.from, last); };
+      // test that period, then bring the answer (verdict and chart) into view
+      // (scroll once the new result is drawn; scrolling straight away is undone by the redraw)
+      var go = function () {
+        document.addEventListener('td:result', function () {
+          var r = $('result'); if (r) r.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' });
+        }, { once: true });
+        setPeriod(p.from, last);
+      };
       gEl.addEventListener('click', go);
       gEl.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
       svg.appendChild(gEl);

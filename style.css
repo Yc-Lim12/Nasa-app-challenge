@@ -882,6 +882,7 @@ button.spot-row:focus-visible { outline: 2px solid var(--accent); outline-offset
 .chart .cp-label { fill: var(--div-wet); font: 600 11px var(--font); }
 .key-cp { border-top-style: dashed; border-color: var(--div-wet); }
 .chart-sens { margin-top: 6px; }
+.chart-sens .sens-empty { margin: 10px 0 4px; font-size: 13px; color: var(--ink-3); }
 .chart-sens .zero-solid { stroke: var(--ink-3); stroke-width: 1; }
 .chart-sens .sens-hit { fill: transparent; cursor: pointer; }
 .chart-sens .sens-pt-group:hover .sens-hit, .chart-sens .sens-pt-group:focus-visible .sens-hit { fill: var(--hover); }

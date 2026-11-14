@@ -95,7 +95,12 @@
       else if (set === 'map') setMapStyle(v);
       else if (act === 'close') { close(); return; }
       else if (act === 'tour') { close(); if (window.TDGuide) window.TDGuide.start(); return; }
-      else if (act === 'methods') { close(); var m = document.querySelector('[data-open-methods]'); if (m) m.click(); return; }
+      else if (act === 'methods') {
+        close();
+        var d = $('methods');   // the Methods dialog in index.html
+        if (d) { if (d.showModal) d.showModal(); else d.setAttribute('open', ''); }
+        return;
+      }
       else if (act === 'ai') { close(); if (window.TDAI && window.TDAI.settings) window.TDAI.settings(); return; }
       render(); place();
       var again = pop.querySelector('[data-set="' + set + '"][data-v="' + v + '"]'); if (again) again.focus();

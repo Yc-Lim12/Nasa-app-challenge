@@ -927,9 +927,7 @@
         dotSel = gDots.selectAll('circle').data(list.filter(function (c) { return c.dot; })).enter().append('circle').attr('r', 1.8);
         buildCellGrid(list);
         paintCellGrid(function (c) { return c.fill; });
-        var g = cellGrid;   // outline of the whole area, curved like the lines of latitude
-        // (a whole-globe grid has no edge; its outline would be a stray line along 180°)
-        if (g.lonMax - g.lonMin < 359) gCells.append('path').attr('class', 'g-cells-edge').datum(areaShape(g.lonMin, g.lonMax, g.latMin, g.latMax));
+        // no outline around the whole area: the cells' own edges show where it ends
       }
       host.classList.toggle('has-cells', !!(list && list.length));
       if (!raster) {

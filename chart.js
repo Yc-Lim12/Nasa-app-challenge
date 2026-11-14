@@ -70,7 +70,9 @@
   }
 
   function stripeColours(vr) {
-    var wet = vr.topic === 'water' || vr.topic === 'soil';
+    // dry/wet colours for water and soil, but any temperature (e.g. sea surface temperature,
+    // filed under Water) keeps the usual cold/warm blue and red
+    var wet = (vr.topic === 'water' || vr.topic === 'soil') && vr.unit !== '°C';
     return wet ? { lo: 'var(--div-dry)', hi: 'var(--div-wet)', loName: 'brown', hiName: 'teal' }
       : { lo: 'var(--div-lo)', hi: 'var(--div-hi)', loName: 'blue', hiName: 'red' };
   }

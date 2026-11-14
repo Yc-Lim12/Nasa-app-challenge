@@ -224,6 +224,30 @@
     '{what} is only measured on land, and this spot is open ocean. Choose a place on land, or another variable.':
       '{what} hanya diukur di darat, dan tempat ini ialah lautan terbuka. Pilih tempat di darat, atau pemboleh ubah lain.',
     '{n} open-ocean cells were left out: NASA POWER has no soil there.': '{n} sel lautan terbuka tidak dimasukkan: NASA POWER tiada data tanah di sana.',
+    'How to use': 'Cara guna', 'New here?': 'Baru di sini?', 'Show me': 'Tunjukkan', 'No thanks': 'Tidak, terima kasih', 'Close tour': 'Tutup lawatan',
+    'Take a one-minute tour of what to click and what each part shows.': 'Ikuti lawatan seminit tentang apa yang perlu diklik dan apa yang ditunjukkan setiap bahagian.',
+    'The globe': 'Glob', 'Ask a question': 'Tanya soalan', 'Not sure what to test?': 'Tidak pasti apa yang hendak diuji?', 'Map layers': 'Lapisan peta',
+    'The answer': 'Jawapan', 'The chart': 'Carta', 'The evidence': 'Bukti', 'Change the case': 'Ubah kes', 'Ask AI': 'Tanya AI',
+    'Drag to spin the Earth, scroll or pinch to zoom. Click any place to test it: forty years of NASA data are fetched for that spot.':
+      'Seret untuk memutar Bumi, tatal atau cubit untuk zum. Klik mana-mana tempat untuk mengujinya: empat puluh tahun data NASA diambil untuk tempat itu.',
+    'Or type a question in plain words, such as “Is Penang getting rainier?” or “Is the Arctic warming since 2000?”. It sets up the case for you.':
+      'Atau taip soalan dalam bahasa mudah, seperti “Adakah Pulau Pinang semakin kerap hujan?”. Ia menyediakan kes untuk anda.',
+    'Answer three short questions (what kind of place, what you are curious about, where) and get suggested NASA variables to test.':
+      'Jawab tiga soalan ringkas (jenis tempat, apa yang anda ingin tahu, di mana) dan dapatkan cadangan pemboleh ubah NASA untuk diuji.',
+    'Step-by-step examples with real data: city heat, haze, monsoon rain, a warming sea and wildfire smoke. A good place to start.':
+      'Contoh langkah demi langkah dengan data sebenar: haba bandar, jerebu, hujan monsun, laut yang memanas dan asap kebakaran hutan. Tempat yang baik untuk bermula.',
+    'Trend map: the trend in every grid cell around the place (a dot means significant). Timelapse: every month, one after another. Rain now and Wind: current conditions.':
+      'Peta tren: tren dalam setiap sel grid di sekitar tempat itu (titik bermaksud signifikan). Selang masa: setiap bulan, satu demi satu. Hujan kini dan Angin: keadaan semasa.',
+    'The verdict in one sentence: is it really changing, and how fast? The badge says whether the change is statistically significant or could be chance.':
+      'Keputusan dalam satu ayat: adakah ia benar-benar berubah, dan berapa cepat? Lencana menunjukkan sama ada perubahan itu signifikan secara statistik atau mungkin kebetulan.',
+    'One dot per year, with the trend line and its 95% range. Hover for values. Drag across the chart to test only part of the record. The coloured stripes show warm and cool years.':
+      'Satu titik setahun, dengan garis tren dan julat 95%. Halakan tetikus untuk nilai. Seret merentasi carta untuk menguji sebahagian rekod sahaja. Jalur berwarna menunjukkan tahun panas dan sejuk.',
+    'The numbers behind the verdict: rate per decade, total change, the two tests (Mann-Kendall and t-test) and how many years a test would need.':
+      'Nombor di sebalik keputusan: kadar sedekad, jumlah perubahan, dua ujian (Mann-Kendall dan ujian-t) dan berapa tahun yang diperlukan oleh ujian.',
+    'What, where and when: the variable, the place and area, the years, a season or a month, and one value per year or every month.':
+      'Apa, di mana dan bila: pemboleh ubah, tempat dan kawasan, tahun, musim atau bulan, dan satu nilai setahun atau setiap bulan.',
+    'Explains the result in plain words and answers questions about it. It works without an account; an OpenAI key in its settings gives longer answers.':
+      'Menerangkan keputusan dalam bahasa mudah dan menjawab soalan tentangnya. Ia berfungsi tanpa akaun; kunci OpenAI dalam tetapannya memberi jawapan lebih panjang.',
     'Grid cells': 'Sel grid', 'Smooth': 'Licin', 'Opacity': 'Kelegapan', 'How to draw the grid': 'Cara melukis grid',
     'Guided stories': 'Kisah berpandu', 'World story': 'Kisah dunia',
     'Wildfire smoke over Wisconsin': 'Asap kebakaran hutan di Wisconsin', 'Summer haze far from the fires': 'Jerebu musim panas jauh dari kebakaran',

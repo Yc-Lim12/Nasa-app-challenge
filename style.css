@@ -1268,3 +1268,42 @@ button, summary { -webkit-user-select: none; user-select: none; }
 /* the note under the globe hint: what the grey areas of the daily picture are */
 .g-fillnote { max-width: 300px; margin-left: auto; margin-top: 4px; line-height: 1.4; white-space: normal; }
 @media (max-width: 960px) { .g-fillnote { margin-left: 0; max-width: 260px; } }
+
+/* =========================================================================
+   "How to use" guided tour
+   ========================================================================= */
+.gd-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; pointer-events: auto; }
+.gd-row .wz-open { margin-top: 0; }
+.gd-open span { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: #0a84ff; color: #fff; font-size: 12px; font-weight: 700; }
+.gd { position: fixed; inset: 0; z-index: 80; }
+.gd[hidden] { display: none; }
+.gd-ring {
+  position: fixed; border-radius: 14px; pointer-events: none;
+  box-shadow: 0 0 0 2px #0a84ff, 0 0 0 9999px rgb(0 0 0 / 0.62);
+  transition: left .3s var(--ease-out), top .3s var(--ease-out), width .3s var(--ease-out), height .3s var(--ease-out);
+}
+.gd-bubble {
+  position: fixed; padding: 16px 18px 14px; border-radius: 18px; background: var(--panel); color: var(--ink);
+  box-shadow: 0 20px 60px rgb(0 0 0 / 0.45), 0 0 0 1px var(--line);
+  transition: left .3s var(--ease-out), top .3s var(--ease-out), opacity .2s;
+}
+.gd-bubble.loading { opacity: 0.6; }
+.gd-count { margin: 0 0 4px; font-size: 12px; color: var(--ink-2); }
+.gd-title { margin: 0 0 6px; font-size: 18px; letter-spacing: -0.01em; }
+.gd-text { margin: 0; font-size: 14.5px; line-height: 1.5; color: var(--ink-2); }
+.gd-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; }
+.gd-btns { display: flex; gap: 8px; }
+.gd-next, .gd-back, .gd-skip { height: 36px; padding: 0 16px; border-radius: 10px; cursor: pointer; font: inherit; font-size: 14px; font-weight: 600; }
+.gd-next { border: 0; background: var(--accent); color: #fff; }
+.gd-back { border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+.gd-skip { border: 0; background: none; color: var(--ink-2); padding: 0 4px; font-weight: 500; }
+.gd-next:focus-visible, .gd-back:focus-visible, .gd-skip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.gd-offer {
+  position: fixed; left: 50%; bottom: 24px; z-index: 75; transform: translateX(-50%); width: min(440px, calc(100vw - 32px));
+  display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: 16px;
+  background: var(--panel); color: var(--ink); box-shadow: 0 16px 50px rgb(0 0 0 / 0.4), 0 0 0 1px var(--line);
+  animation: wz-pop .25s var(--ease-out) both;
+}
+.gd-offer p { margin: 0; font-size: 14.5px; line-height: 1.45; }
+.gd-offer div { display: flex; gap: 10px; }
+@media (prefers-reduced-motion: reduce) { .gd-ring, .gd-bubble { transition: none; } .gd-offer { animation: none; } }

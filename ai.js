@@ -425,6 +425,11 @@
     buildExplainUI();
     buildChat();
     if (TD.current) res = TD.current;
+    // a case that failed: forget the old one, so the AI cannot answer about it
+    document.addEventListener('td:clear', function () {
+      res = null; history = [];
+      var card = $('ai-explain'); if (card) card.hidden = true;
+    });
     document.addEventListener('td:result', function (e) {
       var changed = !res || !e.detail || res.variable.id !== e.detail.variable.id || res.placeName !== e.detail.placeName;
       res = e.detail;

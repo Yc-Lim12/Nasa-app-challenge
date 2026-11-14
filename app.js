@@ -791,6 +791,12 @@
       if (id !== runId) return;
       setStatus(e.message, true);
       if (globe) globe.setBadge({ title: T('No answer here'), text: T('See the case file for why'), cls: 'none' });
+      // The old answer belonged to other settings: take it away so it cannot be read
+      // as the result of this case. Only the message above stays.
+      current = null; compareData = null;
+      $('result').hidden = true;
+      $('empty').hidden = true;
+      document.dispatchEvent(new CustomEvent('td:clear'));
     }).then(function () {
       if (id !== runId) return;
       btn.disabled = false; btn.textContent = T('Investigate');

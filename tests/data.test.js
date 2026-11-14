@@ -131,3 +131,23 @@ test('CSV download contains the correct year, observation and trend values', asy
   const csv = await getDownloadedBlob().text();
   assert.equal(csv, '"year","T2M (°C)","trend_line"\n"2000","10.0000","10.0000"\n"2010","20.0000","20.0000"\n');
 });
+
+test('open-ocean topsoil wetness (NASA gives 1 in every month) is left out, not averaged', () => {
+  const months = (v) => Object.fromEntries(Array.from({ length: 12 }, (_, i) => [`2020${String(i + 1).padStart(2, '0')}`, typeof v === 'function' ? v(i) : v]));
+  const cell = (lon, lat, table) => ({ geometry: { coordinates: [lon, lat] }, properties: { parameter: { GWETTOP: table } } });
+  // one point over open ocean: no data at all
+  const point = TD.monthlyTable({ properties: { parameter: { GWETTOP: months(1) } } }, 'GWETTOP');
+  assert.equal(point.cells, 0);
+  assert.equal(point.ocean, 1);
+  assert.deepEqual(Object.keys(point.table), []);
+  // a coastal box: two land cells and one ocean cell; the ocean cell must not pull the mean towards 1
+  const box = TD.monthlyTable({ features: [cell(100, 0, months(0.5)), cell(100.625, 0, months(0.7)), cell(101.25, 0, months(1))] }, 'GWETTOP');
+  assert.equal(box.cells, 2);
+  assert.equal(box.ocean, 1);
+  assert.ok(Math.abs(box.table['202001'] - 0.6) < 1e-9);
+  // a wet land cell that only sometimes reaches 1 is real data and stays
+  const wet = TD.monthlyTable({ properties: { parameter: { GWETTOP: months((i) => (i < 6 ? 1 : 0.95)) } } }, 'GWETTOP');
+  assert.equal(wet.cells, 1);
+  // other variables are never treated this way
+  assert.equal(TD.isOceanFill('T2M', months(1)), false);
+});

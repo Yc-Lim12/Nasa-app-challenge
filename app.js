@@ -326,13 +326,41 @@
    * A regional response has one feature per grid cell: average them, weighted by
    * cos(latitude) because cells shrink towards the poles.
    */
+  /**
+   * Over open ocean NASA POWER gives topsoil wetness (GWETTOP) as exactly 1 in every
+   * month, while the other land-only variables give -999 there. A cell like that is
+   * ocean, not a measurement, so it is left out (and the raw answer is logged).
+   */
+  var OCEAN_FILL = { GWETTOP: 1 };
+  function isOceanFill(param, t) {
+    var f = OCEAN_FILL[param], n = 0;
+    if (f === undefined || !t) return false;
+    for (var k in t) {
+      var v = t[k];
+      if (v === null || v < FILL) continue;
+      if (Math.abs(v - f) > 1e-6) return false;
+      n++;
+    }
+    return n > 0;
+  }
+  function logOcean(param, n, json) {
+    if (n && window.console) console.info('[Trend Detective] NASA POWER returned ' + param + ' = ' + OCEAN_FILL[param] +
+      ' in every month for ' + n + ' grid cell(s): open ocean, left out of the average. Raw NASA response:', json);
+  }
+
   function monthlyTable(json, param) {
-    if (json.properties) return { table: json.properties.parameter[param] || {}, cells: 1 };
+    if (json.properties) {
+      var pt = json.properties.parameter[param] || {};
+      if (isOceanFill(param, pt)) { logOcean(param, 1, json); return { table: {}, cells: 0, ocean: 1 }; }
+      return { table: pt, cells: 1, ocean: 0 };
+    }
     var feats = json.features || [];
-    var sum = {}, wsum = {};
+    var sum = {}, wsum = {}, ocean = 0, land = 0;
     feats.forEach(function (f) {
       var w = Math.cos(f.geometry.coordinates[1] * Math.PI / 180);
       var t = f.properties.parameter[param] || {};
+      if (isOceanFill(param, t)) { ocean++; return; }
+      land++;
       for (var k in t) {
         var v = t[k];
         if (v === null || v < FILL) continue;
@@ -342,7 +370,8 @@
     });
     var out = {};
     for (var k in sum) out[k] = sum[k] / wsum[k];
-    return { table: out, cells: feats.length };
+    logOcean(param, ocean, json);
+    return { table: out, cells: land, ocean: ocean };
   }
 
   /**
@@ -425,6 +454,7 @@
       var mt = monthlyTable(json, pm);
       var ser = seriesOf(mt.table, st);
       ser.cells = mt.cells;
+      ser.ocean = mt.ocean;
       ser.table = mt.table;
       return ser;
     });
@@ -690,6 +720,7 @@
     $('about-var').innerHTML = '<strong>' + esc(vname(vr)) + '.</strong> ' + esc(T(vr.def)) +
       ' <span class="muted">Source: ' + esc(vr.source) + ', through NASA POWER. ' +
       (res.cells > 1 ? 'Averaged over ' + res.cells + ' grid cells in the area, weighted by area.' : 'One grid cell at ' + esc(coordLabel(res.lat, res.lon)) + '.') +
+      (res.ocean ? ' ' + esc(T('{n} open-ocean cells were left out: NASA POWER has no soil there.', { n: res.ocean })) : '') +
       (monthly ? ' ' + esc(T('Each value is that month minus the average for the same calendar month in {a}–{b}.', { a: res.y0, b: res.y1 })) : '') + '</span>';
 
     $('table-body').innerHTML = res.years.map(function (y, i) {
@@ -742,13 +773,17 @@
     }).then(function (ser) {
       if (id !== runId) return;
       var got = yearCount(ser);
+      if (ser.ocean && !ser.cells) {
+        throw new Error(T('{what} is only measured on land, and this spot is open ocean. Choose a place on land, or another variable.', {
+          what: capFirst(T(vr.name).toLowerCase()) }));
+      }
       if (got < MIN_YEARS) {
         throw new Error(T('Only {n} usable years of {what} here for that period. A trend test needs at least {min}. Try a longer period, another place or another variable.', {
           n: got, what: T(vr.name).toLowerCase(), min: MIN_YEARS
         }));
       }
       render({ variable: vr, years: ser.years, values: ser.values, cells: ser.cells, table: ser.table,
-        skipped: ser.skipped, expected: ser.expected, step: snap.step,
+        skipped: ser.skipped, expected: ser.expected, step: snap.step, ocean: ser.ocean,
         stats: analyzeFor(snap, ser.years, ser.values), placeName: snap.placeName, short: snap.short, placeId: snap.placeId,
         lat: snap.lat, lon: snap.lon, size: snap.size, month: snap.month, y0: snap.y0, y1: snap.y1 });
       if (opts.scroll) $('result').scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' });
@@ -1408,7 +1443,8 @@
     FIRST_YEAR: FIRST_YEAR, LAST_YEAR: LAST_YEAR, MIN_YEARS: MIN_YEARS,
     variable: variable, place: place, prm: prm, vname: vname, box: box, urlFor: urlFor, fetchJson: fetchJson,
     monthlyTable: monthlyTable, yearlySeries: yearlySeries, loadSeries: loadSeries, partMonths: partMonths,
-    seriesOf: seriesOf, monthlyAnomalies: monthlyAnomalies, regionOf: regionOf, splitArea: splitArea, whenLabel: whenLabel,
+    seriesOf: seriesOf, monthlyAnomalies: monthlyAnomalies, isOceanFill: isOceanFill,
+    raw: function (url) { return cache[url]; },   // debugging: the raw NASA answer behind a URL regionOf: regionOf, splitArea: splitArea, whenLabel: whenLabel,
     esc: esc, withUnit: withUnit, signed: signed, sig: sig, fmtP: fmtP, pEquals: pEquals, coordLabel: coordLabel, capFirst: capFirst,
     toast: toast, apply: apply, investigate: investigate, openStep: openStep,
     get globe() { return globe; }, get current() { return current; },

@@ -111,6 +111,8 @@
         var lon = f.geometry.coordinates[0], lat = f.geometry.coordinates[1];
         lons.push(lon); lats.push(lat);
         var table = f.properties.parameter[pm] || {};
+        // open-ocean cells of a land-only variable have no data (see isOceanFill in app.js)
+        if (TD.isOceanFill(pm, table)) return { lon: lon, lat: lat, table: {}, stats: null };
         var ser = TD.yearlySeries(table, s.y0, s.y1, s.month);
         var st = ser.years.length >= TD.MIN_YEARS ? TD.S.analyze(ser.years, ser.values) : null;
         return { lon: lon, lat: lat, table: table, stats: st };

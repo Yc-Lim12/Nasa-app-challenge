@@ -221,6 +221,9 @@
       'Setiap tahun di sini menyerupai tahun sebelumnya (autokorelasi lag-1 {r}), jadi {n} tahun membawa maklumat bebas lebih kurang sama seperti {e}. Kedua-dua ujian telah diselaraskan untuk ini.',
     'Grey areas: no satellite photo (polar night or no pass yet). NASA Blue Marble shown.': 'Kawasan kelabu: tiada foto satelit (malam kutub atau belum dilalui). NASA Blue Marble ditunjukkan.',
     'Grey areas: no satellite photo (polar night or no pass yet). NASA Blue Marble shown, with sea ice from {d} (NASA GHRSST).': 'Kawasan kelabu: tiada foto satelit (malam kutub atau belum dilalui). NASA Blue Marble ditunjukkan, dengan ais laut pada {d} (NASA GHRSST).',
+    '{what} is only measured on land, and this spot is open ocean. Choose a place on land, or another variable.':
+      '{what} hanya diukur di darat, dan tempat ini ialah lautan terbuka. Pilih tempat di darat, atau pemboleh ubah lain.',
+    '{n} open-ocean cells were left out: NASA POWER has no soil there.': '{n} sel lautan terbuka tidak dimasukkan: NASA POWER tiada data tanah di sana.',
     'Grid cells': 'Sel grid', 'Smooth': 'Licin', 'Opacity': 'Kelegapan', 'How to draw the grid': 'Cara melukis grid',
     'Guided stories': 'Kisah berpandu', 'World story': 'Kisah dunia',
     'Wildfire smoke over Wisconsin': 'Asap kebakaran hutan di Wisconsin', 'Summer haze far from the fires': 'Jerebu musim panas jauh dari kebakaran',

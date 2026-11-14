@@ -402,9 +402,9 @@
       g.appendChild(svgEl('text', { x: cx, y: H - 8, 'text-anchor': 'middle', class: 'tick' + (on ? ' tick-on' : '') },
         narrow ? T(MONTH_SHORT[i]).charAt(0) : T(MONTH_SHORT[i])));
       function showTip() {
-        var html = '<strong>' + MONTHS[r.m] + '</strong>' + (r.st
+        var html = '<strong>' + esc(T(MONTHS[r.m])) + '</strong>' + (r.st
           ? '<span>' + esc(ratePhrase(r.st, vr)) + '</span><span>' + verdictLabel(r.st.verdict) + ', ' + esc(pEquals(r.st.mk.pAdj)) + '</span>'
-          : '<span>Not enough data</span>') + '<span><em>' + (on ? 'Click to go back to the whole year' : 'Click to investigate this month') + '</em></span>';
+          : '<span>' + esc(T('Not enough data')) + '</span>') + '<span><em>' + esc(T(on ? 'Click to go back to the whole year' : 'Click to investigate this month')) + '</em></span>';
         tip.show(html, cx, barTop, svg, W);
       }
       g.addEventListener('pointerenter', showTip);

@@ -515,6 +515,11 @@
     'project repository':
       'repositori projek',
 
+    // ---- months panel: bar tooltip ----
+    'Not enough data': 'Data tidak mencukupi',
+    'Click to go back to the whole year': 'Klik untuk kembali ke sepanjang tahun',
+    'Click to investigate this month': 'Klik untuk menyiasat bulan ini',
+
     // ---- months ----
     'Whole year': 'Sepanjang tahun', 'January': 'Januari', 'February': 'Februari', 'March': 'Mac', 'May': 'Mei', 'June': 'Jun',
     'July': 'Julai', 'August': 'Ogos', 'October': 'Oktober', 'December': 'Disember',

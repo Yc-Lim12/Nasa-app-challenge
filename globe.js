@@ -48,9 +48,14 @@
       });
     }
     radial('ocean', [['0%', '#1a4a7a'], ['60%', '#0d2847'], ['100%', '#040d1a']], '40%', '36%', '72%');
-    radial('shade', [['58%', '#000', 0], ['100%', '#000', 0.5]]);
-    radial('shine', [['0%', '#cfe0ff', 0.16], ['60%', '#cfe0ff', 0]], '34%', '26%', '55%');
-    radial('halo', [['84%', '#8fb8ff', 0.34], ['90%', '#8fb8ff', 0.12], ['100%', '#8fb8ff', 0]]);
+    // Light 3D cues only: a strong shine and shade washed out the satellite picture and
+    // made the globe look less sharp than the flat map.
+    radial('shade', [['72%', '#000', 0], ['100%', '#000', 0.35]]);
+    radial('shine', [['0%', '#cfe0ff', 0.05], ['55%', '#cfe0ff', 0]], '34%', '26%', '55%');
+    // The glow is a ring just outside the Earth's edge (at 1 / 1.16 = 86% of this circle).
+    // Inside it must be transparent: a gradient fills everything before its first stop with
+    // that stop's colour, which used to lay a 34% blue haze over the whole satellite picture.
+    radial('halo', [['0%', '#8fb8ff', 0], ['84%', '#8fb8ff', 0], ['86.5%', '#8fb8ff', 0.34], ['91%', '#8fb8ff', 0.12], ['100%', '#8fb8ff', 0]]);
 
     // star field behind the globe (canvas, drawn with a little parallax)
     var canvas = document.createElement('canvas');

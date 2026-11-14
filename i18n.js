@@ -779,6 +779,8 @@
     'Trend from each start year: with {a}–{b} there is only one possible start year, because a trend needs at least {n} years.':
       'Tren dari setiap tahun mula: bagi {a}–{b} hanya ada satu tahun mula yang mungkin, kerana tren memerlukan sekurang-kurangnya {n} tahun.',
     'Back to the full record': 'Kembali ke rekod penuh',
+    '{y} left out: before {f} this variable comes from a different satellite dataset (GEWEX SRB) that does not match the later one (CERES), and the jump between them would look like a trend.':
+      '{y} tidak digunakan: sebelum {f} pemboleh ubah ini datang daripada set data satelit yang berbeza (GEWEX SRB) yang tidak sepadan dengan set data kemudian (CERES), dan lonjakan antara keduanya akan kelihatan seperti tren.',
     'At this spot': 'Di lokasi ini', 'No data here': 'Tiada data di sini',
     'One grid cell, yearly averages from NASA POWER. Pick one to open the full case: chart, tests and evidence.':
       'Satu sel grid, purata tahunan daripada NASA POWER. Pilih satu untuk membuka kes penuh: carta, ujian dan bukti.',

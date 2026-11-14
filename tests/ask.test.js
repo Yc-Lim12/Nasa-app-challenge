@@ -15,7 +15,8 @@ const LAST_YEAR = 2025;
 function loadAsk() {
   const places = {
     klang: { short: 'Klang Valley' }, penang: { short: 'Penang' }, eastcoast: { short: 'east coast' },
-    malaysia: { short: 'Malaysia' }, peninsular: { short: 'Peninsular Malaysia' }, borneo: { short: 'Borneo' }
+    malaysia: { short: 'Malaysia' }, peninsular: { short: 'Peninsular Malaysia' }, borneo: { short: 'Borneo' },
+    sabah: { short: 'Sabah' }, kedah: { short: 'Kedah' }, kelantan: { short: 'Kelantan' }, johor: { short: 'Johor' }
   };
   const window = {
     TD: {
@@ -41,8 +42,8 @@ const QUESTIONS = [
   ['Are nights in Kota Bharu warmer than before?', { v: 'T2M_MIN', place: [6.13, 102.24] }],
   ['Has the haze in the Klang Valley got worse from 1990 to 2020?', { v: 'AOD_55', place: 'klang', y0: 2001, y1: 2020 }],
   ['Is the South China Sea warming?', { v: 'SST', place: [6.0, 109.0] }],
-  ['Is Sabah getting windier in July?', { v: 'WS10M', place: [5.3, 117.0], month: 7 }],
-  ['Is drought getting worse in Kedah over the last 20 years?', { v: 'GWETROOT', place: [6.0, 100.6], y0: LAST_YEAR - 19, y1: LAST_YEAR }],
+  ['Is Sabah getting windier in July?', { v: 'WS10M', place: 'sabah', month: 7 }],
+  ['Is drought getting worse in Kedah over the last 20 years?', { v: 'GWETROOT', place: 'kedah', y0: LAST_YEAR - 19, y1: LAST_YEAR }],
   ['Is it getting cloudier over Kuching in August?', { v: 'CLOUD_AMT', place: [1.55, 110.35], month: 8 }],
   ['Is London getting hotter in summer?', { v: 'T2M', place: [51.5, -0.12], month: 13 }],
   ['Is Sydney getting hotter in summer?', { v: 'T2M', place: [-33.87, 151.21], month: 15 }],
@@ -52,11 +53,11 @@ const QUESTIONS = [
   ['Adakah malam di Kuching semakin panas sejak 2000?', { v: 'T2M_MIN', place: [1.55, 110.35], y0: 2000 }],
   ['Adakah jerebu di Lembah Klang semakin teruk?', { v: 'AOD_55', place: 'klang', y0: 2001 }],
   ['Adakah laut di sekitar Malaysia semakin panas?', { v: 'SST', place: 'malaysia' }],
-  ['Adakah banjir di Kelantan semakin kerap dari 1990 hingga 2020?', { v: 'PRECTOTCORR', place: [5.6, 102.1], y0: 1990, y1: 2020 }],
-  ['Adakah angin di Sabah semakin kuat pada bulan Julai?', { v: 'WS10M', place: [5.3, 117.0], month: 7 }],
-  ['Adakah tanah di Kedah semakin kering?', { v: 'GWETROOT', place: [6.0, 100.6] }],
+  ['Adakah banjir di Kelantan semakin kerap dari 1990 hingga 2020?', { v: 'PRECTOTCORR', place: 'kelantan', y0: 1990, y1: 2020 }],
+  ['Adakah angin di Sabah semakin kuat pada bulan Julai?', { v: 'WS10M', place: 'sabah', month: 7 }],
+  ['Adakah tanah di Kedah semakin kering?', { v: 'GWETROOT', place: 'kedah' }],
   ['Adakah suhu di Pantai Timur meningkat dalam 10 tahun lepas?', { v: 'T2M', place: 'eastcoast', y0: LAST_YEAR - 9, y1: LAST_YEAR }],
-  ['Adakah cuaca di Johor semakin mendung pada bulan Ogos?', { v: 'CLOUD_AMT', place: [1.9, 103.4], month: 8 }]
+  ['Adakah cuaca di Johor semakin mendung pada bulan Ogos?', { v: 'CLOUD_AMT', place: 'johor', month: 8 }]
 ];
 
 function check(q, exp) {

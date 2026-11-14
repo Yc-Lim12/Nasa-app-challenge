@@ -94,7 +94,40 @@
       bounds: { latMin: 0.5, latMax: 7.5, lonMin: 99.5, lonMax: 119.5 } },
     { id: 'borneo', name: 'Borneo', short: 'Borneo', lat: 1.5, lon: 114.0, size: 12, region: true,
       bounds: { latMin: -4.5, latMax: 7.5, lonMin: 108.5, lonMax: 119.5 } }
-  ];
+  ].concat(malaysianStates());
+
+  /**
+   * Malaysia's 13 states and 3 federal territories. NASA POWER's grid cells are about
+   * 55 × 70 km, so a state is a rectangle around it (it includes some sea and the
+   * edge of the neighbours), at least 2° a side because POWER's regional answers need
+   * that. The five smallest are one grid cell: the area around them, not the state alone.
+   * Penang is the 'penang' place above. Rough bounds, south, north, west, east.
+   */
+  function malaysianStates() {
+    var big = [
+      ['johor', 'Johor', 1.25, 2.85, 102.5, 104.3], ['kedah', 'Kedah', 5.08, 6.72, 99.6, 101.1],
+      ['kelantan', 'Kelantan', 4.55, 6.25, 101.3, 102.65], ['negerisembilan', 'Negeri Sembilan', 2.4, 3.25, 101.6, 102.7],
+      ['pahang', 'Pahang', 2.45, 4.8, 101.3, 103.5], ['perak', 'Perak', 3.65, 5.95, 100.35, 101.75],
+      ['sabah', 'Sabah', 4.0, 7.4, 115.3, 119.3], ['sarawak', 'Sarawak', 0.85, 5.05, 109.6, 115.7],
+      ['selangor', 'Selangor', 2.6, 3.85, 100.75, 101.95], ['terengganu', 'Terengganu', 3.85, 5.85, 102.4, 103.6]
+    ].map(function (r) {
+      var b = { latMin: Math.floor(r[2] * 2) / 2, latMax: Math.ceil(r[3] * 2) / 2, lonMin: Math.floor(r[4] * 2) / 2, lonMax: Math.ceil(r[5] * 2) / 2 };
+      [['latMin', 'latMax'], ['lonMin', 'lonMax']].forEach(function (k) {
+        var grow = 2 - (b[k[1]] - b[k[0]]);
+        if (grow > 0) { b[k[0]] -= grow / 2; b[k[1]] += grow / 2; }
+      });
+      return { id: r[0], name: r[1] + ', Malaysia', short: r[1], state: true, region: true,
+        lat: (b.latMin + b.latMax) / 2, lon: (b.lonMin + b.lonMax) / 2,
+        size: Math.round(Math.max(b.latMax - b.latMin, b.lonMax - b.lonMin)), bounds: b };
+    });
+    var small = [
+      ['perlis', 'Perlis', 6.45, 100.22], ['melaka', 'Melaka', 2.25, 102.25], ['kualalumpur', 'Kuala Lumpur', 3.14, 101.69],
+      ['putrajaya', 'Putrajaya', 2.93, 101.69], ['labuan', 'Labuan', 5.3, 115.22]
+    ].map(function (r) {
+      return { id: r[0], name: r[1] + ', Malaysia', short: r[1], state: true, small: true, region: true, lat: r[2], lon: r[3], size: 0 };
+    });
+    return big.concat(small).sort(function (a, b) { return a.short < b.short ? -1 : 1; });
+  }
 
   // Area to average over: one grid cell, or a box from 2° to 20°. NASA POWER answers
   // at most 10° × 10° per request, so bigger boxes are fetched in parts (fetchArea).
@@ -108,6 +141,11 @@
   }
   function sizeLabel(v) {
     var p = place(state.placeId);
+    if (p && p.state && p.bounds) {
+      var sb = p.bounds;
+      return T('A rectangle around the state ({a}° × {b}°), with some sea and neighbouring land', { a: sb.latMax - sb.latMin, b: sb.lonMax - sb.lonMin });
+    }
+    if (p && p.small && v < 2) return T('One grid cell (about 50 km): {name} is smaller than one NASA grid cell, so this is the area around it', { name: T(p.short) });
     if (p && p.bounds) {
       var b = p.bounds;
       return T('The whole region ({a}° × {b}°)', { a: b.latMax - b.latMin, b: b.lonMax - b.lonMin });
@@ -1190,9 +1228,14 @@
     $('topics').innerHTML = TOPICS.map(function (t) {
       return '<button type="button" class="chip" data-topic="' + t.id + '" aria-pressed="false">' + esc(T(t.label)) + '</button>';
     }).join('');
-    $('place').innerHTML = PLACES.map(function (p) {
-      return '<option value="' + p.id + '">' + esc(capFirst(p.name)) + '</option>';
-    }).join('') + '<option value="custom">A place I chose on the globe</option>';
+    var popt = function (p) { return '<option value="' + p.id + '">' + esc(capFirst(T(p.name))) + '</option>'; };
+    var group = function (label, list) { return '<optgroup label="' + esc(T(label)) + '">' + list.map(popt).join('') + '</optgroup>'; };
+    $('place').innerHTML =
+      group('Example places', PLACES.filter(function (p) { return !p.region && p.id !== 'penang'; })) +
+      group('Malaysian states and federal territories', PLACES.filter(function (p) { return p.state || p.id === 'penang'; })
+        .sort(function (a, b) { return a.short < b.short ? -1 : 1; })) +
+      group('Whole regions', PLACES.filter(function (p) { return p.region && !p.state; })) +
+      '<option value="custom">' + esc(T('A place I chose on the globe')) + '</option>';
     var ys = '';
     for (var y = FIRST_YEAR; y <= LAST_YEAR; y++) ys += '<option>' + y + '</option>';
     $('y0').innerHTML = ys; $('y1').innerHTML = ys;

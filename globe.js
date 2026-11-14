@@ -103,6 +103,17 @@
     var readBox = d3.select(host).append('div').attr('class', 'g-readout').attr('aria-hidden', 'true');
     var readout = readBox.append('span').text(HINT);
     var sunEl = readBox.append('span').attr('class', 'g-sun');
+    // says what the grey areas are, when the daily picture had gaps filled
+    var fillEl = readBox.append('span').attr('class', 'g-sun g-fillnote').style('display', 'none');
+    function trG(sx) { return window.TDi18n ? window.TDi18n.tr(sx) : sx; }
+    function showFillNote() {
+      var on = basemap === 'live' && fillUsed;
+      fillEl.style('display', on ? null : 'none')
+        .text(!on ? '' : iceUsed
+          ? trG('Grey areas: no satellite photo (polar night or no pass yet). NASA Blue Marble shown, with sea ice from {d} (NASA GHRSST).').replace('{d}', ICE.date)
+          : trG('Grey areas: no satellite photo (polar night or no pass yet). NASA Blue Marble shown.'));
+    }
+    document.addEventListener('td:lang', showFillNote);
 
     var proj = d3.geoOrthographic().clipAngle(90).precision(0.3);
     var path = d3.geoPath(proj);
@@ -509,6 +520,130 @@
       return { z: z, c0: c0, c1: c1, r0: r0, r1: r1, n: (c1 - c0 + 1) * (r1 - r0 + 1),
         lon0: -180 + c0 * sp, lon1: -180 + (c1 + 1) * sp, lat1: 90 - r0 * sp, lat0: 90 - (r1 + 1) * sp };
     }
+    // The daily satellite picture is black where there was no sunlight to photograph
+    // (polar night) or no pass yet. Those pixels are filled from the cloud-free Blue
+    // Marble picture, one tile at a time so it needs little memory.
+    var under = null, underWait = [], fillUsed = false;
+    function withUnder(cb) {
+      if (under !== null) { cb(under); return; }
+      underWait.push(cb);
+      if (underWait.length > 1) return;
+      var img = new Image();
+      img.onload = function () { under = img; underWait.splice(0).forEach(function (f) { f(img); }); };
+      img.onerror = function () { under = false; underWait.splice(0).forEach(function (f) { f(false); }); };
+      img.src = STYLES.sat.local + (SMALL ? '4k' : '8k') + '.jpg';
+    }
+    // Sea ice today, for the gaps: NASA GHRSST MUR sea-ice concentration (daily, gap-free,
+    // from microwave, so it also covers polar night). Its tiles are transparent where
+    // there is no ice; elsewhere each colour is one step of NASA's 101-step scale for
+    // 0-100% ice cover (GIBS colormap GHRSST_Sea_Ice_Concentration), turned back into
+    // the percentage here.
+    var ICE_RAMP = '1111110e000e1c001c3200324000404e004e630063710071870087950095a300a3b800b8c600c6dc00dcea00eaf800f8f100ffe300ffcd00ffbf00ffb100ff9c00ff8e00ff7f00ff6a00ff5c00ff4700ff3900ff2a00ff1500ff0700ff0010ff0021ff0031ff004aff005aff0073ff0084ff0094ff00adff00bdff00ceff00e6ff00f7ff00faf100f6e300f1d400eabf00e5b100de9c00d98e00d47f00cd6a00c95c00c24700bd3900b82a00b11500ac070faf001eb4002db90044c10053c60062cb0078d20087d7009edf00ade400bce900d2f000e1f500f8fd00fff800ffea00ffd400ffc600ffb100ffa300ff9500ff7f00ff7100ff6300ff4e00ff4000ff2a00ff1c00ff0e00ff0909ff1a1aff3333ff4444ff5555ff6f6fff8080ff9999ffaaaaffbbbbffd5d5ffe6e6ffffff', iceLookup = {};
+    for (var ii = 0; ii <= 100; ii++) iceLookup[parseInt(ICE_RAMP.substr(ii * 6, 6), 16)] = ii / 100;
+    function iceCover(r, g, b) {
+      var v = iceLookup[(r << 16) | (g << 8) | b];
+      if (v !== undefined) return v;
+      // not an exact palette colour (edge smoothing): the nearest step
+      var best = 0, bd = 1e9;
+      for (var q = 0; q <= 100; q++) {
+        var c = parseInt(ICE_RAMP.substr(q * 6, 6), 16), dr = (c >> 16) - r, dg = ((c >> 8) & 255) - g, db = (c & 255) - b;
+        var dd = dr * dr + dg * dg + db * db;
+        if (dd < bd) { bd = dd; best = q; }
+      }
+      iceLookup[(r << 16) | (g << 8) | b] = best / 100;
+      return best / 100;
+    }
+    var ICE = { layer: 'GHRSST_L4_MUR_Sea_Ice_Concentration', tms: '1km', maxZ: 6,
+      date: new Date(Date.now() - 60 * 3600e3).toISOString().slice(0, 10) };
+    var iceTiles = {}, iceUsed = false;
+    function iceImage(zi, row, col, cb) {
+      var key = zi + '/' + row + '/' + col, e = iceTiles[key];
+      if (e && e.done) { cb(e.img); return; }
+      if (e) { e.wait.push(cb); return; }
+      e = iceTiles[key] = { done: false, img: null, wait: [cb] };
+      var img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = function () { e.done = true; e.img = img; e.wait.splice(0).forEach(function (f) { f(img); }); };
+      img.onerror = function () { e.done = true; e.wait.splice(0).forEach(function (f) { f(null); }); };
+      img.src = GIBS_WMTS + ICE.layer + '/default/' + ICE.date + '/' + ICE.tms + '/' + zi + '/' + row + '/' + col + '.png';
+    }
+    /** The ice under one picture tile (level z), as 512 x 512 RGBA, or null. */
+    function iceFor(z, row, col, cb) {
+      var zi = Math.min(z, ICE.maxZ), sc = Math.pow(2, z - zi);
+      iceImage(zi, Math.floor(row / sc), Math.floor(col / sc), function (img) {
+        if (!img) { cb(null); return; }
+        try {
+          var t = document.createElement('canvas');
+          t.width = 512; t.height = 512;
+          var tx = t.getContext('2d', { willReadFrequently: true }), part = 512 / sc;
+          tx.drawImage(img, (col % sc) * part, (row % sc) * part, part, part, 0, 0, 512, 512);
+          cb(tx.getImageData(0, 0, 512, 512).data);
+        } catch (err) { cb(null); }
+      });
+    }
+
+    // A filled pixel is shown dimmed and greyish, so it reads as background, not as
+    // today's photo; today's sea ice is drawn on it in white; the edge is blended over
+    // a few pixels so it has no hard step.
+    var FILL_R = 5;
+    function fillTile(x, img, dx, dy, lon0, lat1, span, z, row, col, done) {
+      var t = document.createElement('canvas');
+      t.width = 512; t.height = 512;
+      var tx = t.getContext('2d', { willReadFrequently: true });
+      tx.drawImage(img, 0, 0);
+      var a;
+      try { a = tx.getImageData(0, 0, 512, 512); } catch (err) { x.drawImage(img, dx, dy); done(); return; }
+      var d = a.data, N = 512 * 512, i, k;
+      var hole = new Float32Array(N), any = false;
+      for (i = 0; i < N; i++) {
+        k = i * 4;
+        if (d[k] < 9 && d[k + 1] < 9 && d[k + 2] < 9) { hole[i] = 1; any = true; }
+      }
+      if (!any || !under) { x.putImageData(a, dx, dy); done(); return; }
+      var b;
+      try {
+        var bw = under.naturalWidth, bh = under.naturalHeight;
+        tx.drawImage(under, (lon0 + 180) / 360 * bw, (90 - lat1) / 180 * bh, span / 360 * bw, span / 180 * bh, 0, 0, 512, 512);
+        b = tx.getImageData(0, 0, 512, 512).data;
+      } catch (err) { under = false; x.putImageData(a, dx, dy); done(); return; }   // e.g. opened from disk
+      iceFor(z, row, col, function (ice) {
+        // soft mask: box blur of the hole mask, across then down
+        var tmp = new Float32Array(N), w = new Float32Array(N), R = FILL_R, inv = 1 / (2 * R + 1), y, xx, acc, j;
+        for (y = 0; y < 512; y++) {
+          acc = 0;
+          for (xx = -R; xx <= R; xx++) acc += hole[y * 512 + Math.min(511, Math.max(0, xx))];
+          for (xx = 0; xx < 512; xx++) {
+            tmp[y * 512 + xx] = acc * inv;
+            acc += hole[y * 512 + Math.min(511, xx + R + 1)] - hole[y * 512 + Math.max(0, xx - R)];
+          }
+        }
+        for (xx = 0; xx < 512; xx++) {
+          acc = 0;
+          for (y = -R; y <= R; y++) acc += tmp[Math.min(511, Math.max(0, y)) * 512 + xx];
+          for (y = 0; y < 512; y++) {
+            w[y * 512 + xx] = acc * inv;
+            acc += tmp[Math.min(511, y + R + 1) * 512 + xx] - tmp[Math.max(0, y - R) * 512 + xx];
+          }
+        }
+        for (i = 0; i < N; i++) {
+          var m = hole[i] ? 1 : w[i];
+          if (m <= 0.001) continue;
+          k = i * 4;
+          var g = 0.3 * b[k] + 0.59 * b[k + 1] + 0.11 * b[k + 2];
+          var ic = ice && ice[k + 3] > 128 ? iceCover(ice[k], ice[k + 1], ice[k + 2]) * 0.88 : 0;   // today's ice cover
+          if (ic) iceUsed = true;
+          for (j = 0; j < 3; j++) {
+            var f = (g + (b[k + j] - g) * 0.45) * 0.72;        // Blue Marble: 45% colour, 72% brightness
+            f = f * (1 - ic) + 235 * ic;                        // ice in near-white
+            d[k + j] = d[k + j] * (1 - m) + f * m;
+          }
+        }
+        fillUsed = true;
+        x.putImageData(a, dx, dy);
+        done();
+      });
+    }
+
     /**
      * Load a block of tiles in parallel, paste them into one canvas and hand it on
      * like loadSurface does. Any failed tile fails the whole block (the caller then
@@ -518,7 +653,9 @@
       var nc = tr.c1 - tr.c0 + 1, nr = tr.r1 - tr.r0 + 1, left = nc * nr, failed = false;
       var c = document.createElement('canvas');
       c.width = nc * 512; c.height = nr * 512;
-      var x = c.getContext('2d', { willReadFrequently: !gl });
+      var x = c.getContext('2d', { willReadFrequently: !gl || !!st.daily });
+      if (st.daily && under === null) { withUnder(function () { loadTiles(st, tr, wrap, done); }); return; }
+      var sp = tileSpan(tr.z);
       for (var r = tr.r0; r <= tr.r1; r++) {
         for (var cc = tr.c0; cc <= tr.c1; cc++) {
           (function (row, col) {
@@ -526,8 +663,9 @@
             img.crossOrigin = 'anonymous';
             img.onload = function () {
               if (failed) return;
-              x.drawImage(img, (col - tr.c0) * 512, (row - tr.r0) * 512);
-              if (--left === 0) finish();
+              var placed = function () { if (!failed && --left === 0) finish(); };
+              if (st.daily) fillTile(x, img, (col - tr.c0) * 512, (row - tr.r0) * 512, -180 + col * sp, 90 - row * sp, sp, tr.z, row, col, placed);
+              else { x.drawImage(img, (col - tr.c0) * 512, (row - tr.r0) * 512); placed(); }
             };
             img.onerror = function () { if (!failed) { failed = true; done(null); } };
             img.src = tileUrl(st, tr.z, row, col);
@@ -535,6 +673,7 @@
         }
       }
       function finish() {
+        if (st.daily) showFillNote();
         if (gl) {
           var t = makeTex(c, wrap ? gl.REPEAT : gl.CLAMP_TO_EDGE);
           done(t ? { tex: t, w: c.width, h: c.height } : null);
@@ -570,6 +709,7 @@
     function setBasemap(style) {
       if (!STYLES[style]) style = 'dark';
       basemap = style;
+      fillUsed = false; showFillNote();
       var my = ++satToken, st = STYLES[style];
       clearTimeout(refineTimer); refineKey = '';
       if (sat) { freeTex(sat.base); freeTex(sat.region); }

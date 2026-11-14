@@ -199,6 +199,8 @@
       'Bulan-bulan bersebelahan adalah serupa (autokorelasi lag-1 {r}), jadi {n} nilai bulanan membawa maklumat bebas lebih kurang sama seperti {e}. Kedua-dua ujian telah diselaraskan untuk ini.',
     'Each year here resembles the year before it (lag-1 autocorrelation {r}), so {n} years carry about as much independent information as {e}. Both tests were adjusted for this.':
       'Setiap tahun di sini menyerupai tahun sebelumnya (autokorelasi lag-1 {r}), jadi {n} tahun membawa maklumat bebas lebih kurang sama seperti {e}. Kedua-dua ujian telah diselaraskan untuk ini.',
+    'Grey areas: no satellite photo (polar night or no pass yet). NASA Blue Marble shown.': 'Kawasan kelabu: tiada foto satelit (malam kutub atau belum dilalui). NASA Blue Marble ditunjukkan.',
+    'Grey areas: no satellite photo (polar night or no pass yet). NASA Blue Marble shown, with sea ice from {d} (NASA GHRSST).': 'Kawasan kelabu: tiada foto satelit (malam kutub atau belum dilalui). NASA Blue Marble ditunjukkan, dengan ais laut pada {d} (NASA GHRSST).',
     'Grid cells': 'Sel grid', 'Smooth': 'Licin', 'Opacity': 'Kelegapan', 'How to draw the grid': 'Cara melukis grid',
     'Guided stories': 'Kisah berpandu', 'World story': 'Kisah dunia',
     'Wildfire smoke over Wisconsin': 'Asap kebakaran hutan di Wisconsin', 'Summer haze far from the fires': 'Jerebu musim panas jauh dari kebakaran',

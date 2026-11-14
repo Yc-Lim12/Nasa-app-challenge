@@ -750,9 +750,18 @@
       var polar = lat1 > 40 || lat1 - span < -40;
       (polar ? function (cb) { iceFor(z, row, col, cb); } : function (cb) { cb(null); })(function (ice) {
         var d = a.data;
+        // Local brightness (7 x 7 average), so the "dim photo" test below treats a whole
+        // patch alike; tested pixel by pixel it flipped single pixels in dark land or sea
+        // and left salt-and-pepper speckle.
+        var L = new Float32Array(512 * 512), L2 = new Float32Array(512 * 512);
+        for (var q = 0; q < 512 * 512; q++) L[q] = 0.3 * d[q * 4] + 0.59 * d[q * 4 + 1] + 0.11 * d[q * 4 + 2];
+        for (var r0 = 0; r0 < 512; r0++) { boxLine(L, L2, 512, 1, r0 * 512, 3); }
+        for (var c0 = 0; c0 < 512; c0++) { boxLine(L2, L, 512, 512, c0, 3); }
         for (var py = 0; py < 512; py++) {
           var gy = (dy + py + 0.5) / CELL - 0.5, y0 = Math.floor(gy), fy = gy - y0;
           var ya = Math.max(0, y0) * GW, yb = Math.min(GH - 1, y0 + 1) * GW;
+          // dim photos (low sun, twilight) only happen toward the poles: off below 40°, full from 55°
+          var plat = Math.abs(lat1 - (py + 0.5) / 512 * span), polW = Math.max(0, Math.min(1, (plat - 40) / 15));
           for (var px = 0; px < 512; px++) {
             var k = (py * 512 + px) * 4, m;
             if (isHole(d, k)) m = 1;
@@ -767,8 +776,8 @@
               // partly missing, more so the darker it is (fully at the black limit of 9,
               // not at all from 60). Only close to a gap, so dark open sea elsewhere in
               // the daytime photo is left alone.
-              var lum = 0.3 * d[k] + 0.59 * d[k + 1] + 0.11 * d[k + 2];
-              if (lum < DIM_LUM) m = Math.max(m, Math.min(1, (DIM_LUM - lum) / (DIM_LUM - 9)) * Math.min(1, ww * 4));
+              var lum = L[py * 512 + px];
+              if (polW > 0 && lum < DIM_LUM) m = Math.max(m, Math.min(1, (DIM_LUM - lum) / (DIM_LUM - 9)) * Math.min(1, ww * 4) * polW);
               if (m <= 0.002) continue;
             }
             var g = 0.3 * b[k] + 0.59 * b[k + 1] + 0.11 * b[k + 2];

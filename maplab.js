@@ -58,7 +58,7 @@
   var grid = null;           // { key, cells, dlon, dlat, vr }
   var lapse = { timer: 0, i: 0, mode: 'anom', speed: 1 };
   var rain = { timer: 0, i: 0, frames: null, speed: 1 };
-  var windMonth = null;
+  var windMonth = null, windStash = null;
 
   function $(id) { return document.getElementById(id); }
   function T(s, v) { return TD.T(s, v); }
@@ -91,7 +91,17 @@
     clearInterval(wind.timer); wind.timer = 0;
     g.setCells(null); g.setMarks(null); g.setRaster(null); g.setField(null);
     panel.onclick = null; panel.oninput = null;     // handlers of the previous layer's panel
-    active = id || '';
+    // Wind always opens as Ryan designed it (whole 10° box, crisp cells, 75% opacity),
+    // whatever was chosen on the trend map; the trend map gets its own choices back after.
+    var next = id || '';
+    if (next === 'wind' && active !== 'wind') {
+      windStash = { box: BOX, mode: CELLS.mode, alpha: CELLS.alpha };
+      BOX = BOX_MAX; CELLS.mode = 'crisp'; CELLS.alpha = 0.75;
+    } else if (next !== 'wind' && active === 'wind' && windStash) {
+      BOX = windStash.box; CELLS.mode = windStash.mode; CELLS.alpha = windStash.alpha;
+      windStash = null;
+    }
+    active = next;
     loadKey = '';
     Array.prototype.forEach.call(document.querySelectorAll('#layers button'), function (b) {
       b.setAttribute('aria-pressed', b.getAttribute('data-layer') === active ? 'true' : 'false');
@@ -1087,14 +1097,14 @@
       var b = e.target.closest('[data-cm]');
       if (!b) return;
       CELLS.mode = b.getAttribute('data-cm');
-      try { localStorage.setItem('td-cellmode', CELLS.mode); } catch (err) { /* private mode */ }
+      try { if (active !== 'wind') localStorage.setItem('td-cellmode', CELLS.mode); } catch (err) { /* private mode */ }
       Array.prototype.forEach.call(panel.querySelectorAll('[data-cm]'), function (x) { x.setAttribute('aria-pressed', String(x === b)); });
       TD.globe.setCellStyle(CELLS.mode);
     });
     panel.addEventListener('input', function (e) {
       if (e.target.id !== 'lp-alpha') return;
       CELLS.alpha = +e.target.value / 100;
-      try { localStorage.setItem('td-cellalpha', String(CELLS.alpha)); } catch (err) { /* private mode */ }
+      try { if (active !== 'wind') localStorage.setItem('td-cellalpha', String(CELLS.alpha)); } catch (err) { /* private mode */ }
       TD.globe.setCellStyle(null, CELLS.alpha);
     });
     // Map-area slider (trend map, timelapse, wind): label follows the thumb, reload on release
@@ -1107,7 +1117,7 @@
       var b = Math.max(BOX_MIN, Math.min(BOX_MAX, parseInt(e.target.value, 10) || BOX));
       if (b === BOX) return;
       BOX = b;
-      try { localStorage.setItem('td-mapbox', String(BOX)); } catch (err) { /* private mode */ }
+      try { if (active !== 'wind') localStorage.setItem('td-mapbox', String(BOX)); } catch (err) { /* private mode */ }
       if (active) setLayer(active, { frame: active === 'lapse' ? lapse.i : undefined });
     });
     // When the case changes, refresh map layers that depend on it.

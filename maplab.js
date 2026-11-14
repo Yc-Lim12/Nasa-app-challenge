@@ -88,6 +88,7 @@
     if (!g) return;
     token++;
     clearInterval(lapse.timer); clearInterval(rain.timer); clearInterval(world.timer); world.timer = 0;
+    clearInterval(wind.timer); wind.timer = 0;
     g.setCells(null); g.setMarks(null); g.setRaster(null); g.setField(null);
     panel.onclick = null; panel.oninput = null;     // handlers of the previous layer's panel
     active = id || '';
@@ -864,70 +865,192 @@
 
   // ---- wind particles -------------------------------------------------------------
 
+  // ---- wind -----------------------------------------------------------------------
+  // Streaks follow the average wind vector (MERRA-2 U10M, V10M). The colour shows the
+  // average wind SPEED from NASA's own WS10M, which is the mean of the speed at every
+  // hour. That differs from the speed of the average vector: winds that reverse with the
+  // monsoon cancel out in the vector average but are still strong. "Change" colours each
+  // cell by its WS10M trend (stats.js, same tests as everywhere), dots after the false
+  // discovery rate correction.
+  var wind = { data: null, key: '', mode: 'mean', timer: 0 };
+
+  function loadWind() {
+    var s = TD.state, key = gridKey();
+    if (wind.data && wind.key === key) return Promise.resolve(wind.data);
+    return Promise.all(['U10M', 'V10M', 'WS10M'].map(function (pm) { return TD.fetchJson(TD.urlFor(pm, s.lat, s.lon, BOX)); })).then(function (js) {
+      var byPos = function (json, pm) {
+        var o = {};
+        (json.features || []).forEach(function (f) {
+          o[f.geometry.coordinates[0].toFixed(3) + ',' + f.geometry.coordinates[1].toFixed(3)] = f.properties.parameter[pm] || {};
+        });
+        return o;
+      };
+      var U = byPos(js[0], 'U10M'), V = byPos(js[1], 'V10M'), W = byPos(js[2], 'WS10M');
+      var cells = Object.keys(W).filter(function (k) { return U[k] && V[k]; }).map(function (k) {
+        var p = k.split(',');
+        return { lon: +p[0], lat: +p[1], u: U[k], v: V[k], ws: W[k] };
+      });
+      if (!cells.length) throw new Error(T('NASA POWER returned no grid cells for this area.'));
+      var uniq = function (a) { return a.filter(function (v, i) { return a.indexOf(v) === i; }).sort(function (x, y) { return x - y; }); };
+      var lons = uniq(cells.map(function (c) { return c.lon; })), lats = uniq(cells.map(function (c) { return c.lat; }));
+      wind.key = key;
+      wind.data = { cells: cells, lons: lons, lats: lats,
+        dlon: lons.length > 1 ? lons[1] - lons[0] : 0.625, dlat: lats.length > 1 ? lats[1] - lats[0] : 0.5 };
+      return wind.data;
+    });
+  }
+
+  /** Mean of a monthly table over the chosen years, for one calendar month (0 = every month). */
+  function monthMean(table, y0, y1, month) {
+    var sum = 0, n = 0;
+    for (var k in table) {
+      var y = +k.slice(0, 4), m = +k.slice(4, 6), v = table[k];
+      if (m < 1 || m > 12 || y < y0 || y > y1 || (month && m !== month) || v === null || v < -900) continue;
+      sum += v; n++;
+    }
+    return n ? sum / n : null;
+  }
+
+  function monsoonNote(lat, lon, m) {
+    if (!(lat > -6 && lat < 12 && lon > 94 && lon < 122) || !m) return '';
+    if (m === 11 || m === 12 || m <= 3) return T('Northeast monsoon (November to March): winds blow from the north-east across the South China Sea and bring heavy rain to the east coast.');
+    if (m >= 5 && m <= 9) return T('Southwest monsoon (May to September): winds blow from the south-west, and the west coast is drier.');
+    return T('Inter-monsoon month: light, changeable winds and afternoon thunderstorms.');
+  }
+
   function showWind() {
     var my = token, s = TD.state;
-    // a season shows its middle month, which matches one of the panel buttons
+    clearInterval(wind.timer); wind.timer = 0;
+    // a season shows its middle month
     if (windMonth === null) windMonth = s.month > 12 ? { 13: 7, 14: 10, 15: 1, 16: 4 }[s.month] : s.month;
     busy(T('Wind'), T('Loading 10 m wind for a {b}° box around this place…', { b: BOX }));
     TD.globe.flyTo(s.lat, s.lon, BOX, 1300, zoomFor());
-    Promise.all(['U10M', 'V10M'].map(function (pm) { return TD.fetchJson(TD.urlFor(pm, s.lat, s.lon, BOX)); })).then(function (js) {
+    loadWind().then(function (d) {
       if (my !== token) return;
       loadKey = gridKey();
-      var mean = function (table) {
-        var sum = 0, n = 0;
-        for (var k in table) {
-          var y = +k.slice(0, 4), m = +k.slice(4, 6), v = table[k];
-          if (m > 12 || y < s.y0 || y > s.y1 || (windMonth && m !== windMonth) || v === null || v < -900) continue;
-          sum += v; n++;
-        }
-        return n ? sum / n : null;
-      };
-      var pts = {};
-      js[0].features.forEach(function (f, i) {
-        var lon = f.geometry.coordinates[0], lat = f.geometry.coordinates[1];
-        var u = mean(f.properties.parameter.U10M || {}), v = mean((js[1].features[i] || f).properties.parameter.V10M || {});
-        if (u !== null && v !== null) pts[lon.toFixed(3) + ',' + lat.toFixed(3)] = [u, v];
-      });
-      var lons = [], lats = [];
-      Object.keys(pts).forEach(function (k) { var p = k.split(','); lons.push(+p[0]); lats.push(+p[1]); });
-      lons = lons.filter(function (v, i, a) { return a.indexOf(v) === i; }).sort(function (a, c) { return a - c; });
-      lats = lats.filter(function (v, i, a) { return a.indexOf(v) === i; }).sort(function (a, c) { return a - c; });
-      var get = function (i, j) { return pts[lons[i].toFixed(3) + ',' + lats[j].toFixed(3)]; };
-      var idx = function (arr, x) {
-        for (var i = 0; i < arr.length - 1; i++) if (x <= arr[i + 1]) return i;
-        return arr.length - 2;
-      };
-      var speeds = Object.keys(pts).map(function (k) { return Math.sqrt(pts[k][0] * pts[k][0] + pts[k][1] * pts[k][1]); });
-      TD.globe.setField({
-        bounds: { lonMin: lons[0], lonMax: lons[lons.length - 1], latMin: lats[0], latMax: lats[lats.length - 1] },
-        count: 1100,
-        speed: 0.0045 * BOX / 10,
-        sample: function (lon, lat) {
-          var i = idx(lons, lon), j = idx(lats, lat);
-          var a = get(i, j), c = get(i + 1, j), d = get(i, j + 1), e = get(i + 1, j + 1);
-          if (!a || !c || !d || !e) return a || null;
-          var tx = (lon - lons[i]) / (lons[i + 1] - lons[i]), ty = (lat - lats[j]) / (lats[j + 1] - lats[j]);
-          return [0, 1].map(function (q) {
-            return (a[q] * (1 - tx) + c[q] * tx) * (1 - ty) + (d[q] * (1 - tx) + e[q] * tx) * ty;
+      TD.globe.setCellStyle(CELLS.mode, CELLS.alpha);
+
+      // trend of the wind speed in every cell, for the chosen month (or the whole year)
+      function trends(month) {
+        var out = d.cells.map(function (c) {
+          var ser = TD.yearlySeries(c.ws, s.y0, s.y1, month);
+          return ser.years.length >= TD.MIN_YEARS ? TD.S.analyze(ser.years, ser.values) : null;
+        });
+        var ok = out.filter(Boolean);
+        var pass = TD.S.fdr(ok.map(function (a) { return a.mk.pAdj; }), 0.05), i = 0;
+        out.forEach(function (a) { if (a) a.fdr = pass[i++]; });
+        return out;
+      }
+
+      function render() {
+        var m = windMonth || 0;
+        var vecs = d.cells.map(function (c) {
+          var u = monthMean(c.u, s.y0, s.y1, m), v = monthMean(c.v, s.y0, s.y1, m);
+          return u === null || v === null ? null : [u, v];
+        });
+        var speeds = d.cells.map(function (c) { return monthMean(c.ws, s.y0, s.y1, m); });
+        var pts = {};
+        d.cells.forEach(function (c, i) { if (vecs[i]) pts[c.lon.toFixed(3) + ',' + c.lat.toFixed(3)] = vecs[i]; });
+        var get = function (i, j) { return pts[d.lons[i].toFixed(3) + ',' + d.lats[j].toFixed(3)]; };
+        var idx = function (arr, x) {
+          for (var i = 0; i < arr.length - 1; i++) if (x <= arr[i + 1]) return i;
+          return Math.max(0, arr.length - 2);
+        };
+        TD.globe.setField({
+          bounds: { lonMin: d.lons[0], lonMax: d.lons[d.lons.length - 1], latMin: d.lats[0], latMax: d.lats[d.lats.length - 1] },
+          count: 1100,
+          speed: 0.0045 * BOX / 10,
+          sample: function (lon, lat) {
+            var i = idx(d.lons, lon), j = idx(d.lats, lat);
+            var a = get(i, j), c = get(i + 1, j), e = get(i, j + 1), f = get(i + 1, j + 1);
+            if (!a || !c || !e || !f) return a || null;
+            var tx = (lon - d.lons[i]) / (d.lons[i + 1] - d.lons[i]), ty = (lat - d.lats[j]) / (d.lats[j + 1] - d.lats[j]);
+            return [0, 1].map(function (q) {
+              return (a[q] * (1 - tx) + c[q] * tx) * (1 - ty) + (e[q] * (1 - tx) + f[q] * tx) * ty;
+            });
+          }
+        });
+
+        var bounds = function (c) {
+          return { lon0: c.lon - d.dlon / 2, lon1: c.lon + d.dlon / 2, lat0: c.lat - d.dlat / 2, lat1: c.lat + d.dlat / 2 };
+        };
+        var html = '<div class="lp-head"><strong>' + esc(T('Wind')) + '</strong><span>' + esc(T('At 10 m')) + ', ' + s.y0 + '–' + s.y1 + '</span></div>' +
+          boxCtl() +
+          '<div class="lp-seg lp-scope" id="lp-wmode"><button type="button" data-wmode="mean" aria-pressed="' + (wind.mode === 'mean') + '">' + esc(T('Average wind')) + '</button>' +
+          '<button type="button" data-wmode="change" aria-pressed="' + (wind.mode === 'change') + '">' + esc(T('Change since {y}', { y: s.y0 })) + '</button></div>' +
+          '<div class="lp-player"><button type="button" class="lp-play" id="lp-wplay" aria-label="' + esc(T(wind.timer ? 'Pause' : 'Play')) + '">' + (wind.timer ? '❚❚' : '▶') + '</button>' +
+          '<input type="range" id="lp-wslider" min="0" max="12" value="' + m + '" aria-label="' + esc(T('Month')) + '">' +
+          '<output class="lp-when">' + esc(m ? T(TD.MONTHS[m]) : T('Whole year')) + '</output></div>';
+
+        var ok = speeds.filter(function (v) { return v !== null; });
+        if (wind.mode === 'mean') {
+          var lo = percentile(ok, 0.02), hi = percentile(ok, 0.98);
+          var list = [];
+          d.cells.forEach(function (c, i) {
+            if (speeds[i] === null) return;
+            var b = bounds(c), t = Math.max(0, Math.min(1, (speeds[i] - lo) / ((hi - lo) || 1)));
+            b.fill = d3.interpolateYlGnBu(0.15 + 0.85 * t); b.opacity = 0.7; b.value = speeds[i];
+            list.push(b);
           });
+          TD.globe.setCells(list);
+          // how much of the speed survives in the average direction (1 = always the same way)
+          var steady = d.cells.map(function (c, i) {
+            return vecs[i] && speeds[i] ? Math.sqrt(vecs[i][0] * vecs[i][0] + vecs[i][1] * vecs[i][1]) / speeds[i] : null;
+          }).filter(function (v) { return v !== null; });
+          html += '<div class="lp-scale"><span>' + esc(TD.withUnit(lo.toFixed(1), 'm/s')) + '</span><i class="lp-ramp lp-ramp-wet"></i><span>' +
+            esc(TD.withUnit(hi.toFixed(1), 'm/s')) + '</span></div>' +
+            '<p class="lp-key">' + esc(T('Colour: average wind speed (NASA WS10M). Streaks follow the average wind direction (U10M, V10M).')) + '</p>' +
+            '<p class="lp-note">' + esc(T('Average speed in this box: {s} m/s. On average {p}% of that blows in one steady direction; the rest changes direction and cancels out.',
+              { s: TD.S.mean(ok).toFixed(1), p: Math.round(100 * TD.S.mean(steady)) })) + '</p>';
+        } else {
+          var tr = trends(m), done = tr.filter(Boolean);
+          var rates = done.map(function (a) { return a.slopePerDecade; });
+          var lim = percentile(rates.map(Math.abs), 0.95) || 0.01;
+          var list2 = [];
+          d.cells.forEach(function (c, i) {
+            if (!tr[i]) return;
+            var b = bounds(c), t = Math.max(-1, Math.min(1, tr[i].slopePerDecade / lim));
+            b.fill = d3.interpolateRdBu(0.5 - t / 2); b.opacity = 0.82; b.dot = tr[i].fdr; b.value = tr[i].slopePerDecade;
+            list2.push(b);
+          });
+          TD.globe.setCells(list2);
+          var up = done.filter(function (a) { return a.fdr && a.slopePerDecade > 0; }).length;
+          var dn = done.filter(function (a) { return a.fdr && a.slopePerDecade < 0; }).length;
+          html += '<div class="lp-scale"><span>' + esc(TD.withUnit(TD.signed(-lim, 2), 'm/s')) + '</span><i class="lp-ramp lp-ramp-div"></i><span>' +
+            esc(TD.withUnit(TD.signed(lim, 2), 'm/s')) + '</span></div>' +
+            '<p class="lp-key"><span class="lp-dot"></span>' + esc(T('Red: windier, blue: calmer, per decade (NASA WS10M). Dot: significant after allowing for year-to-year memory and testing many cells at once (false discovery rate 5%).')) + '</p>' +
+            '<p class="lp-note">' + esc(T('{s} of {n} grid cells show a significant change in wind speed: {u} windier, {d} calmer. Average change: {r} per decade.',
+              { s: up + dn, n: done.length, u: up, d: dn, r: TD.withUnit(TD.signed(TD.S.mean(rates), 2), 'm/s') })) + '</p>';
         }
-      });
-      var malaysia = s.lat > -6 && s.lat < 12 && s.lon > 94 && s.lon < 122;
-      var caption = '';
-      if (malaysia && (windMonth === 12 || windMonth === 1 || windMonth === 2)) caption = T('This is the northeast monsoon season: winds blow from the north-east across the South China Sea.');
-      else if (malaysia && windMonth >= 6 && windMonth <= 8) caption = T('This is the southwest monsoon season: winds blow from the south-west, and the Strait of Malacca is drier.');
-      panel.innerHTML = '<div class="lp-head"><strong>' + esc(T('Wind')) + '</strong><span>' + esc(T('Average at 10 m')) + ', ' + s.y0 + '–' + s.y1 + '</span></div>' +
-        boxCtl() +
-        '<div class="lp-seg lp-months" id="lp-wm">' + [0, 1, 4, 7, 10].map(function (m) {
-          return '<button type="button" data-wm="' + m + '" aria-pressed="' + (windMonth === m) + '">' + esc(m ? T(TD.MONTHS[m]).slice(0, 3) : T('Year')) + '</button>';
-        }).join('') + '</div>' +
-        '<p class="lp-key">' + esc(T('Each streak follows the average wind. Brighter streaks are faster. Average speed in this box: {s} m/s.',
-          { s: TD.S.mean(speeds).toFixed(1) })) + '</p>' + (caption ? '<p class="lp-note">' + esc(caption) + '</p>' : '');
+        var note = monsoonNote(s.lat, s.lon, m);
+        if (note) html += '<p class="lp-note">' + esc(note) + '</p>';
+        html += cellCtl();
+        panel.innerHTML = html;
+      }
+
+      function play(on) {
+        clearInterval(wind.timer); wind.timer = 0;
+        if (on) wind.timer = setInterval(function () {
+          if (my !== token || active !== 'wind') { clearInterval(wind.timer); wind.timer = 0; return; }
+          windMonth = windMonth % 12 + 1; render();
+        }, 2500);   // one month every 2.5 s, time to see the streaks settle
+        var b = $('lp-wplay'); if (b) { b.textContent = on ? '❚❚' : '▶'; b.setAttribute('aria-label', T(on ? 'Pause' : 'Play')); }
+      }
+
+      render();
       panel.onclick = function (e) {
-        var t = e.target.closest('[data-wm]'); if (!t) return;
-        windMonth = +t.dataset.wm; setLayer('wind');
+        var t = e.target.closest('button'); if (!t) return;
+        if (t.id === 'lp-wplay') {
+          var on = !wind.timer;
+          if (on && !windMonth) { windMonth = 1; render(); }   // play goes month by month
+          play(on);
+        }
+        else if (t.dataset.wmode) { wind.mode = t.dataset.wmode; render(); }
       };
-      panel.oninput = null;
+      panel.oninput = function (e) {
+        if (e.target.id !== 'lp-wslider') return;
+        play(false); windMonth = +e.target.value; render();
+      };
     }).catch(function (e) { if (my === token) fail(T('Wind'), e.message); });
   }
 

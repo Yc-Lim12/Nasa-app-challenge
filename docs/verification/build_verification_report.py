@@ -1,5 +1,7 @@
 from pathlib import Path
 import sys
+import csv
+import math
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tmp" / "pdfs" / "lib"))
 from html import escape
 from reportlab.lib import colors
@@ -81,6 +83,71 @@ class FlowDiagram(Flowable):
                 c.line(ax, mid, end, mid)
                 c.line(end, mid, end - 3, mid + 2)
                 c.line(end, mid, end - 3, mid - 2)
+
+
+class PowerAnnualTrend(Flowable):
+    """Plot annual means rebuilt from the official NASA POWER monthly CSV."""
+    def __init__(self):
+        super().__init__()
+        self.height = 48 * mm
+        csv_path = ROOT / "docs" / "verification" / "power-t2m-klang-valley-1981-2025.csv"
+        rows = list(csv.reader(csv_path.open(encoding="utf-8-sig", newline="")))
+        header = next(i for i, row in enumerate(rows) if len(row) > 1 and row[0] == "PARAMETER" and row[1] == "YEAR")
+        self.points = []
+        for row in rows[header + 1:]:
+            if len(row) > 13 and row[0] == "T2M":
+                year = int(row[1])
+                months = [float(v) for v in row[2:14] if v.strip() not in ("-999", "-999.0")]
+                if months:
+                    self.points.append((year, sum(months) / len(months)))
+        mean_x = sum(x for x, _ in self.points) / len(self.points)
+        mean_y = sum(y for _, y in self.points) / len(self.points)
+        self.slope = sum((x - mean_x) * (y - mean_y) for x, y in self.points) / sum((x - mean_x) ** 2 for x, _ in self.points)
+        self.intercept = mean_y - self.slope * mean_x
+
+    def wrap(self, availWidth, availHeight):
+        self.width = availWidth
+        return availWidth, self.height
+
+    def draw(self):
+        c = self.canv
+        left, right, bottom, top = 31, 17, 15, 10
+        pw, ph = self.width - left - right, self.height - bottom - top
+        values = [v for _, v in self.points]
+        ymin = math.floor((min(values) - 0.1) * 2) / 2
+        ymax = math.ceil((max(values) + 0.1) * 2) / 2
+        x0, x1 = self.points[0][0], self.points[-1][0]
+        px = lambda year: left + (year - x0) / (x1 - x0) * pw
+        py = lambda value: bottom + (value - ymin) / (ymax - ymin) * ph
+        c.setFont("Helvetica", 7)
+        c.setFillColor(DARK)
+        c.setStrokeColor(colors.HexColor("#d8e2ea"))
+        for tick_i in range(int(round(ymin * 2)), int(round(ymax * 2)) + 1):
+            tick = tick_i / 2
+            yy = py(tick)
+            c.line(left, yy, left + pw, yy)
+            c.drawRightString(left - 5, yy - 2.5, f"{tick:.1f}")
+        c.setStrokeColor(colors.HexColor("#63788b"))
+        c.line(left, bottom, left + pw, bottom)
+        for year in (1981, 1990, 2000, 2010, 2020, 2025):
+            xx = px(year)
+            c.line(xx, bottom, xx, bottom - 2)
+            c.drawCentredString(xx, 3, str(year))
+        c.setStrokeColor(BLUE)
+        c.setLineWidth(1.25)
+        for (xa, ya), (xb, yb) in zip(self.points, self.points[1:]):
+            c.line(px(xa), py(ya), px(xb), py(yb))
+        c.setFillColor(BLUE)
+        for year, value in self.points:
+            c.circle(px(year), py(value), 1.35, stroke=0, fill=1)
+        c.setStrokeColor(colors.HexColor("#e59b25"))
+        c.setLineWidth(1.8)
+        c.line(px(x0), py(self.slope * x0 + self.intercept), px(x1), py(self.slope * x1 + self.intercept))
+        c.setFont("Helvetica-Bold", 7.2)
+        c.setFillColor(BLUE)
+        c.drawString(left, self.height - 8, "NASA POWER annual means")
+        c.setFillColor(DARK)
+        c.drawString(left + 108, self.height - 8, f"OLS trend: {self.slope * 10:+.2f} °C/decade")
 
 
 def footer(canvas, doc):
@@ -212,6 +279,18 @@ story.append(plot)
 story.append(P("Giovanni-generated plot: monthly 2-meter temperature in K, 1981-2025. The caption identifies the selected bounds and the single effective data-grid point.", "Smallx"))
 story.append(Spacer(1, 3))
 story.append(P(f"Reproduce: {link('https://giovanni.gsfc.nasa.gov/giovanni/#service=ArAvTs&starttime=1981-01-01T00:00:00Z&endtime=2025-12-31T23:59:59Z&bbox=101.25,3,101.875,3.5&data=M2IMNXASM_5_12_4_T2M&dataKeyword=2-meter%20air%20temperature', 'Giovanni selection')} · {link('https://power.larc.nasa.gov/api/temporal/monthly/point?parameters=T2M&community=AG&longitude=101.25&latitude=3&start=1981&end=2025&format=CSV', 'same-grid NASA POWER CSV')} · {link('https://disc.gsfc.nasa.gov/datacollection/M2IMNXASM_5.12.4.html', 'MERRA-2 product')} · {link('https://giovanni.gsfc.nasa.gov/giovanni/doc/UsersManualworkingdocument.docx.html', 'Giovanni User Guide')}.", "Smallx"))
+
+story.append(PageBreak())
+story.append(P("Matched chart comparison: Klang Valley T2M", "H1x"))
+story.append(P("Same variable, point and years in both panels: monthly NASA POWER MERRA-2 T2M values, averaged by year, at 3.1°N, 101.6°E from 1981–2025. The chart above is the image saved from Trend Detective. The plot below is rebuilt from the official NASA POWER monthly CSV saved with this report; it is not a screenshot of the POWER website.", "Bodyx"))
+story.append(P("Trend Detective app chart export", "H2x"))
+app_chart = Image(str(ROOT / "docs" / "verification" / "assets" / "trend-detective-t2m-kl-1981-2025-panel.png"), width=132*mm, height=132*mm*726/972)
+app_chart.hAlign = "CENTER"
+story.append(app_chart)
+story.append(P("Chart panel cropped from the app's native PNG export; the original export remains in the project evidence. The app displays Sen's slope (+0.15 °C/decade). The independent NASA POWER plot below shows an ordinary least-squares slope (+0.16 °C/decade); the small difference is expected because these are different trend estimators.", "Smallx"))
+story.append(P("NASA POWER monthly CSV, averaged and replotted", "H2x"))
+story.append(PowerAnnualTrend())
+story.append(P(f"Source: {link('https://power.larc.nasa.gov/api/temporal/monthly/point?parameters=T2M&community=AG&longitude=101.6&latitude=3.1&start=1981&end=2025&format=CSV', 'NASA POWER monthly API request')} · downloaded response: docs/verification/power-t2m-klang-valley-1981-2025.csv. Monthly values marked -999 are omitted before annual averaging.", "Smallx"))
 
 
 doc = SimpleDocTemplate(str(OUT), pagesize=A4, rightMargin=19*mm, leftMargin=19*mm, topMargin=17*mm, bottomMargin=19*mm, title="Trend Detective Weekend Verification", author="Team Sunway to the Moon")

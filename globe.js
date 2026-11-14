@@ -169,6 +169,7 @@
     var pCanvas = overlayCanvas('g-particles'), pctx = pCanvas.getContext('2d');
     var rBuf = document.createElement('canvas'), rbctx = rBuf.getContext('2d');
     var raster = null, rasterQueued = false, rasterCache = null;
+    var rainGL = null, triedRainGL = false;
     var field = null, particles = [], pRaf = 0, pClear = true;
     var dotSel = null, marks = [];
 
@@ -1163,14 +1164,140 @@
     }
 
     // Raster: an equirectangular image draped on the sphere (live rain).
+    function initRainGL() {
+      var surface = overlayCanvas('g-raster');
+      surface.hidden = true;
+      var gpu;
+      try { gpu = surface.getContext('webgl2', { antialias: false, depth: false }); } catch (err) { /* use the canvas renderer */ }
+      if (!gpu) { surface.remove(); return null; }
+
+      var vertex = [
+        '#version 300 es',
+        'void main() {',
+        '  vec2 corners[3] = vec2[3](vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0));',
+        '  gl_Position = vec4(corners[gl_VertexID], 0.0, 1.0);',
+        '}'
+      ].join('\n');
+      var fragment = [
+        '#version 300 es',
+        'precision highp float;',
+        'uniform vec2 center, radius;',
+        'uniform vec3 rotation;',
+        'uniform sampler2D pixels, palette;',
+        'uniform bool indexed;',
+        'out vec4 color;',
+        'const float PI = 3.141592653589793;',
+        'void main() {',
+        '  vec2 q = (gl_FragCoord.xy - center) / radius;',
+        '  float r2 = dot(q, q);',
+        '  if (r2 >= 1.0) discard;',
+        '  float z = sqrt(1.0 - r2);',
+        '  float lat = asin(clamp(z * rotation.y + q.y * rotation.z, -1.0, 1.0));',
+        '  float lon = rotation.x + atan(q.x, z * rotation.z - q.y * rotation.y);',
+        '  vec4 sampleColor = texture(pixels, vec2(fract(lon / (2.0 * PI) + 0.5), 0.5 - lat / PI));',
+        '  if (indexed) sampleColor = texelFetch(palette, ivec2(int(round(sampleColor.r * 255.0)), 0), 0);',
+        '  if (sampleColor.a < 6.0 / 255.0) discard;',
+        '  float alpha = min(sampleColor.a, 245.0 / 255.0);',
+        '  color = vec4(sampleColor.rgb * alpha, alpha);',
+        '}'
+      ].join('\n');
+      var program = gpu.createProgram();
+      [vertex, fragment].forEach(function (source, i) {
+        var shader = gpu.createShader(i === 0 ? gpu.VERTEX_SHADER : gpu.FRAGMENT_SHADER);
+        gpu.shaderSource(shader, source);
+        gpu.compileShader(shader);
+        gpu.attachShader(program, shader);
+        gpu.deleteShader(shader);
+      });
+      gpu.linkProgram(program);
+      if (!gpu.getProgramParameter(program, gpu.LINK_STATUS)) { surface.remove(); return null; }
+
+      function texture(unit) {
+        var tex = gpu.createTexture();
+        gpu.activeTexture(unit);
+        gpu.bindTexture(gpu.TEXTURE_2D, tex);
+        gpu.texParameteri(gpu.TEXTURE_2D, gpu.TEXTURE_MIN_FILTER, gpu.NEAREST);
+        gpu.texParameteri(gpu.TEXTURE_2D, gpu.TEXTURE_MAG_FILTER, gpu.NEAREST);
+        gpu.texParameteri(gpu.TEXTURE_2D, gpu.TEXTURE_WRAP_S, gpu.CLAMP_TO_EDGE);
+        gpu.texParameteri(gpu.TEXTURE_2D, gpu.TEXTURE_WRAP_T, gpu.CLAMP_TO_EDGE);
+        return tex;
+      }
+      gpu.useProgram(program);
+      gpu.uniform1i(gpu.getUniformLocation(program, 'pixels'), 0);
+      gpu.uniform1i(gpu.getUniformLocation(program, 'palette'), 1);
+      gpu.pixelStorei(gpu.UNPACK_ALIGNMENT, 1);
+      gpu.clearColor(0, 0, 0, 0);
+      surface.addEventListener('webglcontextlost', queueRaster);
+      return {
+        canvas: surface, gl: gpu, program: program,
+        pixels: texture(gpu.TEXTURE0), palette: texture(gpu.TEXTURE1),
+        center: gpu.getUniformLocation(program, 'center'),
+        radius: gpu.getUniformLocation(program, 'radius'),
+        rotation: gpu.getUniformLocation(program, 'rotation'),
+        indexed: gpu.getUniformLocation(program, 'indexed'),
+        frame: null
+      };
+    }
+
+    function drawRainGL(frame) {
+      if (flat) return false;                          // its maths is for the round globe; the CPU path draws the flat map
+      if (!triedRainGL) { triedRainGL = true; rainGL = initRainGL(); }
+      if (!rainGL || rainGL.gl.isContextLost()) return false;
+      var layer = rainGL, gpu = layer.gl, surface = layer.canvas;
+      var width = Math.round(W * dpr), height = Math.round(H * dpr);
+      if (surface.width !== width) surface.width = width;
+      if (surface.height !== height) surface.height = height;
+      gpu.useProgram(layer.program);
+      if (layer.frame !== frame) {
+        var format = frame.palette ? gpu.RED : gpu.RGBA;
+        gpu.activeTexture(gpu.TEXTURE0);
+        gpu.bindTexture(gpu.TEXTURE_2D, layer.pixels);
+        var previous = layer.frame;
+        if (previous && previous.width === frame.width && previous.height === frame.height && !!previous.palette === !!frame.palette) {
+          gpu.texSubImage2D(gpu.TEXTURE_2D, 0, 0, 0, frame.width, frame.height, format, gpu.UNSIGNED_BYTE, frame.pixels);
+        } else {
+          var internalFormat = frame.palette ? gpu.R8 : gpu.RGBA8;
+          gpu.texImage2D(gpu.TEXTURE_2D, 0, internalFormat, frame.width, frame.height, 0, format, gpu.UNSIGNED_BYTE, frame.pixels);
+        }
+        gpu.activeTexture(gpu.TEXTURE1);
+        gpu.bindTexture(gpu.TEXTURE_2D, layer.palette);
+        var palette = frame.palette || new Uint8Array(4);
+        gpu.texImage2D(gpu.TEXTURE_2D, 0, gpu.RGBA8, palette.length / 4, 1, 0, gpu.RGBA, gpu.UNSIGNED_BYTE, palette);
+        if (gpu.getError() !== gpu.NO_ERROR) { surface.remove(); rainGL = null; return false; }
+        gpu.uniform1i(layer.indexed, frame.palette ? 1 : 0);
+        layer.frame = frame;
+      }
+      var sx = width / W, sy = height / H, rad = Math.PI / 180, phi = -rot[1] * rad;
+      gpu.viewport(0, 0, width, height);
+      gpu.clear(gpu.COLOR_BUFFER_BIT);
+      gpu.uniform2f(layer.center, CX * sx, (H - CY) * sy);
+      gpu.uniform2f(layer.radius, R * k * sx, R * k * sy);
+      gpu.uniform3f(layer.rotation, -rot[0] * rad, Math.sin(phi), Math.cos(phi));
+      gpu.drawArrays(gpu.TRIANGLES, 0, 3);
+      surface.hidden = false;
+      return true;
+    }
+
     function setRaster(r) {
       raster = r;
       host.classList.toggle('has-raster', !!r);
-      if (!r && !cellGrid) { rctx.clearRect(0, 0, rCanvas.width, rCanvas.height); return; }
+      if (!r && !cellGrid) {
+        if (rainGL) rainGL.canvas.hidden = true;
+        rCanvas.hidden = false;
+        rctx.clearRect(0, 0, rCanvas.width, rCanvas.height);
+        return;
+      }
       queueRaster();
     }
     function queueRaster() {
-      if ((!raster && !cellGrid) || rasterQueued) return;
+      if (!raster && !cellGrid) return;
+      if (raster && raster.grid && drawRainGL(raster.grid)) {
+        rCanvas.hidden = true;
+        return;
+      }
+      if (rainGL) rainGL.canvas.hidden = true;
+      rCanvas.hidden = false;
+      if (rasterQueued) return;
       rasterQueued = true;
       requestAnimationFrame(function () { rasterQueued = false; drawRaster(); });
     }
@@ -1231,20 +1358,21 @@
 
     function drawRaster() {
       if (!raster && cellGrid && cellMode === 'crisp') { drawCellShapes(); return; }
+      if (rCanvas.hidden) return;                     // the GPU is drawing the rain (drawRainGL)
       lastDraw = 'raster';
       var src = raster ? raster.sample : cellGrid ? sampleCells : null;
       if (!src) return;
       var moving = !!(drag || anim || spinning), crisp = !raster && cellMode === 'crisp';
-      // CSS pixels per sample: fine at rest (one per pixel for crisp cells, so their
-      // edges are sharp), coarser while the globe moves
+      // pictures that ask for it are drawn at full resolution at rest: sharp rain edges
+      // (raster.crisp) and the whole-world layer (raster.fine)
+      var sharp = !!(raster && (raster.crisp || raster.fine));
       // While colours change quickly (timelapse playing), crisp cells draw at half
       // resolution and get one sharp redraw once the frames stop.
       var now = performance.now(), rapid = crisp && !moving && now - lastCellDraw < 250;
       lastCellDraw = now;
       if (rapid) { clearTimeout(cellSettle); cellSettle = setTimeout(queueRaster, 260); }
-      // a picture that asks for it (the whole-world layer) is drawn at full resolution at rest;
-      // the live-rain picture covers the whole globe, so it samples more coarsely while moving
-      var step = moving ? (raster ? 4 : 2) : crisp ? (rapid ? 2 : 1) : (raster && raster.fine ? 1 : Math.max(1, 2 / dpr)), w = Math.ceil(W / step), h = Math.ceil(H / step);
+      var step = moving ? (raster ? (raster.crisp ? 2 : 4) : 2) : crisp ? (rapid ? 2 : 1) : (sharp ? 1 : Math.max(1, 2 / dpr)),
+        w = Math.ceil(W / step), h = Math.ceil(H / step);
       // screen pixels per degree near the centre; cell borders only once cells are big
       var ppd = R * k * Math.PI / 180;
       cellPx = crisp && !moving && cellGrid && Math.min(cellGrid.dlon, cellGrid.dlat) * ppd >= 14 ? ppd : 0;
@@ -1287,7 +1415,7 @@
       rbctx.putImageData(img, 0, 0);
       rCanvas.width = Math.round(W * dpr); rCanvas.height = Math.round(H * dpr);
       rctx.setTransform(1, 0, 0, 1, 0, 0);
-      rctx.imageSmoothingEnabled = !crisp || moving || rapid;
+      rctx.imageSmoothingEnabled = raster && raster.crisp ? false : (!crisp || moving || rapid);
       rctx.imageSmoothingQuality = 'high';
       rctx.drawImage(rBuf, 0, 0, rCanvas.width, rCanvas.height);
       // a full-cover picture (the whole-world layer) hides the map: draw the coastlines on top

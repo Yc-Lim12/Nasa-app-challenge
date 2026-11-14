@@ -259,8 +259,6 @@
     '“Explain this simply” puts the result in plain words. “Ask AI a question” opens a chat about it. It works without an account; an OpenAI key in Settings gives longer answers.':
       '“Terangkan dengan mudah” menerangkan keputusan dalam bahasa mudah. “Tanya AI satu soalan” membuka sembang tentangnya. Ia berfungsi tanpa akaun; kunci OpenAI dalam Tetapan memberi jawapan lebih panjang.',
     'Light or dark, English or Bahasa Malaysia, the map style, and this tour again.': 'Cerah atau gelap, Bahasa Inggeris atau Bahasa Malaysia, gaya peta, dan lawatan ini semula.',
-    'For a chosen place, variable and period, Trend Detective turns NASA’s monthly data into one value per year (the mean of the twelve months weighted by their number of days, as NASA POWER computes its own annual values; one chosen month; or a three-month season, also weighted by days; December to February takes December from the year before) and asks: is there a steady rise or fall, how fast is it, and could it be chance?':
-      'Untuk tempat, pemboleh ubah dan tempoh yang dipilih, Trend Detective menukar data bulanan NASA kepada satu nilai setahun (purata dua belas bulan ditimbang mengikut bilangan hari, seperti NASA POWER mengira nilai tahunannya sendiri; satu bulan yang dipilih; atau musim tiga bulan, juga ditimbang mengikut hari; Disember hingga Februari mengambil Disember tahun sebelumnya) dan bertanya: adakah terdapat kenaikan atau penurunan yang konsisten, berapa cepat, dan mungkinkah ia kebetulan?',
     'Grid cells': 'Sel grid', 'Smooth': 'Licin', 'Opacity': 'Kelegapan', 'How to draw the grid': 'Cara melukis grid',
     'Guided stories': 'Kisah berpandu', 'World story': 'Kisah dunia',
     'Wildfire smoke over Wisconsin': 'Asap kebakaran hutan di Wisconsin', 'Summer haze far from the fires': 'Jerebu musim panas jauh dari kebakaran',
@@ -465,20 +463,14 @@
     '{x} vs average': '{x} berbanding purata', '{x} on the trend line': '{x} pada garis tren',
 
     // ---- months panel, how to read this, footer ----
-    'There is not enough monthly data here to test each month.':
-      'Tidak cukup data bulanan di sini untuk menguji setiap bulan.',
     '<strong>{n} of {m}</strong> months show a significant trend. The biggest is <strong>{month}</strong>, rising by about {rate}.':
       '<strong>{n} daripada {m}</strong> bulan menunjukkan tren yang signifikan. Yang terbesar ialah <strong>{month}</strong>, meningkat kira-kira {rate}.',
     '<strong>{n} of {m}</strong> months show a significant trend. The biggest is <strong>{month}</strong>, falling by about {rate}.':
       '<strong>{n} daripada {m}</strong> bulan menunjukkan tren yang signifikan. Yang terbesar ialah <strong>{month}</strong>, menurun kira-kira {rate}.',
-    'No single month shows a statistically significant trend here.':
-      'Tiada satu bulan pun yang menunjukkan tren signifikan secara statistik di sini.',
     'Trend per decade for each month of the year':
       'Tren sedekad bagi setiap bulan dalam setahun',
     'not enough data':
       'data tidak mencukupi',
-    'Mar':
-      'Mac',
     'Aug':
       'Ogo',
     'Oct':
@@ -530,7 +522,6 @@
 
     // ---- months panel: bar tooltip ----
     'Not enough data': 'Data tidak mencukupi',
-    'Click to go back to the whole year': 'Klik untuk kembali ke sepanjang tahun',
     'Click to investigate this month': 'Klik untuk menyiasat bulan ini',
 
     // ---- units ----
@@ -569,7 +560,6 @@
     'Your browser cannot share its location.': 'Pelayar anda tidak dapat berkongsi lokasinya.',
     'Moved to {x}.': 'Dipindahkan ke {x}.',
     'Could not get your location. Click the map instead.': 'Tidak dapat mendapatkan lokasi anda. Klik pada peta sebagai gantinya.',
-    'Pick at least {n} years to test a trend.': 'Pilih sekurang-kurangnya {n} tahun untuk menguji tren.',
     'Data': 'Data',
     'April': 'April',
     'September': 'September',
@@ -578,8 +568,6 @@
     // ---- methods dialog ----
     'What the app measures':
       'Apa yang diukur oleh aplikasi ini',
-    'For a chosen place, variable and period, Trend Detective turns NASA’s monthly data into one value per year (the mean of the twelve months, one chosen month, or a three-month season; December to February takes December from the year before) and asks: is there a steady rise or fall, how fast is it, and could it be chance?':
-      'Bagi tempat, pemboleh ubah dan tempoh yang dipilih, Trend Detective menukar data bulanan NASA kepada satu nilai setahun (purata dua belas bulan, satu bulan yang dipilih, atau satu musim tiga bulan; Disember hingga Februari mengambil Disember daripada tahun sebelumnya) dan bertanya: adakah terdapat kenaikan atau penurunan yang konsisten, berapa cepat ia berlaku, dan mungkinkah ia hanya kebetulan?',
     'For a chosen place, variable and period, Trend Detective turns NASA’s monthly data into one value per year (the mean of the twelve months weighted by their number of days, as NASA POWER computes its own annual values; one chosen month; or a three-month season, also weighted by days; December to February takes December from the year before) and asks: is there a steady rise or fall, how fast is it, and could it be chance?':
       'Bagi tempat, pemboleh ubah dan tempoh yang dipilih, Trend Detective menukar data bulanan NASA kepada satu nilai setahun (purata dua belas bulan yang diberi pemberat mengikut bilangan hari, seperti cara NASA POWER mengira nilai tahunannya sendiri; satu bulan yang dipilih; atau satu musim tiga bulan, juga diberi pemberat mengikut hari; Disember hingga Februari mengambil Disember daripada tahun sebelumnya) dan bertanya: adakah terdapat kenaikan atau penurunan yang konsisten, berapa cepat ia berlaku, dan mungkinkah ia hanya kebetulan?',
     '{y} left out: before {f} this variable comes from a different satellite dataset (GEWEX SRB) that does not match the later one (CERES), and the jump between them would look like a trend.':

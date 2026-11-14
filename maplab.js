@@ -698,7 +698,7 @@
         if (on) wind.timer = setInterval(function () {
           if (my !== token || active !== 'wind') { clearInterval(wind.timer); wind.timer = 0; return; }
           windMonth = windMonth % 12 + 1; render();
-        }, 1400);
+        }, 2500);   // one month every 2.5 s, time to see the streaks settle
         var b = $('lp-wplay'); if (b) { b.textContent = on ? '❚❚' : '▶'; b.setAttribute('aria-label', T(on ? 'Pause' : 'Play')); }
       }
 

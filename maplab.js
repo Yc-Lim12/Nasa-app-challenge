@@ -41,14 +41,16 @@
   // asked for live (648 NASA POWER boxes, about 2 GB), so it is pre-built for a few
   // variables by tools/build_global_trends.mjs into data/global/<PARAM>.json.
   var GLOBAL_READY = { T2M: true, PRECTOTCORR: true };
-  var SCOPE = 'box', globalCache = {};
-  try { if (localStorage.getItem('td-mapscope') === 'globe') SCOPE = 'globe'; } catch (err) { /* private mode */ }
+  // The whole globe is the default; a viewer who picks "This area" keeps that choice.
+  var SCOPE = 'globe', globalCache = {};
+  try { if (localStorage.getItem('td-mapscope') === 'box') SCOPE = 'box'; } catch (err) { /* private mode */ }
+  function globeReady() { return !!GLOBAL_READY[TD.prm(TD.variable(TD.state.v))]; }
   function scopeCtl() {
     return '<div class="lp-seg lp-scope" role="group" aria-label="' + esc(T('Map area')) + '">' +
       '<button type="button" data-scope="box" aria-pressed="' + (SCOPE === 'box') + '">' + esc(T('This area')) + '</button>' +
       '<button type="button" data-scope="globe" aria-pressed="' + (SCOPE === 'globe') + '">' + esc(T('Whole globe')) + '</button></div>';
   }
-  function trendKey() { return SCOPE === 'globe' ? 'globe|' + TD.state.v : gridKey(); }
+  function trendKey() { return SCOPE === 'globe' && globeReady() ? 'globe|' + TD.state.v : gridKey(); }
   var TD, panel, active = '', loadKey = '', token = 0;
   var grid = null;           // { key, cells, dlon, dlat, vr }
   var lapse = { timer: 0, i: 0, mode: 'anom', speed: 1 };
@@ -198,7 +200,8 @@
   }
 
   function showTrend() {
-    if (SCOPE === 'globe') return showGlobalTrend();
+    // variables without a pre-built whole-globe map fall back to the live area
+    if (SCOPE === 'globe' && globeReady()) return showGlobalTrend();
     var my = token, vr = TD.variable(TD.state.v);
     busy(T('Trend map'), T('Testing every grid cell in a {b}° box around this place…', { b: BOX }));
     TD.globe.flyTo(TD.state.lat, TD.state.lon, BOX, 1300, zoomFor());
@@ -230,6 +233,7 @@
       var html = '<div class="lp-head"><strong>' + esc(T('Trend map')) + '</strong><span>' + esc(TD.vname(vr)) + ', ' +
         TD.state.y0 + '–' + TD.state.y1 + (TD.state.month ? ', ' + esc(T(TD.MONTHS[TD.state.month])) : '') + '</span></div>';
       html += scopeCtl() + boxCtl() + cellCtl();
+      if (SCOPE === 'globe') html += '<p class="lp-note muted-light">' + esc(T('The whole-globe map is ready for air temperature and rain, so this variable shows the area around the place.')) + '</p>';
       html += '<div class="lp-scale"><span>' + esc(TD.withUnit(TD.signed(-lim, 2), vr.unit)) + '</span><i class="lp-ramp lp-ramp-div"></i><span>' +
         esc(TD.withUnit(TD.signed(lim, 2), vr.unit)) + '</span></div>';
       html += '<p class="lp-key"><span class="lp-dot"></span>' + esc(T('Dot: significant after correcting for testing many cells at once (Benjamini–Hochberg false discovery rate, 5%). Red: going up, blue: going down, per decade.')) + '</p>';

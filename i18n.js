@@ -520,6 +520,9 @@
     'Click to go back to the whole year': 'Klik untuk kembali ke sepanjang tahun',
     'Click to investigate this month': 'Klik untuk menyiasat bulan ini',
 
+    // ---- units ----
+    'mm/day': 'mm/hari', 'MJ/m²/day': 'MJ/m²/hari',
+
     // ---- months ----
     'Whole year': 'Sepanjang tahun', 'January': 'Januari', 'February': 'Februari', 'March': 'Mac', 'May': 'Mei', 'June': 'Jun',
     'July': 'Julai', 'August': 'Ogos', 'October': 'Oktober', 'December': 'Disember',

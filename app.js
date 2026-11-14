@@ -187,7 +187,7 @@
 
   function withUnit(text, unit) {
     if (!unit) return text;
-    return unit === '%' ? text + '%' : text + ' ' + unit;
+    return unit === '%' ? text + '%' : text + ' ' + T(unit);   // T(): mm/day -> mm/hari in BM
   }
   function fmtValue(v, vr) { return withUnit(v.toFixed(vr.dp), vr.unit); }
   function fmtAnom(v, vr) { return withUnit((v < 0 ? '−' : '+') + Math.abs(v).toFixed(vr.dp), vr.unit); }
@@ -648,7 +648,7 @@
     badge.textContent = v.badge; badge.className = 'badge badge-' + v.cls;
     replay($('verdict'));
 
-    $('chart-title').textContent = vname(vr) + (vr.unit ? ' (' + vr.unit + ')' : '') + ', ' +
+    $('chart-title').textContent = vname(vr) + (vr.unit ? ' (' + T(vr.unit) + ')' : '') + ', ' +
       (monthly ? T('each month minus its normal') + (res.month ? ' (' + T(MONTHS[res.month]) + ')' : '')
         : T(res.month ? '{month} average' : 'yearly average', { month: T(MONTHS[res.month]) })) + ', ' +
       (res.placeId === 'custom' ? coordLabel(res.lat, res.lon) : T(res.placeName));
@@ -729,7 +729,7 @@
       return '<tr><td>' + whenLabel(y) + '</td><td>' + res.values[i].toFixed(vr.dp) + '</td><td>' +
         (st.ols.intercept + st.ols.slope * y).toFixed(vr.dp) + '</td></tr>';
     }).join('');
-    $('table-unit').textContent = vr.unit ? ' (' + vr.unit + ')' : '';
+    $('table-unit').textContent = vr.unit ? ' (' + T(vr.unit) + ')' : '';
 
     drawSeason(res);
     fillCompare(res);
@@ -1052,7 +1052,7 @@
     if (!list.some(function (v) { return v.id === state.v; })) state.v = list[0].id;
     $('variables').innerHTML = list.map(function (v) {
       return '<label class="var' + (v.id === state.v ? ' var-on' : '') + '"><input type="radio" name="var" value="' + v.id + '"' +
-        (v.id === state.v ? ' checked' : '') + '><span class="var-name">' + esc(vname(v)) + (v.unit ? ' <small>' + esc(v.unit) + '</small>' : '') +
+        (v.id === state.v ? ' checked' : '') + '><span class="var-name">' + esc(vname(v)) + (v.unit ? ' <small>' + esc(T(v.unit)) + '</small>' : '') +
         '</span><span class="var-def">' + esc(T(v.def)) + '</span></label>';
     }).join('');
     Array.prototype.forEach.call(document.querySelectorAll('.chip'), function (c) {

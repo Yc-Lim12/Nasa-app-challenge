@@ -73,7 +73,7 @@
     };
   }
 
-  function amount(x, unit, dp) { return (Math.abs(x) < 1e-9 ? '0' : Math.abs(x).toFixed(dp)) + (unit ? ' ' + unit : ''); }
+  function amount(x, unit, dp) { return (Math.abs(x) < 1e-9 ? '0' : Math.abs(x).toFixed(dp)) + (unit ? ' ' + L(unit) : ''); }
   function oneIn(p) {
     var k = Math.round(1 / Math.max(p, 1e-9));
     return k >= 1000 ? L('less than 1 time in 1,000') : L('about 1 time in ' + k, 'kira-kira 1 kali dalam ' + k);

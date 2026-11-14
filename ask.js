@@ -120,9 +120,17 @@
     var y0 = TD.FIRST_YEAR, y1 = TD.LAST_YEAR, m;
     if ((m = s.match(/\b(19[89]\d|20[0-4]\d)\s*(?:-|–|to|and|until|till|hingga|sampai|dan)\s*(19[89]\d|20[0-4]\d)\b/))) { y0 = +m[1]; y1 = +m[2]; }
     else if ((m = s.match(/\b(?:since|from|after|sejak|selepas|dari)\s+(19[89]\d|20[0-4]\d)\b/))) y0 = +m[1];
-    else if ((m = s.match(/\b(?:last|past|lepas)\s+(\d{1,2})\s+(?:years|tahun)\b/))) y0 = TD.LAST_YEAR - +m[1] + 1;
-    out.cfg.y0 = Math.max(TD.FIRST_YEAR, Math.min(y0, y1));
-    out.cfg.y1 = Math.min(TD.LAST_YEAR, Math.max(y0, y1));
+    else if ((m = s.match(/\b(?:last|past|lepas)\s+(\d{1,2})\s+(?:years|tahun)\b/)) ||
+             (m = s.match(/\b(\d{1,2})\s+tahun\s+(?:lepas|terakhir|kebelakangan)\b/))) y0 = TD.LAST_YEAR - +m[1] + 1;   // BM: "dalam 10 tahun lepas"
+    // Keep the years in order and inside the NASA POWER record. If the question reaches
+    // past the record (e.g. 2030 to 2040), use the nearest MIN_YEARS years that exist.
+    var lo = Math.min(y0, y1), hi = Math.max(y0, y1), need = TD.MIN_YEARS || 10;
+    var outside = lo > TD.LAST_YEAR || hi < TD.FIRST_YEAR || lo < TD.FIRST_YEAR || hi > TD.LAST_YEAR;
+    hi = Math.min(TD.LAST_YEAR, Math.max(TD.FIRST_YEAR, hi));
+    lo = Math.min(hi, Math.max(TD.FIRST_YEAR, lo));
+    if (outside && hi - lo + 1 < need) { lo = Math.max(TD.FIRST_YEAR, hi - need + 1); hi = Math.min(TD.LAST_YEAR, lo + need - 1); }
+    out.cfg.y0 = lo;
+    out.cfg.y1 = hi;
     if (v === 'AOD_55' && out.cfg.y0 < 2001) out.cfg.y0 = 2001;   // aerosol record starts in 2001
     return out;
   }

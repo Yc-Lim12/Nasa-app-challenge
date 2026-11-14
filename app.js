@@ -1007,15 +1007,26 @@
 
   // ---- compare -------------------------------------------------------------
 
+  /** The named places as <optgroup>s: examples, Malaysian states, whole regions. */
+  function placeOptions(skip, short) {
+    var opt = function (p) { return '<option value="' + p.id + '">' + esc(short ? T(p.short) : capFirst(T(p.name))) + '</option>'; };
+    var group = function (label, list) {
+      list = list.filter(function (p) { return p.id !== skip; });
+      return list.length ? '<optgroup label="' + esc(T(label)) + '">' + list.map(opt).join('') + '</optgroup>' : '';
+    };
+    return group('Example places', PLACES.filter(function (p) { return !p.region && p.id !== 'penang'; })) +
+      group('Malaysian states and federal territories', PLACES.filter(function (p) { return p.state || p.id === 'penang'; })
+        .sort(function (a, b) { return a.short < b.short ? -1 : 1; })) +
+      group('Whole regions', PLACES.filter(function (p) { return p.region && !p.state; }));
+  }
+
   function fillCompare(res) {
     var sel = $('compare');
     if (state.compare === res.placeId) state.compare = '';
     var ct = compareTarget();
     sel.innerHTML = '<option value="">' + esc(T('Nothing')) + '</option>' +
       (ct && state.compare.indexOf('pt:') === 0 ? '<option value="' + esc(ct.id) + '">' + esc(ct.short) + '</option>' : '') +
-      PLACES.filter(function (p) { return p.id !== res.placeId; }).map(function (p) {
-        return '<option value="' + p.id + '">' + esc(p.short) + '</option>';
-      }).join('');
+      placeOptions(res.placeId, true);
     sel.value = state.compare;
   }
 
@@ -1228,13 +1239,7 @@
     $('topics').innerHTML = TOPICS.map(function (t) {
       return '<button type="button" class="chip" data-topic="' + t.id + '" aria-pressed="false">' + esc(T(t.label)) + '</button>';
     }).join('');
-    var popt = function (p) { return '<option value="' + p.id + '">' + esc(capFirst(T(p.name))) + '</option>'; };
-    var group = function (label, list) { return '<optgroup label="' + esc(T(label)) + '">' + list.map(popt).join('') + '</optgroup>'; };
-    $('place').innerHTML =
-      group('Example places', PLACES.filter(function (p) { return !p.region && p.id !== 'penang'; })) +
-      group('Malaysian states and federal territories', PLACES.filter(function (p) { return p.state || p.id === 'penang'; })
-        .sort(function (a, b) { return a.short < b.short ? -1 : 1; })) +
-      group('Whole regions', PLACES.filter(function (p) { return p.region && !p.state; })) +
+    $('place').innerHTML = placeOptions('') +
       '<option value="custom">' + esc(T('A place I chose on the globe')) + '</option>';
     var ys = '';
     for (var y = FIRST_YEAR; y <= LAST_YEAR; y++) ys += '<option>' + y + '</option>';

@@ -17,7 +17,13 @@
   var BOX = 10, BOX_MIN = 2, BOX_MAX = 10;
   try { var savedBox = parseInt(localStorage.getItem('td-mapbox'), 10); if (savedBox >= BOX_MIN && savedBox <= BOX_MAX) BOX = savedBox; } catch (err) { /* private mode */ }
   function zoomFor() { return 3.6 * 10 / BOX; }
-  function boxLabel(b) { return b + '° × ' + b + '° (' + T('about {km} km', { km: Math.round(b * 111 / 10) * 10 }) + ')'; }
+  function boxLabel(b) {
+    // north-south is always about 111 km a degree; east-west shrinks toward the poles
+    var ns = Math.round(b * 111 / 10) * 10, lat = TD.state ? Math.abs(TD.state.lat) : 0;
+    var ew = Math.round(b * 111 * Math.cos(Math.min(89, lat) * Math.PI / 180) / 10) * 10;
+    return b + '° × ' + b + '° (' + (ew > ns * 0.85 ? T('about {km} km', { km: ns })
+      : T('about {w} × {h} km', { w: Math.max(10, ew), h: ns })) + ')';
+  }
   function boxCtl() {
     return '<label class="lp-box"><span>' + esc(T('Map area')) + '</span>' +
       '<input type="range" id="lp-box" min="' + BOX_MIN + '" max="' + BOX_MAX + '" step="1" value="' + BOX + '" aria-label="' + esc(T('Map area')) + '">' +
@@ -145,10 +151,10 @@
         lons.push(lon); lats.push(lat);
         var table = TD.trimSpliced(pm, f.properties.parameter[pm] || {});
         // open-ocean cells of a land-only variable have no data (see isOceanFill in app.js)
-        if (TD.isOceanFill(pm, table)) return { lon: lon, lat: lat, table: {}, stats: null };
+        if (TD.isOceanFill(pm, table)) return { lon: lon, lat: lat, table: {}, stats: null, ocean: true };
         var ser = TD.yearlySeries(table, s.y0, s.y1, s.month);
         var st = ser.years.length >= TD.MIN_YEARS ? TD.S.analyze(ser.years, ser.values) : null;
-        return { lon: lon, lat: lat, table: table, stats: st };
+        return { lon: lon, lat: lat, table: table, stats: st, n: ser.years.length };
       });
       var step = function (a) {
         var u = a.filter(function (v, i, arr) { return arr.indexOf(v) === i; }).sort(function (x, y) { return x - y; });
@@ -227,7 +233,16 @@
       if (my !== token) return;
       loadKey = g.key;
       var ok = g.cells.filter(function (c) { return c.stats; });
-      if (!ok.length) { fail(T('Trend map'), T('There is not enough data here for this variable and period.')); return; }
+      if (!ok.length) {
+        var land = g.cells.filter(function (c) { return !c.ocean; });
+        var most = Math.max.apply(null, land.map(function (c) { return c.n || 0; }).concat(0));
+        fail(T('Trend map'), !land.length
+          ? T('{what} is only measured on land with soil, and this whole box is open ocean or ice sheet. Choose a place on land or another variable.', { what: TD.capFirst(TD.vname(vr).toLowerCase()) })
+          : most
+            ? T('Only {n} usable years in {a}–{b}. Each grid cell needs at least {min} years for a trend test. Choose a longer period.', { n: most, a: TD.state.y0, b: TD.state.y1, min: TD.MIN_YEARS })
+            : T('There is not enough data here for this variable and period.'));
+        return;
+      }
       var rates = ok.map(function (c) { return c.stats.sen.slope * 10; });
       var lim = percentile(rates.map(Math.abs), 0.95) || Math.max.apply(null, rates.map(Math.abs)) || 1;
       // Each cell uses the memory-adjusted Mann-Kendall p-value, as in the main verdict.

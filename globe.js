@@ -1821,7 +1821,10 @@
       path = d3.geoPath(proj);
       host.classList.toggle('flat', on);
       layout();
-      k = on ? kMin() : Math.max(K_MIN, Math.min(k, 1.2));
+      // Zoomed in on a region (e.g. a map layer's box): stay on it in the other view.
+      // From the whole-Earth view: the whole flat map, or the whole globe.
+      if (k > 1.6) k = on ? Math.max(kMin(), k) : Math.max(K_MIN, k);
+      else k = on ? kMin() : Math.max(K_MIN, Math.min(k, 1.2));
       if (!on) rot[1] = clamp(rot[1], -89, 89);
       rasterCache = null; satFine = ''; refineKey = '';
       if (sat && sat.region) { freeTex(sat.region); sat.region = null; }

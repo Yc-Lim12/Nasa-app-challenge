@@ -219,6 +219,8 @@
       'Bulan-bulan bersebelahan adalah serupa (autokorelasi lag-1 {r}), jadi {n} nilai bulanan membawa maklumat bebas lebih kurang sama seperti {e}. Kedua-dua ujian telah diselaraskan untuk ini.',
     'Each year here resembles the year before it (lag-1 autocorrelation {r}), so {n} years carry about as much independent information as {e}. Both tests were adjusted for this.':
       'Setiap tahun di sini menyerupai tahun sebelumnya (autokorelasi lag-1 {r}), jadi {n} tahun membawa maklumat bebas lebih kurang sama seperti {e}. Kedua-dua ujian telah diselaraskan untuk ini.',
+    'Drag to spin · click a place': 'Seret untuk memutar · klik satu tempat',
+    'Daylight now · {t} UTC': 'Siang sekarang · {t} UTC',
     'Grey areas: no satellite photo (polar night or no pass yet). NASA Blue Marble shown.': 'Kawasan kelabu: tiada foto satelit (malam kutub atau belum dilalui). NASA Blue Marble ditunjukkan.',
     'Grey areas: no satellite photo (polar night or no pass yet). NASA Blue Marble shown, with sea ice from {d} (NASA GHRSST).': 'Kawasan kelabu: tiada foto satelit (malam kutub atau belum dilalui). NASA Blue Marble ditunjukkan, dengan ais laut pada {d} (NASA GHRSST).',
     '{what} is only measured on land, and this spot is open ocean. Choose a place on land, or another variable.':
@@ -488,20 +490,14 @@
     '{x} vs average': '{x} berbanding purata', '{x} on the trend line': '{x} pada garis tren',
 
     // ---- months panel, how to read this, footer ----
-    'There is not enough monthly data here to test each month.':
-      'Tidak cukup data bulanan di sini untuk menguji setiap bulan.',
     '<strong>{n} of {m}</strong> months show a significant trend. The biggest is <strong>{month}</strong>, rising by about {rate}.':
       '<strong>{n} daripada {m}</strong> bulan menunjukkan tren yang signifikan. Yang terbesar ialah <strong>{month}</strong>, meningkat kira-kira {rate}.',
     '<strong>{n} of {m}</strong> months show a significant trend. The biggest is <strong>{month}</strong>, falling by about {rate}.':
       '<strong>{n} daripada {m}</strong> bulan menunjukkan tren yang signifikan. Yang terbesar ialah <strong>{month}</strong>, menurun kira-kira {rate}.',
-    'No single month shows a statistically significant trend here.':
-      'Tiada satu bulan pun yang menunjukkan tren signifikan secara statistik di sini.',
     'Trend per decade for each month of the year':
       'Tren sedekad bagi setiap bulan dalam setahun',
     'not enough data':
       'data tidak mencukupi',
-    'Mar':
-      'Mac',
     'Aug':
       'Ogo',
     'Oct':
@@ -538,8 +534,8 @@
       'Nilai bulanan dipuratakan menjadi satu nilai setahun, dan merentasi sel grid dalam kawasan yang dipilih mengikut pemberat keluasan. Tren: garis kuasa dua terkecil dengan ujian-t, ujian Mann-Kendall dan kecerunan Sen. Tren linear sahaja.',
     'No accounts, no analytics and no cookies. Your choices live only in the page address. The light or dark theme you pick is remembered in your own browser’s storage and never leaves your device. The coordinates of the place you investigate are sent to NASA POWER to fetch the data; if you press “use my location”, that position is used the same way and is not stored by this app. The app handles no personal data under Malaysia’s Personal Data Protection Act 2010.':
       'Tiada akaun, tiada analitik dan tiada kuki. Pilihan anda hanya disimpan dalam alamat halaman. Tema cerah atau gelap yang anda pilih diingati dalam storan pelayar anda sendiri dan tidak pernah meninggalkan peranti anda. Koordinat tempat yang anda siasat dihantar kepada NASA POWER untuk mendapatkan data; jika anda menekan “gunakan lokasi saya”, kedudukan itu digunakan dengan cara yang sama dan tidak disimpan oleh aplikasi ini. Aplikasi ini tidak mengendalikan sebarang data peribadi di bawah Akta Perlindungan Data Peribadi 2010 Malaysia.',
-    'Your browser connects to five outside services: NASA POWER (climate data), NASA GIBS (the satellite pictures on the globe and the live rain images), Google Fonts (typefaces, which means Google receives your IP address), cdnjs (the D3 charting library) and jsDelivr (the topojson-client library and Natural Earth map outlines from the world-atlas package). Each has its own privacy policy. The question box works entirely in your browser; nothing you type is sent anywhere. The AI helper’s plain-language summaries are also built in. Only if you paste your own OpenAI API key into the AI settings are your chat questions and the numbers of the current case sent to OpenAI; the key is stored only in your browser.':
-      'Pelayar anda bersambung kepada lima perkhidmatan luar: NASA POWER (data iklim), NASA GIBS (gambar satelit pada glob dan imej hujan langsung), Google Fonts (fon, yang bermaksud Google menerima alamat IP anda), cdnjs (pustaka carta D3) dan jsDelivr (pustaka topojson-client dan garis peta Natural Earth daripada pakej world-atlas). Setiap satunya mempunyai dasar privasi sendiri. Kotak soalan berfungsi sepenuhnya dalam pelayar anda; tiada apa yang anda taip dihantar ke mana-mana. Ringkasan bahasa mudah oleh pembantu AI juga terbina dalam. Hanya jika anda menampal kunci API OpenAI anda sendiri ke dalam tetapan AI, barulah soalan sembang anda dan nombor kes semasa dihantar kepada OpenAI; kunci itu disimpan hanya dalam pelayar anda.',
+    'Your browser connects to five outside services: NASA POWER (climate data), NASA GIBS (the satellite pictures on the globe and the live rain images), Google Fonts (typefaces, which means Google receives your IP address), cdnjs (the D3 charting library) and jsDelivr (the topojson-client library and Natural Earth map outlines from the world-atlas package). Each has its own privacy policy. The question box works entirely in your browser; nothing you type is sent anywhere. The AI helper’s plain-language summaries are also built in. Only if you paste your own OpenAI or Gemini API key into the AI settings are your chat questions and the numbers of the current case sent to OpenAI or Google; the key is stored only in your browser.':
+      'Pelayar anda bersambung kepada lima perkhidmatan luar: NASA POWER (data iklim), NASA GIBS (gambar satelit pada glob dan imej hujan langsung), Google Fonts (fon, yang bermaksud Google menerima alamat IP anda), cdnjs (pustaka carta D3) dan jsDelivr (pustaka topojson-client dan garis peta Natural Earth daripada pakej world-atlas). Setiap satunya mempunyai dasar privasi sendiri. Kotak soalan berfungsi sepenuhnya dalam pelayar anda; tiada apa yang anda taip dihantar ke mana-mana. Ringkasan bahasa mudah oleh pembantu AI juga terbina dalam. Hanya jika anda menampal kunci API OpenAI atau Gemini anda sendiri ke dalam tetapan AI, barulah soalan sembang anda dan nombor kes semasa dihantar kepada OpenAI atau Google; kunci itu disimpan hanya dalam pelayar anda.',
     'Light and dark themes, a phone layout, a table view of every chart and keyboard control throughout. The globe spins with the arrow keys and Enter chooses the place in the centre; the latitude and longitude boxes do the same job.':
       'Tema cerah dan gelap, susun atur telefon, paparan jadual bagi setiap carta dan kawalan papan kekunci di seluruh halaman. Glob berputar dengan kekunci anak panah dan Enter memilih tempat di tengah; kotak latitud dan longitud melakukan tugas yang sama.',
     'Code under the Apache License 2.0. Map outlines from Natural Earth (public domain). Type: SF Pro, the system font on Apple devices, with Inter (SIL Open Font License) on other devices. No NASA logo or insignia is used.':
@@ -553,7 +549,6 @@
 
     // ---- months panel: bar tooltip ----
     'Not enough data': 'Data tidak mencukupi',
-    'Click to go back to the whole year': 'Klik untuk kembali ke sepanjang tahun',
     'Click to investigate this month': 'Klik untuk menyiasat bulan ini',
 
     // ---- units ----
@@ -592,7 +587,6 @@
     'Your browser cannot share its location.': 'Pelayar anda tidak dapat berkongsi lokasinya.',
     'Moved to {x}.': 'Dipindahkan ke {x}.',
     'Could not get your location. Click the map instead.': 'Tidak dapat mendapatkan lokasi anda. Klik pada peta sebagai gantinya.',
-    'Pick at least {n} years to test a trend.': 'Pilih sekurang-kurangnya {n} tahun untuk menguji tren.',
     'Data': 'Data',
     'April': 'April',
     'September': 'September',
@@ -601,8 +595,6 @@
     // ---- methods dialog ----
     'What the app measures':
       'Apa yang diukur oleh aplikasi ini',
-    'For a chosen place, variable and period, Trend Detective turns NASA’s monthly data into one value per year (the mean of the twelve months, one chosen month, or a three-month season; December to February takes December from the year before) and asks: is there a steady rise or fall, how fast is it, and could it be chance?':
-      'Bagi tempat, pemboleh ubah dan tempoh yang dipilih, Trend Detective menukar data bulanan NASA kepada satu nilai setahun (purata dua belas bulan, satu bulan yang dipilih, atau satu musim tiga bulan; Disember hingga Februari mengambil Disember daripada tahun sebelumnya) dan bertanya: adakah terdapat kenaikan atau penurunan yang konsisten, berapa cepat ia berlaku, dan mungkinkah ia hanya kebetulan?',
     'For a chosen place, variable and period, Trend Detective turns NASA’s monthly data into one value per year (the mean of the twelve months weighted by their number of days, as NASA POWER computes its own annual values; one chosen month; or a three-month season, also weighted by days; December to February takes December from the year before) and asks: is there a steady rise or fall, how fast is it, and could it be chance?':
       'Bagi tempat, pemboleh ubah dan tempoh yang dipilih, Trend Detective menukar data bulanan NASA kepada satu nilai setahun (purata dua belas bulan yang diberi pemberat mengikut bilangan hari, seperti cara NASA POWER mengira nilai tahunannya sendiri; satu bulan yang dipilih; atau satu musim tiga bulan, juga diberi pemberat mengikut hari; Disember hingga Februari mengambil Disember daripada tahun sebelumnya) dan bertanya: adakah terdapat kenaikan atau penurunan yang konsisten, berapa cepat ia berlaku, dan mungkinkah ia hanya kebetulan?',
     '{y} left out: before {f} this variable comes from a different satellite dataset (GEWEX SRB) that does not match the later one (CERES), and the jump between them would look like a trend.':
@@ -679,6 +671,21 @@
       'Soalan dalam bahasa biasa',
     'The question box does not use an AI service. A small set of rules in your browser looks for words such as “rain”, “haze”, “nights” or “hotter”, and for place names, months and years, then sets up the case. Nothing you type leaves your device.':
       'Kotak soalan tidak menggunakan perkhidmatan AI. Satu set peraturan kecil dalam pelayar anda mencari perkataan seperti “rain”, “haze”, “nights” atau “hotter”, serta nama tempat, bulan dan tahun, kemudian menyediakan kes. Tiada apa yang anda taip meninggalkan peranti anda.',
+
+    // ---- AI explainer: wording fixes ----
+    'about half the time or more': 'kira-kira separuh masa atau lebih',
+
+    // ---- AI chat: OpenAI or Gemini ----
+    'The AI service says the limit or quota is reached. Try again later or check your plan.':
+      'Perkhidmatan AI menyatakan had atau kuota telah dicapai. Cuba lagi nanti atau semak pelan anda.',
+    'This summary is built in and works offline. For a fuller AI explanation and free-form questions, add an OpenAI or Gemini API key in the AI chat settings.':
+      'Ringkasan ini terbina dalam dan berfungsi luar talian. Untuk penerangan AI yang lebih lengkap dan soalan bebas, masukkan kunci API OpenAI atau Gemini dalam tetapan sembang AI.',
+    'OpenAI or Gemini API key (optional)':
+      'Kunci API OpenAI atau Gemini (pilihan)',
+    'Stored only in this browser and sent only to OpenAI or Google (Gemini), whichever the key belongs to. Any usage is charged to this key. Leave it empty to use the free built-in explainer.':
+      'Disimpan hanya dalam pelayar ini dan dihantar hanya kepada OpenAI atau Google (Gemini), mengikut pemilik kunci itu. Sebarang penggunaan dicaj kepada kunci ini. Biarkan kosong untuk guna penerang terbina dalam yang percuma.',
+    'Could not reach the AI service.':
+      'Tidak dapat menghubungi perkhidmatan AI.',
 
     // ---- months ----
     'Whole year': 'Sepanjang tahun', 'January': 'Januari', 'February': 'Februari', 'March': 'Mac', 'May': 'Mei', 'June': 'Jun',

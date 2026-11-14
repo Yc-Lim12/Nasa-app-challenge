@@ -4,8 +4,8 @@
  *      Built in, works offline and needs no key.
  *   2. "Ask AI" chat: follow-up questions about the current case.
  *      Without a key it answers from the built-in explainer (common questions).
- *      With an OpenAI API key (pasted by the user, kept only in this browser) it
- *      asks an OpenAI model, giving it the numbers of the current case.
+ *      With an OpenAI or Gemini API key (pasted by the user, kept only in this browser) it
+ *      asks that model, giving it the numbers of the current case. Keys starting with "sk-" go to OpenAI, others to Gemini.
  * Needs app.js (window.TD). English / Bahasa Malaysia follow the page language.
  */
 (function () {
@@ -14,6 +14,9 @@
   var KEY_STORE = 'td-ai-key', MODEL_STORE = 'td-ai-model';
   var DEFAULT_MODEL = 'gpt-4o-mini';
   var OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
+  // Gemini's OpenAI-compatible endpoint: same request and streaming format (ai.google.dev/gemini-api/docs/openai)
+  var GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
+  var GEMINI_MODEL = 'gemini-3.8-flash';
   var TD, res = null, history = [], busy = false, ctrl = null;
 
   function $(id) { return document.getElementById(id); }
@@ -22,7 +25,11 @@
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { return null; } return null; }
   function apiKey() { return (store(KEY_STORE) || '').trim(); }
-  function model() { return (store(MODEL_STORE) || '').trim() || DEFAULT_MODEL; }
+  // OpenAI keys start with "sk-"; anything else is treated as a Gemini key (old ones start with "AIza",
+  // the newer AI Studio "auth keys" may not).
+  function isGemini() { var k = apiKey(); return !!k && !/^sk-/.test(k); }
+  function provider() { return isGemini() ? 'Gemini' : 'OpenAI'; }
+  function model() { return (store(MODEL_STORE) || '').trim() || (isGemini() ? GEMINI_MODEL : DEFAULT_MODEL); }
 
   // Light formatting for model replies: escape everything, then **bold** and line breaks / bullets.
   function fmtReply(text) {
@@ -41,6 +48,11 @@
   // ---- facts about the current case ------------------------------------------
 
   function num(x, dp) { return Number(x).toFixed(dp == null ? 2 : dp); }
+  // Place name in the current language: coordinates are rebuilt so 70.1°N does not stay 70.1°U after a switch.
+  function placeLabel(r) {
+    return r.placeId === 'custom' && TD.coordLabel ? TD.coordLabel(r.lat, r.lon) : TD.T(r.placeName);
+  }
+
   function facts(r) {
     var vr = r.variable, st = r.stats, n = r.years.length, unit = vr.unit || '';
     var span = r.years[n - 1] - r.years[0], monthly = r.step === 'month';
@@ -55,7 +67,7 @@
       });
     }
     return {
-      variable: TD.vname(vr), unit: unit, definition: vr.def, place: r.placeName,
+      variable: TD.vname(vr), unit: unit, definition: vr.def, place: placeLabel(r),
       lat: r.lat, lon: r.lon, area: r.cells > 1 ? r.cells + ' grid cells averaged' : 'one grid cell',
       season: r.month ? TD.MONTHS[r.month] + ' only' : 'whole year',
       first_year: y0, last_year: y1, years_of_data: monthly ? perYear.length : n,
@@ -76,6 +88,7 @@
   function amount(x, unit, dp) { return (Math.abs(x) < 1e-9 ? '0' : Math.abs(x).toFixed(dp)) + (unit ? ' ' + L(unit) : ''); }
   function oneIn(p) {
     var k = Math.round(1 / Math.max(p, 1e-9));
+    if (p >= 0.5) return L('about half the time or more', 'kira-kira separuh masa atau lebih');
     return k >= 1000 ? L('less than 1 time in 1,000') : L('about 1 time in ' + k, 'kira-kira 1 kali dalam ' + k);
   }
 
@@ -90,6 +103,11 @@
     out.push({ kind: 'short', title: L('In short'), text: flat
       ? L('Over ' + years + ' years (' + f.first_year + '–' + f.last_year + '), ' + name + ' around ' + place + ' has stayed about the same.',
           'Dalam ' + years + ' tahun (' + f.first_year + '–' + f.last_year + '), ' + name + ' di sekitar ' + place + ' kekal hampir sama.')
+      : st.verdict !== 'significant'
+        ? L('Over ' + years + ' years (' + f.first_year + '–' + f.last_year + '), the trend line for ' + name + ' around ' + place + ' goes ' + (up ? 'up' : 'down') +
+            ' by about ' + total + ' in total (roughly ' + dec + ' every 10 years). This may not be a real change: see below.',
+            'Dalam ' + years + ' tahun (' + f.first_year + '–' + f.last_year + '), garis tren bagi ' + name + ' di sekitar ' + place + ' ' + (up ? 'naik' : 'turun') +
+            ' kira-kira ' + total + ' secara keseluruhan (lebih kurang ' + dec + ' setiap 10 tahun). Ini mungkin bukan perubahan sebenar: lihat di bawah.')
       : L('Over ' + years + ' years (' + f.first_year + '–' + f.last_year + '), ' + name + ' around ' + place + ' has gone ' + (up ? 'up' : 'down') +
           ' by about ' + total + ' in total. That is roughly ' + dec + ' every 10 years.',
           'Dalam ' + years + ' tahun (' + f.first_year + '–' + f.last_year + '), ' + name + ' di sekitar ' + place + ' telah ' + (up ? 'naik' : 'turun') +
@@ -167,7 +185,7 @@
     var wantsSummary = /summar|explain (this|the|it)|simpl|result|big|ringkas|terangkan|keputusan|besar/i.test(q);
     if (wantsSummary || !parts.length) {
       var ex = res ? safeExplain(res) : null;
-      if (ex) parts.unshift(ex.slice(0, 2).map(function (x) { return '**' + x.title + ':** ' + x.text; }).join('\n'));
+      if (ex) parts.unshift(ex.slice(0, 2).map(function (x) { return '**' + x.title + (/[?!.]$/.test(x.title) ? '' : ':') + '** ' + x.text; }).join('\n'));
       else if (res) parts.unshift(L('I could not read the numbers for this case. Try another place or period, then ask again.'));
       else parts.unshift(L('Pick a place and a variable first, then I can explain the result.'));
     }
@@ -196,16 +214,17 @@
   /** Stream a chat completion; onText gets the growing text. Resolves to the full text. */
   function askOpenAI(messages, onText) {
     ctrl = new AbortController();
-    return fetch(OPENAI_URL, {
+    return fetch(isGemini() ? GEMINI_URL : OPENAI_URL, {
       method: 'POST', signal: ctrl.signal,
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey() },
       body: JSON.stringify({ model: model(), stream: true, messages: messages })
     }).then(function (r) {
       if (!r.ok) {
         return r.json().catch(function () { return {}; }).then(function (j) {
-          var msg = (j.error && j.error.message) || ('HTTP ' + r.status);
-          if (r.status === 401) msg = L('The API key was not accepted. Check it in the AI settings.');
-          else if (r.status === 429) msg = L('OpenAI says the limit or quota is reached. Try again later or check your billing.');
+          var e0 = Array.isArray(j) ? j[0] : j;   // Gemini wraps its error in an array
+          var msg = (e0 && e0.error && e0.error.message) || ('HTTP ' + r.status);
+          if (r.status === 401 || r.status === 403 || /api key/i.test(msg)) msg = L('The API key was not accepted. Check it in the AI settings.');
+          else if (r.status === 429) msg = L('The AI service says the limit or quota is reached. Try again later or check your plan.');
           else if (r.status === 404) msg = L('The model "' + model() + '" is not available to this key. Change it in the AI settings.', 'Model "' + model() + '" tidak tersedia untuk kunci ini. Tukar dalam tetapan AI.');
           throw new Error(msg);
         });
@@ -285,7 +304,7 @@
     }).join('') + '</dl>';
     html += apiKey()
       ? '<div class="ai-more"><button type="button" class="ai-btn ai-btn-sm" id="ai-deeper">' + esc(L('Get an AI explanation')) + '</button><div class="ai-deeper-out" id="ai-deeper-out"></div></div>'
-      : '<p class="ai-note">' + esc(L('This summary is built in and works offline. For a fuller AI explanation and free-form questions, add an OpenAI API key in the AI chat settings.')) + '</p>';
+      : '<p class="ai-note">' + esc(L('This summary is built in and works offline. For a fuller AI explanation and free-form questions, add an OpenAI or Gemini API key in the AI chat settings.')) + '</p>';
     card.innerHTML = html;
     var deeper = $('ai-deeper');
     if (deeper) deeper.addEventListener('click', function () {
@@ -317,8 +336,8 @@
         '<button type="button" class="ai-icon" id="ai-gear" aria-expanded="false" aria-controls="ai-settings">⚙</button>' +
         '<button type="button" class="ai-icon" id="ai-close">✕</button></header>' +
       '<form class="ai-settings" id="ai-settings" hidden>' +
-        '<label><span id="ai-key-label"></span><input id="ai-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-..."></label>' +
-        '<label><span id="ai-model-label"></span><input id="ai-model" type="text" autocomplete="off" spellcheck="false" placeholder="' + DEFAULT_MODEL + '"></label>' +
+        '<label><span id="ai-key-label"></span><input id="ai-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-... / AIza..."></label>' +
+        '<label><span id="ai-model-label"></span><input id="ai-model" type="text" autocomplete="off" spellcheck="false" placeholder="' + DEFAULT_MODEL + ' / ' + GEMINI_MODEL + '"></label>' +
         '<p class="ai-note" id="ai-key-note"></p>' +
         '<div class="ai-row"><button type="submit" class="ai-btn ai-btn-sm" id="ai-save"></button><button type="button" class="ai-link" id="ai-forget"></button></div>' +
       '</form>' +
@@ -342,7 +361,7 @@
       store(KEY_STORE, k || null); store(MODEL_STORE, m || null);
       $('ai-settings').hidden = true; $('ai-gear').setAttribute('aria-expanded', 'false');
       labelChat(); if (!$('ai-explain').hidden) fillExplain();
-      addMsg('bot', k ? L('Saved. I will now answer using OpenAI (' + model() + ').', 'Disimpan. Saya kini akan menjawab menggunakan OpenAI (' + model() + ').')
+      addMsg('bot', k ? L('Saved. I will now answer using ' + provider() + ' (' + model() + ').', 'Disimpan. Saya kini akan menjawab menggunakan ' + provider() + ' (' + model() + ').')
         : L('No key saved. I will use the built-in explainer.'));
     });
     $('ai-forget').addEventListener('click', function () {
@@ -366,12 +385,12 @@
     var f = document.querySelector('#ai-fab .ai-fab-label'); if (f) f.textContent = L('Ask AI');
     if (!$('ai-chat-title')) return;
     $('ai-chat-title').textContent = L('Trend Detective AI');
-    $('ai-mode').textContent = apiKey() ? 'OpenAI · ' + model() : L('built-in');
+    $('ai-mode').textContent = apiKey() ? provider() + ' · ' + model() : L('built-in');
     $('ai-gear').setAttribute('aria-label', L('AI settings'));
     $('ai-close').setAttribute('aria-label', L('Close'));
-    $('ai-key-label').textContent = L('OpenAI API key (optional)');
+    $('ai-key-label').textContent = L('OpenAI or Gemini API key (optional)');
     $('ai-model-label').textContent = L('Model');
-    $('ai-key-note').textContent = L('Stored only in this browser and sent only to OpenAI. Usage is billed to this key. Leave it empty to use the free built-in explainer.');
+    $('ai-key-note').textContent = L('Stored only in this browser and sent only to OpenAI or Google (Gemini), whichever the key belongs to. Any usage is charged to this key. Leave it empty to use the free built-in explainer.');
     $('ai-save').textContent = L('Save');
     $('ai-forget').textContent = L('Remove key');
     $('ai-q').placeholder = L('Ask about this result…');
@@ -384,8 +403,8 @@
     box.hidden = false; $('ai-fab').setAttribute('aria-expanded', 'true'); document.body.classList.add('ai-open');
     if (!$('ai-log').children.length) {
       addMsg('bot', res
-        ? L('Hi! I can explain the result for ' + TD.vname(res.variable).toLowerCase() + ' around ' + res.placeName + ' in plain words. Ask anything, or tap a suggestion.',
-            'Hai! Saya boleh terangkan keputusan untuk ' + TD.vname(res.variable).toLowerCase() + ' di sekitar ' + res.placeName + ' dalam bahasa mudah. Tanya apa sahaja, atau tekan cadangan.')
+        ? L('Hi! I can explain the result for ' + TD.vname(res.variable).toLowerCase() + ' around ' + placeLabel(res) + ' in plain words. Ask anything, or tap a suggestion.',
+            'Hai! Saya boleh terangkan keputusan untuk ' + TD.vname(res.variable).toLowerCase() + ' di sekitar ' + placeLabel(res) + ' dalam bahasa mudah. Tanya apa sahaja, atau tekan cadangan.')
         : L('Hi! Pick a place and something to investigate, then ask me what the numbers mean.'));
     }
     setTimeout(function () { $('ai-q').focus(); }, 30);
@@ -419,7 +438,7 @@
       history.pop();
       el.classList.remove('ai-typing');
       el.innerHTML = e.name === 'AbortError' ? '<p class="ai-err">' + esc(L('Stopped.')) + '</p>'
-        : '<p class="ai-err">' + esc(e.message || L('Could not reach OpenAI.')) + '</p>' +
+        : '<p class="ai-err">' + esc(e.message || L('Could not reach the AI service.')) + '</p>' +
           '<p class="ai-note">' + esc(L('Built-in answer instead:')) + '</p>' + fmtReply(safeAnswer(q));
     }).finally(function () { busy = false; $('ai-send').disabled = false; });
   }

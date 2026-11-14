@@ -14,6 +14,7 @@
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
   function wrapLon(x) { return ((x + 540) % 360 + 360) % 360 - 180; }
   function fmt(lat, lon) {
+    if (window.TD && window.TD.coordLabel) return window.TD.coordLabel(lat, lon);   // U/S/T/B in Bahasa Malaysia
     return Math.abs(lat).toFixed(1) + '°' + (lat >= 0 ? 'N' : 'S') + ', ' +
       Math.abs(lon).toFixed(1) + '°' + (lon >= 0 ? 'E' : 'W');
   }
@@ -69,8 +70,14 @@
     var gGrat = svg.append('path').attr('class', 'g-grat');
     var gLand = svg.append('path').attr('class', 'g-land');
     var gBord = svg.append('path').attr('class', 'g-border');
-    var gNight1 = svg.append('path').attr('class', 'g-night').attr('fill-opacity', 0.4);
-    var gNight2 = svg.append('path').attr('class', 'g-night').attr('fill-opacity', 0.26);
+    // Night side: 20 faint layers 1° apart, so dusk fades in gradually (too finely to
+    // see steps) instead of showing hard stripes. Together they darken the deep night
+    // side by about 55%.
+    var NIGHT_RADII = [];
+    for (var nr = 96; nr > 76; nr--) NIGHT_RADII.push(nr);
+    var gNights = NIGHT_RADII.map(function () {
+      return svg.append('path').attr('class', 'g-night').attr('fill-opacity', 0.039);
+    });
     var gShade = svg.append('path').attr('class', 'g-overlay').attr('fill', 'url(#' + uid + 'shade)');
     var gShine = svg.append('path').attr('class', 'g-overlay').attr('fill', 'url(#' + uid + 'shine)');
     var gRim = svg.append('path').attr('class', 'g-rim');
@@ -106,7 +113,7 @@
         });
     }
     var readBox = d3.select(host).append('div').attr('class', 'g-readout').attr('aria-hidden', 'true');
-    var readout = readBox.append('span').text(HINT);
+    var readout = readBox.append('span').text(trG(HINT));
     var sunEl = readBox.append('span').attr('class', 'g-sun');
     // says what the grey areas are, when the daily picture had gaps filled
     var fillEl = readBox.append('span').attr('class', 'g-sun g-fillnote').style('display', 'none');
@@ -118,7 +125,11 @@
           ? trG('Grey areas: no satellite photo (polar night or no pass yet). NASA Blue Marble shown, with sea ice from {d} (NASA GHRSST).').replace('{d}', ICE.date)
           : trG('Grey areas: no satellite photo (polar night or no pass yet). NASA Blue Marble shown.'));
     }
-    document.addEventListener('td:lang', showFillNote);
+    document.addEventListener('td:lang', function () {
+      showFillNote(); updateSun();
+      var bmHint = window.TDi18n && window.TDi18n.dict[HINT];
+      if (readout.text() === HINT || readout.text() === bmHint) readout.text(trG(HINT));
+    });
 
     // Two views of the same data: the round globe (orthographic) and a flat world map
     // (equirectangular: longitude and latitude as straight x and y, the same layout as
@@ -202,17 +213,16 @@
     }
 
     // where the Sun is overhead right now, so the night side can be shaded
-    var night1 = null, night2 = null;
+    var nights = [];
     function updateSun() {
       var d = new Date();
       var day = (d - Date.UTC(d.getUTCFullYear(), 0, 0)) / 864e5;
       var decl = -23.44 * Math.cos(2 * Math.PI * (day + 10) / 365);
       var hrs = d.getUTCHours() + d.getUTCMinutes() / 60;
       var anti = [wrapLon((12 - hrs) * 15 + 180), -decl];
-      night1 = d3.geoCircle().center(anti).radius(90)();
-      night2 = d3.geoCircle().center(anti).radius(82)();
+      nights = NIGHT_RADII.map(function (r) { return d3.geoCircle().center(anti).radius(r)(); });
       var hh = String(d.getUTCHours()).padStart(2, '0'), mm = String(d.getUTCMinutes()).padStart(2, '0');
-      sunEl.text('Daylight now · ' + hh + ':' + mm + ' UTC');
+      sunEl.text(trG('Daylight now · {t} UTC').replace('{t}', hh + ':' + mm));
     }
     updateSun();
     setInterval(function () { updateSun(); render(); }, 60000);
@@ -292,8 +302,7 @@
       var ds = path({ type: 'Sphere' });
       gOcean.attr('d', ds); gShade.attr('d', flat ? null : ds); gShine.attr('d', flat ? null : ds); gRim.attr('d', flat ? null : ds);
       gHalo.attr('cx', CX).attr('cy', CY).attr('r', flat ? 0 : R * k * 1.16);
-      gNight1.attr('d', night1 ? path(night1) : null);
-      gNight2.attr('d', night2 ? path(night2) : null);
+      gNights.forEach(function (g, i) { g.attr('d', nights[i] ? path(nights[i]) : null); });
       if (REDUCED) drawStars(0);
       gGrat.attr('d', path(grat));
       var still = !(drag || anim || spinning);
@@ -558,7 +567,7 @@
     }
     // The daily satellite picture is black where there was no sunlight to photograph
     // (polar night) or no pass yet. Those pixels are filled from the cloud-free Blue
-    // Marble picture, one tile at a time so it needs little memory.
+    // Marble picture (see blendAll).
     var under = null, underWait = [], fillUsed = false;
     function withUnder(cb) {
       if (under !== null) { cb(under); return; }
@@ -618,66 +627,125 @@
       });
     }
 
-    // A filled pixel is shown dimmed and greyish, so it reads as background, not as
-    // today's photo; today's sea ice is drawn on it in white; the edge is blended over
-    // a few pixels so it has no hard step.
-    var FILL_R = 5;
-    function fillTile(x, img, dx, dy, lon0, lat1, span, z, row, col, done) {
-      var t = document.createElement('canvas');
-      t.width = 512; t.height = 512;
-      var tx = t.getContext('2d', { willReadFrequently: true });
-      tx.drawImage(img, 0, 0);
-      var a;
-      try { a = tx.getImageData(0, 0, 512, 512); } catch (err) { x.drawImage(img, dx, dy); done(); return; }
-      var d = a.data, N = 512 * 512, i, k;
-      var hole = new Float32Array(N), any = false;
-      for (i = 0; i < N; i++) {
-        k = i * 4;
-        if (d[k] < 9 && d[k + 1] < 9 && d[k + 2] < 9) { hole[i] = 1; any = true; }
+    // A filled pixel is shown slightly muted, so it reads as background, not as today's
+    // photo; today's sea ice is drawn on it in white; the edge is blended over a wide
+    // band so the patch fades into the photo instead of showing a hard rim.
+    // The blend is worked out once for the whole picture (not tile by tile, which would
+    // leave seams), on a coarse grid of 8 x 8-pixel cells so it needs little memory,
+    // and fades over about FILL_DEG degrees: the clouds thin out into the patch.
+    var FILL_DEG = 6, CELL = 8, CPT = 512 / CELL;   // CPT: grid cells along one tile side
+    function isHole(d, k) { return d[k] < 9 && d[k + 1] < 9 && d[k + 2] < 9; }
+
+    /** Paste one daily tile and add up, per grid cell, how much of it has no photo. */
+    function scanTile(x, img, dx, dy, grid, GW) {
+      x.drawImage(img, dx, dy);
+      var d;
+      try { d = x.getImageData(dx, dy, 512, 512).data; } catch (err) { return; }
+      var gx0 = dx / CELL, gy0 = dy / CELL, inv = 1 / (CELL * CELL);
+      for (var py = 0; py < 512; py++) {
+        var base = (gy0 + (py / CELL | 0)) * GW + gx0;
+        for (var px = 0; px < 512; px++) {
+          if (isHole(d, (py * 512 + px) * 4)) grid[base + (px / CELL | 0)] += inv;
+        }
       }
-      if (!any || !under) { x.putImageData(a, dx, dy); done(); return; }
-      var b;
+    }
+
+    // one box blur along a line of n values (every `stride`-th from `start`), ends held
+    function boxLine(src, dst, n, stride, start, r) {
+      var acc = 0, inv = 1 / (2 * r + 1), i;
+      function at(j) { return src[start + (j < 0 ? 0 : j >= n ? n - 1 : j) * stride]; }
+      for (i = -r; i <= r; i++) acc += at(i);
+      for (i = 0; i < n; i++) {
+        dst[start + i * stride] = acc * inv;
+        acc += at(i + r + 1) - at(i - r);
+      }
+    }
+    /**
+     * Soft version of the hole grid: two box blurs each way (close to a Gaussian).
+     * Across, the radius grows toward the poles, where a degree of longitude is short,
+     * so the fade is about as wide on the ground in every direction.
+     */
+    function blurGrid(grid, GW, GH, tr) {
+      var sp = tileSpan(tr.z), a = new Float32Array(GW * GH), b = new Float32Array(GW * GH), i, j;
+      var ry = Math.max(1, Math.round(FILL_DEG / sp * CPT / 2));
+      for (j = 0; j < GH; j++) {
+        var lat = tr.lat1 - (j + 0.5) / CPT * sp;
+        var rx = Math.min(GW, Math.max(1, Math.round(ry / Math.max(0.2, Math.cos(lat * Math.PI / 180)))));
+        boxLine(grid, a, GW, 1, j * GW, rx);
+        boxLine(a, b, GW, 1, j * GW, rx);
+      }
+      for (i = 0; i < GW; i++) {
+        boxLine(b, a, GH, GW, i, ry);
+        boxLine(a, b, GH, GW, i, ry);
+      }
+      return b;
+    }
+
+    /** Blend Blue Marble (and today's sea ice) into one tile of the joined picture. */
+    function blendTile(x, dx, dy, lon0, lat1, span, z, row, col, w, GW, GH, done) {
+      var gx0 = dx / CELL, gy0 = dy / CELL, need = false, i, j;
+      for (j = 0; j < CPT && !need; j++) {
+        for (i = 0; i < CPT; i++) if (w[(gy0 + j) * GW + gx0 + i] > 0.001) { need = true; break; }
+      }
+      if (!need) { done(); return; }
+      var a, b;
       try {
+        var t = document.createElement('canvas');
+        t.width = 512; t.height = 512;
+        var tx = t.getContext('2d', { willReadFrequently: true });
         var bw = under.naturalWidth, bh = under.naturalHeight;
         tx.drawImage(under, (lon0 + 180) / 360 * bw, (90 - lat1) / 180 * bh, span / 360 * bw, span / 180 * bh, 0, 0, 512, 512);
         b = tx.getImageData(0, 0, 512, 512).data;
-      } catch (err) { under = false; x.putImageData(a, dx, dy); done(); return; }   // e.g. opened from disk
-      iceFor(z, row, col, function (ice) {
-        // soft mask: box blur of the hole mask, across then down
-        var tmp = new Float32Array(N), w = new Float32Array(N), R = FILL_R, inv = 1 / (2 * R + 1), y, xx, acc, j;
-        for (y = 0; y < 512; y++) {
-          acc = 0;
-          for (xx = -R; xx <= R; xx++) acc += hole[y * 512 + Math.min(511, Math.max(0, xx))];
-          for (xx = 0; xx < 512; xx++) {
-            tmp[y * 512 + xx] = acc * inv;
-            acc += hole[y * 512 + Math.min(511, xx + R + 1)] - hole[y * 512 + Math.max(0, xx - R)];
+        a = x.getImageData(dx, dy, 512, 512);
+      } catch (err) { done(); return; }   // e.g. opened from disk
+      // sea ice only exists toward the poles; elsewhere skip the extra download
+      var polar = lat1 > 40 || lat1 - span < -40;
+      (polar ? function (cb) { iceFor(z, row, col, cb); } : function (cb) { cb(null); })(function (ice) {
+        var d = a.data;
+        for (var py = 0; py < 512; py++) {
+          var gy = (dy + py + 0.5) / CELL - 0.5, y0 = Math.floor(gy), fy = gy - y0;
+          var ya = Math.max(0, y0) * GW, yb = Math.min(GH - 1, y0 + 1) * GW;
+          for (var px = 0; px < 512; px++) {
+            var k = (py * 512 + px) * 4, m;
+            if (isHole(d, k)) m = 1;
+            else {
+              var gx = (dx + px + 0.5) / CELL - 0.5, x0 = Math.floor(gx), fx = gx - x0;
+              var xa = Math.max(0, x0), xb = Math.min(GW - 1, x0 + 1);
+              var ww = (w[ya + xa] * (1 - fx) + w[ya + xb] * fx) * (1 - fy) + (w[yb + xa] * (1 - fx) + w[yb + xb] * fx) * fy;
+              // ww is about 0.5 at the rim: doubled, the fade starts at 1 there (no step)
+              m = Math.min(1, ww * 2);
+              if (m <= 0.002) continue;
+              m = m * m * (3 - 2 * m);   // ease in and out
+            }
+            var g = 0.3 * b[k] + 0.59 * b[k + 1] + 0.11 * b[k + 2];
+            var ic = ice && ice[k + 3] > 128 ? iceCover(ice[k], ice[k + 1], ice[k + 2]) * 0.88 : 0;   // today's ice cover
+            if (ic) iceUsed = true;
+            for (var c = 0; c < 3; c++) {
+              var f = (g + (b[k + c] - g) * 0.7) * 0.9;          // Blue Marble: 70% colour, 90% brightness
+              f = f * (1 - ic) + 235 * ic;                        // ice in near-white
+              d[k + c] = d[k + c] * (1 - m) + f * m;
+            }
           }
         }
-        for (xx = 0; xx < 512; xx++) {
-          acc = 0;
-          for (y = -R; y <= R; y++) acc += tmp[Math.min(511, Math.max(0, y)) * 512 + xx];
-          for (y = 0; y < 512; y++) {
-            w[y * 512 + xx] = acc * inv;
-            acc += tmp[Math.min(511, y + R + 1) * 512 + xx] - tmp[Math.max(0, y - R) * 512 + xx];
-          }
-        }
-        for (i = 0; i < N; i++) {
-          var m = hole[i] ? 1 : w[i];
-          if (m <= 0.001) continue;
-          k = i * 4;
-          var g = 0.3 * b[k] + 0.59 * b[k + 1] + 0.11 * b[k + 2];
-          var ic = ice && ice[k + 3] > 128 ? iceCover(ice[k], ice[k + 1], ice[k + 2]) * 0.88 : 0;   // today's ice cover
-          if (ic) iceUsed = true;
-          for (j = 0; j < 3; j++) {
-            var f = (g + (b[k + j] - g) * 0.45) * 0.72;        // Blue Marble: 45% colour, 72% brightness
-            f = f * (1 - ic) + 235 * ic;                        // ice in near-white
-            d[k + j] = d[k + j] * (1 - m) + f * m;
-          }
-        }
-        fillUsed = true;
         x.putImageData(a, dx, dy);
         done();
       });
+    }
+
+    /** After all daily tiles are in: fill the gaps across the whole picture. */
+    function blendAll(x, tr, grid, GW, GH, done) {
+      var any = false, i;
+      for (i = 0; i < grid.length; i++) if (grid[i] > 0) { any = true; break; }
+      if (!any || !under) { done(); return; }
+      fillUsed = true;
+      var w = blurGrid(grid, GW, GH, tr), sp = tileSpan(tr.z);
+      var left = (tr.c1 - tr.c0 + 1) * (tr.r1 - tr.r0 + 1);
+      for (var r = tr.r0; r <= tr.r1; r++) {
+        for (var c = tr.c0; c <= tr.c1; c++) {
+          blendTile(x, (c - tr.c0) * 512, (r - tr.r0) * 512, -180 + c * sp, 90 - r * sp, sp, tr.z, r, c, w, GW, GH,
+            function () { if (--left === 0) done(); });
+        }
+      }
     }
 
     /**
@@ -691,7 +759,7 @@
       c.width = nc * 512; c.height = nr * 512;
       var x = c.getContext('2d', { willReadFrequently: !gl || !!st.daily });
       if (st.daily && under === null) { withUnder(function () { loadTiles(st, tr, wrap, done); }); return; }
-      var sp = tileSpan(tr.z);
+      var GW = nc * CPT, GH = nr * CPT, grid = st.daily ? new Float32Array(GW * GH) : null;
       for (var r = tr.r0; r <= tr.r1; r++) {
         for (var cc = tr.c0; cc <= tr.c1; cc++) {
           (function (row, col) {
@@ -699,9 +767,9 @@
             img.crossOrigin = 'anonymous';
             img.onload = function () {
               if (failed) return;
-              var placed = function () { if (!failed && --left === 0) finish(); };
-              if (st.daily) fillTile(x, img, (col - tr.c0) * 512, (row - tr.r0) * 512, -180 + col * sp, 90 - row * sp, sp, tr.z, row, col, placed);
-              else { x.drawImage(img, (col - tr.c0) * 512, (row - tr.r0) * 512); placed(); }
+              if (st.daily) scanTile(x, img, (col - tr.c0) * 512, (row - tr.r0) * 512, grid, GW);
+              else x.drawImage(img, (col - tr.c0) * 512, (row - tr.r0) * 512);
+              if (--left === 0) finish();
             };
             img.onerror = function () { if (!failed) { failed = true; done(null); } };
             img.src = tileUrl(st, tr.z, row, col);
@@ -709,6 +777,10 @@
         }
       }
       function finish() {
+        if (st.daily) blendAll(x, tr, grid, GW, GH, publish);
+        else publish();
+      }
+      function publish() {
         if (st.daily) showFillNote();
         if (gl) {
           var t = makeTex(c, wrap ? gl.REPEAT : gl.CLAMP_TO_EDGE);
@@ -1320,7 +1392,7 @@
       if (!drag) {
         if (e.target.closest && e.target.closest('.g-place')) return;
         var p = geoAt(e);
-        readout.text(p ? fmt(p[1], wrapLon(p[0])) : HINT);
+        readout.text(p ? fmt(p[1], wrapLon(p[0])) : trG(HINT));
         return;
       }
       var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
@@ -1362,7 +1434,7 @@
     }
     node.addEventListener('pointerup', function (e) { end(e, false); });
     node.addEventListener('pointercancel', function (e) { end(e, true); });
-    node.addEventListener('pointerleave', function () { if (!drag) readout.text(HINT); });
+    node.addEventListener('pointerleave', function () { if (!drag) readout.text(trG(HINT)); });
     node.addEventListener('dblclick', function (e) { e.preventDefault(); zoomBy(1.6); });
     // Trackpad pinch (and ctrl + wheel) zooms; a plain wheel still scrolls the page.
     node.addEventListener('wheel', function (e) {

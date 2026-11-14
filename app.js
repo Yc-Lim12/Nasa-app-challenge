@@ -670,8 +670,14 @@
       var lead = Math.abs(r) < 0.2 ? T('{a} and {b} show no clear link here (r = {r}).', { a: capFirst(A), b: B, r: r.toFixed(2) })
         : T(r > 0 ? 'Years with high {a} tend to have high {b}: {s} link (r = {r}).' : 'Years with high {a} tend to have low {b}: {s} link (r = {r}).',
           { a: A, b: B, s: strength(r), r: r.toFixed(2) });
-      var det = T('After removing both long-term trends, the link is {s} (r = {r}), which shows how much of it is just two things changing over the same years.',
-        { s: strength(rd).replace(/^(a|an) /, ''), r: rd.toFixed(2) });
+      // If removing the trends flips the sign, say so: the first link came only from both changing over the years.
+      var flipped = r * rd < 0 && Math.abs(rd) >= 0.2;
+      var det = flipped
+        ? T(rd < 0 ? 'After removing both long-term trends, the link turns the other way ({s}, r = {r}): a year with more {a} than usual tends to have less {b}. The first link came from both rising or falling over the same years.'
+          : 'After removing both long-term trends, the link turns the other way ({s}, r = {r}): a year with more {a} than usual tends to have more {b}. The first link came from both rising or falling over the same years.',
+          { s: strength(rd).replace(/^(a|an) /, ''), r: rd.toFixed(2), a: A, b: B })
+        : T('After removing both long-term trends, the link is {s} (r = {r}), which shows how much of it is just two things changing over the same years.',
+          { s: strength(rd).replace(/^(a|an) /, ''), r: rd.toFixed(2) });
       note.innerHTML = esc(lead) + ' ' + esc(det) + ' <span class="muted">' + esc(T('A link is not proof that one causes the other.')) + '</span>';
     }).catch(function (e) { if (myRun === runId) note.textContent = e.message; });
   }
@@ -1004,11 +1010,16 @@
   function downloadCsv() {
     if (!current) return;
     var vr = current.variable, ols = current.stats.ols;
-    var lines = ['year,' + vr.id + (vr.unit ? ' (' + vr.unit + ')' : '') + ',trend_line,band_low_95,band_high_95'];
+    var sen = current.stats.sen;
+    var lines = ['year,' + vr.id + (vr.unit ? ' (' + vr.unit + ')' : '') +
+      ',trend_line,band_low_95,band_high_95,prediction_low_95,prediction_high_95,residual,sen_line'];
     current.years.forEach(function (y, i) {
       var fit = ols.intercept + ols.slope * y;
-      var h = ols.tCrit * ols.residualSE * Math.sqrt(1 / ols.n + Math.pow(y - ols.meanX, 2) / ols.sxx);
-      lines.push(y + ',' + current.values[i].toFixed(4) + ',' + fit.toFixed(4) + ',' + (fit - h).toFixed(4) + ',' + (fit + h).toFixed(4));
+      var lever = 1 / ols.n + Math.pow(y - ols.meanX, 2) / ols.sxx;
+      var h = ols.tCrit * ols.residualSE * Math.sqrt(lever);          // confidence band
+      var ph = ols.tCrit * ols.residualSE * Math.sqrt(1 + lever);     // prediction interval
+      lines.push([y, current.values[i], fit, fit - h, fit + h, fit - ph, fit + ph, ols.resid[i], sen.intercept + sen.slope * y]
+        .map(function (v, k) { return k ? v.toFixed(4) : v; }).join(','));
     });
     var a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([lines.join('\n') + '\n'], { type: 'text/csv' }));

@@ -132,19 +132,39 @@
     var t = se === 0 ? (slope === 0 ? 0 : Infinity) : slope / se;
     var p = syy === 0 ? 1 : tPValue(t, df);
     var tc = tCritical(0.95, df);
-    // lag-1 autocorrelation of the residuals
-    var num = 0, den = 0;
+    // lag-1 autocorrelation of the residuals, and the Durbin-Watson statistic
+    var num = 0, den = 0, dsq = 0;
     for (i = 0; i < n; i++) {
       den += resid[i] * resid[i];
-      if (i > 0) num += resid[i] * resid[i - 1];
+      if (i > 0) {
+        num += resid[i] * resid[i - 1];
+        dsq += (resid[i] - resid[i - 1]) * (resid[i] - resid[i - 1]);
+      }
     }
     return {
       n: n, slope: slope, intercept: intercept, se: se, t: t, df: df, p: p,
       ciLow: slope - tc * se, ciHigh: slope + tc * se,
       r2: syy === 0 ? 0 : 1 - sse / syy,
-      residualSE: s, tCrit: tc, meanX: mx, sxx: sxx,
-      lag1: den === 0 ? 0 : num / den
+      residualSE: s, tCrit: tc, meanX: mx, sxx: sxx, resid: resid,
+      lag1: den === 0 ? 0 : num / den,
+      dw: den === 0 ? null : dsq / den
     };
+  }
+
+  /**
+   * The same t-test with fewer, "effective" years when neighbouring years are alike
+   * (Santer et al. 2000): n_eff = n (1 - r1) / (1 + r1), using the residuals' lag-1
+   * autocorrelation r1. Only applied when r1 > 0; null when n_eff is 2 or less.
+   */
+  function adjustForAutocorrelation(ols) {
+    var r1 = ols.lag1;
+    var nEff = r1 > 0 ? ols.n * (1 - r1) / (1 + r1) : ols.n;
+    if (nEff <= 2) return { nEff: nEff, se: null, df: null, p: null, ciLow: null, ciHigh: null };
+    var df = nEff - 2;
+    var se = ols.se * Math.sqrt((ols.n - 2) / df);
+    var t = se === 0 ? (ols.slope === 0 ? 0 : Infinity) : ols.slope / se;
+    var tc = tCritical(0.95, df);
+    return { nEff: nEff, se: se, df: df, p: tPValue(t, df), ciLow: ols.slope - tc * se, ciHigh: ols.slope + tc * se };
   }
 
   /**
@@ -175,7 +195,26 @@
     return { n: n, S: S, varS: varS, z: z, p: normPValue(z), tau: S / (n * (n - 1) / 2) };
   }
 
-  /** Sen's slope: the median of the slopes between every pair of points. */
+  var Z975 = 1.959963984540054;   // standard normal quantile for a two-sided 95% interval
+
+  /** Round to the nearest whole number, halves to the even one (as NumPy does). */
+  function roundHalfEven(v) {
+    var r = Math.round(v);
+    return Math.abs(v % 1) === 0.5 && r % 2 !== 0 ? r - 1 : r;
+  }
+
+  /** Sum of k(k-1)(2k+5) over groups of tied values, used in Kendall-type variances. */
+  function tieTerm(a) {
+    var counts = {}, sum = 0;
+    for (var i = 0; i < a.length; i++) counts[a[i]] = (counts[a[i]] || 0) + 1;
+    for (var k in counts) { var c = counts[k]; if (c > 1) sum += c * (c - 1) * (2 * c + 5); }
+    return sum;
+  }
+
+  /**
+   * Sen's slope: the median of the slopes between every pair of points,
+   * with its 95% confidence interval (Sen 1968, eq. 2.6; the same rule as SciPy's theilslopes).
+   */
   function senSlope(x, y) {
     var slopes = [], n = x.length, i, j;
     for (i = 0; i < n - 1; i++) {
@@ -183,10 +222,57 @@
         if (x[j] !== x[i]) slopes.push((y[j] - y[i]) / (x[j] - x[i]));
       }
     }
+    slopes.sort(function (p, q) { return p - q; });
     var slope = median(slopes);
     var inter = [];
     for (i = 0; i < n; i++) inter.push(y[i] - slope * x[i]);
-    return { slope: slope, intercept: median(inter) };
+
+    var sigma = Math.sqrt((n * (n - 1) * (2 * n + 5) - tieTerm(x) - tieTerm(y)) / 18);
+    var nt = slopes.length;
+    var hi = Math.min(roundHalfEven((nt + Z975 * sigma) / 2), nt - 1);
+    var lo = Math.max(roundHalfEven((nt - Z975 * sigma) / 2) - 1, 0);
+    return { slope: slope, intercept: median(inter), ciLow: slopes[lo], ciHigh: slopes[hi] };
+  }
+
+  /** Ranks 1..n, tied values sharing their average rank. */
+  function ranks(a) {
+    var idx = [], i;
+    for (i = 0; i < a.length; i++) idx.push(i);
+    idx.sort(function (p, q) { return a[p] - a[q]; });
+    var r = new Array(a.length);
+    i = 0;
+    while (i < idx.length) {
+      var j = i;
+      while (j + 1 < idx.length && a[idx[j + 1]] === a[idx[i]]) j++;
+      for (var k = i; k <= j; k++) r[idx[k]] = (i + j) / 2 + 1;
+      i = j + 1;
+    }
+    return r;
+  }
+
+  /**
+   * Mann-Kendall with the Hamed and Rao (1998) variance correction for autocorrelation.
+   * The series is detrended with Sen's slope and ranked; every lag whose autocorrelation of
+   * the ranks is outside ±1.96/√n inflates Var(S). Matches pymannkendall's
+   * hamed_rao_modification_test. p is null if the correction makes the variance non-positive.
+   */
+  function hamedRao(x, y, mk, slope) {
+    var n = y.length, k;
+    // Count years from the first one (1, 2, 3 …) rather than 1981, 1982 …: the same detrending,
+    // but without the rounding that can swap two nearly equal values when ranked.
+    var r = ranks(y.map(function (v, idx) { return v - slope * (x[idx] - x[0] + 1); }));
+    var m = mean(r), d = r.map(function (v) { return v - m; });
+    var acov = function (lag) { var s = 0; for (var t = 0; t + lag < n; t++) s += d[t] * d[t + lag]; return s / n; };
+    var c0 = acov(0), bound = Z975 / Math.sqrt(n), sum = 0, lags = [];
+    for (k = 1; k < n; k++) {
+      var rk = acov(k) / c0;
+      if (rk > bound || rk < -bound) { sum += (n - k) * (n - k - 1) * (n - k - 2) * rk; lags.push(k); }
+    }
+    var factor = 1 + 2 / (n * (n - 1) * (n - 2)) * sum;
+    var varS = mk.varS * factor;
+    if (!(varS > 0)) return { factor: factor, varS: varS, z: null, p: null, lags: lags };
+    var z = mk.S > 0 ? (mk.S - 1) / Math.sqrt(varS) : (mk.S < 0 ? (mk.S + 1) / Math.sqrt(varS) : 0);
+    return { factor: factor, varS: varS, z: z, p: normPValue(z), lags: lags };
   }
 
   /**
@@ -199,14 +285,16 @@
     var sen = senSlope(x, y);
     var verdict = mk.p < 0.05 ? 'significant' : (mk.p < 0.10 ? 'borderline' : 'none');
     var direction = sen.slope > 0 ? 'up' : (sen.slope < 0 ? 'down' : 'flat');
-    return { ols: ols, mk: mk, sen: sen, verdict: verdict, direction: direction };
+    return { ols: ols, mk: mk, sen: sen, verdict: verdict, direction: direction,
+      hr: hamedRao(x, y, mk, sen.slope), adj: adjustForAutocorrelation(ols) };
   }
 
   var api = {
     lgamma: lgamma, ibeta: ibeta, tPValue: tPValue, tCritical: tCritical,
     normPValue: normPValue, mean: mean, median: median,
     linearRegression: linearRegression, mannKendall: mannKendall,
-    senSlope: senSlope, analyze: analyze
+    senSlope: senSlope, hamedRao: hamedRao, adjustForAutocorrelation: adjustForAutocorrelation,
+    ranks: ranks, analyze: analyze
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.TDStats = api;

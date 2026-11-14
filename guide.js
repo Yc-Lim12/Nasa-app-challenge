@@ -21,7 +21,7 @@
       text: 'Or type a question in plain words, such as “Is Penang getting rainier?” or “Is the Arctic warming since 2000?”. It sets up the case for you.' },
     { target: '#wz-open', title: 'Not sure what to test?',
       text: 'Answer three short questions (what kind of place, what you are curious about, where) and get suggested NASA variables to test.' },
-    { target: '#stage-foot', title: 'Guided stories',
+    { target: '#stage-foot', prep: 'unfold', title: 'Guided stories',
       text: 'Step-by-step examples with real data: city heat, haze, monsoon rain, a warming sea and wildfire smoke. A good place to start.' },
     { target: '#layers', title: 'Map layers',
       text: 'Trend map: the trend in every grid cell around the place (a dot means significant). Timelapse: every month, one after another. Rain now and Wind: current conditions. Whole world: NASA’s global monthly maps, one per year since 1980.' },
@@ -89,6 +89,10 @@
     i = Math.max(0, Math.min(STEPS.length - 1, n));
     var step = STEPS[i], my = ++showToken;
     bubble.classList.add('loading');
+    if (step.prep === 'unfold') {      // the story list may be folded away: open it for this step
+      var foot = $('stage-foot'), tg = $('story-toggle');
+      if (foot && tg && foot.classList.contains('folded')) tg.click();
+    }
     var ready = step.prep === 'case' ? ensureCase().then(openCase) : Promise.resolve();
     ready.then(function () {
       if (!running || my !== showToken) return;

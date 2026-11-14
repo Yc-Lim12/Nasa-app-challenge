@@ -137,10 +137,26 @@
   function start(i) { cur = STORIES[i]; go(0); }
   function exit() { cur = null; card(); if (window.TDMap) window.TDMap.setLayer(''); }
 
+  // The list can be folded away to free the map; the choice is remembered.
+  function fold(on) {
+    var foot = $('stage-foot'), btn = $('story-toggle');
+    if (!foot || !btn) return;
+    foot.classList.toggle('folded', on);
+    btn.setAttribute('aria-expanded', String(!on));
+    try { if (on) localStorage.setItem('td-stories', 'folded'); else localStorage.removeItem('td-stories'); } catch (e) { /* private mode */ }
+  }
+
   function init() {
     TD = window.TD;
     if (!TD || !$('stories')) return;
     list();
+    var tg = $('story-toggle');
+    if (tg) {
+      var folded = false;
+      try { folded = localStorage.getItem('td-stories') === 'folded'; } catch (e) { /* private mode */ }
+      fold(folded);
+      tg.addEventListener('click', function () { fold(tg.getAttribute('aria-expanded') === 'true'); });
+    }
     $('stories').addEventListener('click', function (e) {
       var b = e.target.closest('[data-story]');
       if (b) start(+b.getAttribute('data-story'));

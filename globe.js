@@ -65,8 +65,14 @@
     var gGrat = svg.append('path').attr('class', 'g-grat');
     var gLand = svg.append('path').attr('class', 'g-land');
     var gBord = svg.append('path').attr('class', 'g-border');
-    var gNight1 = svg.append('path').attr('class', 'g-night').attr('fill-opacity', 0.4);
-    var gNight2 = svg.append('path').attr('class', 'g-night').attr('fill-opacity', 0.26);
+    // Night side: 20 faint layers 1° apart, so dusk fades in gradually (too finely to
+    // see steps) instead of showing hard stripes. Together they darken the deep night
+    // side by about 55%.
+    var NIGHT_RADII = [];
+    for (var nr = 96; nr > 76; nr--) NIGHT_RADII.push(nr);
+    var gNights = NIGHT_RADII.map(function () {
+      return svg.append('path').attr('class', 'g-night').attr('fill-opacity', 0.039);
+    });
     var gShade = svg.append('path').attr('class', 'g-overlay').attr('fill', 'url(#' + uid + 'shade)');
     var gShine = svg.append('path').attr('class', 'g-overlay').attr('fill', 'url(#' + uid + 'shine)');
     var gRim = svg.append('path').attr('class', 'g-rim');
@@ -196,15 +202,14 @@
     }
 
     // where the Sun is overhead right now, so the night side can be shaded
-    var night1 = null, night2 = null;
+    var nights = [];
     function updateSun() {
       var d = new Date();
       var day = (d - Date.UTC(d.getUTCFullYear(), 0, 0)) / 864e5;
       var decl = -23.44 * Math.cos(2 * Math.PI * (day + 10) / 365);
       var hrs = d.getUTCHours() + d.getUTCMinutes() / 60;
       var anti = [wrapLon((12 - hrs) * 15 + 180), -decl];
-      night1 = d3.geoCircle().center(anti).radius(90)();
-      night2 = d3.geoCircle().center(anti).radius(82)();
+      nights = NIGHT_RADII.map(function (r) { return d3.geoCircle().center(anti).radius(r)(); });
       var hh = String(d.getUTCHours()).padStart(2, '0'), mm = String(d.getUTCMinutes()).padStart(2, '0');
       sunEl.text(trG('Daylight now · {t} UTC').replace('{t}', hh + ':' + mm));
     }
@@ -268,8 +273,7 @@
       var ds = path({ type: 'Sphere' });
       gOcean.attr('d', ds); gShade.attr('d', ds); gShine.attr('d', ds); gRim.attr('d', ds);
       gHalo.attr('cx', CX).attr('cy', CY).attr('r', R * k * 1.16);
-      gNight1.attr('d', night1 ? path(night1) : null);
-      gNight2.attr('d', night2 ? path(night2) : null);
+      gNights.forEach(function (g, i) { g.attr('d', nights[i] ? path(nights[i]) : null); });
       if (REDUCED) drawStars(0);
       gGrat.attr('d', path(grat));
       var still = !(drag || anim || spinning);
@@ -587,10 +591,10 @@
       });
     }
 
-    // A filled pixel is shown dimmed and greyish, so it reads as background, not as
-    // today's photo; today's sea ice is drawn on it in white; the edge is blended over
-    // a few pixels so it has no hard step.
-    var FILL_R = 5;
+    // A filled pixel is shown slightly muted, so it reads as background, not as today's
+    // photo; today's sea ice is drawn on it in white; the edge is blended over a wide
+    // band so the patch fades into the photo instead of showing a hard rim.
+    var FILL_R = 18;
     function fillTile(x, img, dx, dy, lon0, lat1, span, z, row, col, done) {
       var t = document.createElement('canvas');
       t.width = 512; t.height = 512;
@@ -631,14 +635,16 @@
           }
         }
         for (i = 0; i < N; i++) {
-          var m = hole[i] ? 1 : w[i];
+          // w is about 0.5 just outside the hole, so doubling it makes the ramp start at 1
+          // (no step at the rim) and fade to 0 over FILL_R pixels
+          var m = hole[i] ? 1 : Math.min(1, w[i] * 2);
           if (m <= 0.001) continue;
           k = i * 4;
           var g = 0.3 * b[k] + 0.59 * b[k + 1] + 0.11 * b[k + 2];
           var ic = ice && ice[k + 3] > 128 ? iceCover(ice[k], ice[k + 1], ice[k + 2]) * 0.88 : 0;   // today's ice cover
           if (ic) iceUsed = true;
           for (j = 0; j < 3; j++) {
-            var f = (g + (b[k + j] - g) * 0.45) * 0.72;        // Blue Marble: 45% colour, 72% brightness
+            var f = (g + (b[k + j] - g) * 0.7) * 0.9;          // Blue Marble: 70% colour, 90% brightness
             f = f * (1 - ic) + 235 * ic;                        // ice in near-white
             d[k + j] = d[k + j] * (1 - m) + f * m;
           }

@@ -817,7 +817,8 @@ button.spot-row:focus-visible { outline: 2px solid var(--accent); outline-offset
 .g-mark-label { fill: #fff; font: 600 12px var(--font); paint-order: stroke; stroke: rgb(0 0 0 / 0.75); stroke-width: 3px; stroke-linejoin: round; pointer-events: none; }
 .g-dots circle { fill: #fff; stroke: rgb(0 0 0 / 0.55); stroke-width: 0.8; pointer-events: none; }
 .g-cells path { stroke: none; pointer-events: none; }
-.g-cells path.g-cells-edge { fill: none; stroke: rgb(255 255 255 / 0.7); stroke-width: 1; stroke-linejoin: round; }
+/* no outline around the whole map area: the cells' own edges show where it ends */
+.g-cells path.g-cells-edge { display: none; }
 .lp-cells { display: flex; align-items: center; gap: 12px; margin: 0 0 10px; }
 .lp-alpha { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 12px; color: #d2d2d7; }
 .lp-alpha span { font-weight: 600; }

@@ -928,7 +928,8 @@
         buildCellGrid(list);
         paintCellGrid(function (c) { return c.fill; });
         var g = cellGrid;   // outline of the whole area, curved like the lines of latitude
-        gCells.append('path').attr('class', 'g-cells-edge').datum(areaShape(g.lonMin, g.lonMax, g.latMin, g.latMax));
+        // (a whole-globe grid has no edge; its outline would be a stray line along 180°)
+        if (g.lonMax - g.lonMin < 359) gCells.append('path').attr('class', 'g-cells-edge').datum(areaShape(g.lonMin, g.lonMax, g.latMin, g.latMax));
       }
       host.classList.toggle('has-cells', !!(list && list.length));
       if (!raster) {
@@ -965,6 +966,14 @@
     }
     function areaShape(lo0, lo1, la0, la1) {
       var ring = [], n = Math.max(2, Math.ceil(Math.max(lo1 - lo0, la1 - la0) / 0.5)), i;
+      for (i = 0; i <= n; i++) ring.push([lo0, la0 + (la1 - la0) * i / n]);
+      for (i = 1; i <= n; i++) ring.push([lo0 + (lo1 - lo0) * i / n, la1]);
+      for (i = 1; i <= n; i++) ring.push([lo1, la1 - (la1 - la0) * i / n]);
+      for (i = 1; i <= n; i++) ring.push([lo1 - (lo1 - lo0) * i / n, la0]);
+      return { type: 'Polygon', coordinates: [ring] };
+    }
+    function cellOutline(lo0, lo1, la0, la1) {
+      var ring = [], n = Math.max(1, Math.ceil(Math.max(lo1 - lo0, la1 - la0) / 2.5)), i;
       for (i = 0; i <= n; i++) ring.push([lo0, la0 + (la1 - la0) * i / n]);
       for (i = 1; i <= n; i++) ring.push([lo0 + (lo1 - lo0) * i / n, la1]);
       for (i = 1; i <= n; i++) ring.push([lo1, la1 - (la1 - la0) * i / n]);
@@ -1069,7 +1078,8 @@
       // which is slow), and clear and copy only the part of the screen the cells cover.
       if (rBuf.width !== cw || rBuf.height !== ch) { rBuf.width = cw; rBuf.height = ch; }
       if (rCanvas.width !== cw || rCanvas.height !== ch) { rCanvas.width = cw; rCanvas.height = ch; }
-      var bb = path.bounds(areaShape(g.lonMin, g.lonMax, g.latMin, g.latMax));
+      // a whole-globe grid has no edge to measure, so it may cover the whole screen
+      var bb = g.lonMax - g.lonMin >= 359 ? [[0, 0], [W, H]] : path.bounds(areaShape(g.lonMin, g.lonMax, g.latMin, g.latMax));
       var box = isFinite(bb[0][0]) ? {
         x: Math.max(0, Math.floor(bb[0][0] * dpr) - 4), y: Math.max(0, Math.floor(bb[0][1] * dpr) - 4),
         x1: Math.min(cw, Math.ceil(bb[1][0] * dpr) + 4), y1: Math.min(ch, Math.ceil(bb[1][1] * dpr) + 4) } : null;
@@ -1085,12 +1095,15 @@
       rbctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       rbctx.lineJoin = 'round';
       var alpha = 0, shapes = [];
+      // each cell's outline is built once per grid; 2.5° steps keep the edges curved like
+      // lines of latitude while keeping the 2,592 cells of the whole globe quick to draw
+      if (!g.shapes) g.shapes = g.list.map(function (c) { return cellOutline(c.lon0, c.lon1, c.lat0, c.lat1); });
       g.list.forEach(function (c, i) {
         var o = g.idx[i] * 4, al = a[o + 3];
         if (al < 0.02) return;                        // 'transparent' (no data this month)
         alpha = Math.max(alpha, al);
         var col = 'rgb(' + Math.round(a[o] / al) + ',' + Math.round(a[o + 1] / al) + ',' + Math.round(a[o + 2] / al) + ')';
-        var shape = areaShape(c.lon0, c.lon1, c.lat0, c.lat1);
+        var shape = g.shapes[i];
         rbctx.beginPath(); cellPath(shape);
         rbctx.fillStyle = col; rbctx.fill();
         rbctx.strokeStyle = col; rbctx.lineWidth = 0.8; rbctx.stroke();   // closes hairline gaps between neighbours

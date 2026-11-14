@@ -390,8 +390,9 @@
     // CPU drawing when WebGL2 is not available.
     var GIBS_WMS = 'https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&CRS=EPSG:4326&FORMAT=image/jpeg';
     var STYLES = {
-      sat: { name: 'Satellite', layer: 'BlueMarble_ShadedRelief_Bathymetry', local: 'assets/earth-' },
-      live: { name: 'Latest satellite pass', layer: 'VIIRS_NOAA20_CorrectedReflectance_TrueColor', daily: true },
+      // tms/maxZ: NASA GIBS ready-made tiles (WMTS) for sharp close-ups: 500 m and 250 m
+      sat: { name: 'Satellite', layer: 'BlueMarble_ShadedRelief_Bathymetry', local: 'assets/earth-', tms: '500m', maxZ: 7 },
+      live: { name: 'Latest satellite pass', layer: 'VIIRS_NOAA20_CorrectedReflectance_TrueColor', daily: true, tms: '250m', maxZ: 8 },
       dark: { name: 'Dark map' }
     };
     var SMALL = Math.min(window.innerWidth, window.innerHeight) < 700;
@@ -489,6 +490,60 @@
       if (st.daily) url += '&TIME=' + new Date(Date.now() - 36 * 3600e3).toISOString().slice(0, 10);
       return url;
     }
+    // ---- NASA GIBS tiles (WMTS) ----------------------------------------------------
+    // Pre-rendered 512 px tiles in plate carrée: at level z one tile spans 288 / 2^z
+    // degrees, counted from (-180°, 90°). From level 3 up the grid fits the world exactly.
+    // They come from NASA's cache and stay in the browser's cache, so they are much
+    // quicker than asking the WMS to draw a new picture for every view.
+    var GIBS_WMTS = 'https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/';
+    function tileSpan(z) { return 288 / Math.pow(2, z); }
+    function gibsDate(st) { return st.daily ? new Date(Date.now() - 36 * 3600e3).toISOString().slice(0, 10) : 'default'; }
+    function tileUrl(st, z, row, col) {
+      return GIBS_WMTS + st.layer + '/default/' + gibsDate(st) + '/' + st.tms + '/' + z + '/' + row + '/' + col + '.jpg';
+    }
+    /** Tiles covering a lon/lat box at level z: column and row ranges, and their exact bounds. */
+    function tileRange(z, lo0, lo1, la0, la1) {
+      var sp = tileSpan(z), cols = Math.round(360 / sp), rows = Math.round(180 / sp);
+      var c0 = Math.max(0, Math.floor((lo0 + 180) / sp)), c1 = Math.min(cols - 1, Math.floor((lo1 + 180 - 1e-9) / sp));
+      var r0 = Math.max(0, Math.floor((90 - la1) / sp)), r1 = Math.min(rows - 1, Math.floor((90 - la0 - 1e-9) / sp));
+      return { z: z, c0: c0, c1: c1, r0: r0, r1: r1, n: (c1 - c0 + 1) * (r1 - r0 + 1),
+        lon0: -180 + c0 * sp, lon1: -180 + (c1 + 1) * sp, lat1: 90 - r0 * sp, lat0: 90 - (r1 + 1) * sp };
+    }
+    /**
+     * Load a block of tiles in parallel, paste them into one canvas and hand it on
+     * like loadSurface does. Any failed tile fails the whole block (the caller then
+     * falls back to the WMS), so no holes are ever shown.
+     */
+    function loadTiles(st, tr, wrap, done) {
+      var nc = tr.c1 - tr.c0 + 1, nr = tr.r1 - tr.r0 + 1, left = nc * nr, failed = false;
+      var c = document.createElement('canvas');
+      c.width = nc * 512; c.height = nr * 512;
+      var x = c.getContext('2d', { willReadFrequently: !gl });
+      for (var r = tr.r0; r <= tr.r1; r++) {
+        for (var cc = tr.c0; cc <= tr.c1; cc++) {
+          (function (row, col) {
+            var img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = function () {
+              if (failed) return;
+              x.drawImage(img, (col - tr.c0) * 512, (row - tr.r0) * 512);
+              if (--left === 0) finish();
+            };
+            img.onerror = function () { if (!failed) { failed = true; done(null); } };
+            img.src = tileUrl(st, tr.z, row, col);
+          })(r, cc);
+        }
+      }
+      function finish() {
+        if (gl) {
+          var t = makeTex(c, wrap ? gl.REPEAT : gl.CLAMP_TO_EDGE);
+          done(t ? { tex: t, w: c.width, h: c.height } : null);
+          return;
+        }
+        try { done({ data: x.getImageData(0, 0, c.width, c.height).data, w: c.width, h: c.height }); } catch (err) { done(null); }
+      }
+    }
+
     // Load an image and turn it into what the active renderer needs:
     // a WebGL texture, or raw pixels for the CPU fallback. null on failure.
     function loadSurface(url, wrap, done) {
@@ -532,11 +587,16 @@
         ? [st.local + '2k.jpg', st.local + bigLocal + '.jpg']
         : [gibsUrl(st, world, 1024, 512), gibsUrl(st, world, SMALL ? 2048 : 4096, SMALL ? 1024 : 2048)];
       var fallback = [gibsUrl(st, world, 1024, 512), gibsUrl(st, world, SMALL ? 2048 : 4096, SMALL ? 1024 : 2048)];
+      // the daily cloud picture: the 50 level-3 tiles (5120 x 2560) on a desktop
+      if (!st.local && st.tms && gl && !SMALL && glMaxTex >= 5120) steps[1] = { tiles: tileRange(3, -180, 180, -90, 90) };
       // a quick small picture first, then a sharper one
       function step(list, i, isFallback) {
         if (i >= list.length) return;
-        loadSurface(list[i], true, function (px) {
+        var item = list[i];
+        var load = item.tiles ? function (cb) { loadTiles(st, item.tiles, true, cb); } : function (cb) { loadSurface(item, true, cb); };
+        load(function (px) {
           if (my !== satToken) { freeTex(px); return; }
+          if (!px && item.tiles) { step(fallback, i, true); return; }   // tiles failed: the WMS picture instead
           if (!px) {
             // the local picture could not be used (e.g. opened from disk): ask NASA GIBS instead
             if (!isFallback && st.local) { step(fallback, sat ? 1 : 0, true); return; }
@@ -651,39 +711,63 @@
     }
     function refineSat() {
       if (!sat || drag || anim || spinning) return;
-      if (k < 2) { dropRegion(); return; }
-      // lon/lat of a grid of screen points; give up if the edge of the Earth is in view
-      var lonMid = wrapLon(-rot[0]), la0 = 90, la1 = -90, lo0 = 1e9, lo1 = -1e9, n = 8;
+      // zoomed out, the world picture is enough
+      if (k < 1.3) { dropRegion(); return; }
+      // lon/lat of a grid of screen points that land on the Earth (the edge of the disc
+      // may be in view: those points are skipped)
+      var lonMid = wrapLon(-rot[0]), la0 = 90, la1 = -90, lo0 = 1e9, lo1 = -1e9, n = 10, hits = 0;
       for (var a = 0; a <= n; a++) {
         for (var c = 0; c <= n; c++) {
-          var p = proj.invert([W * a / n, H * c / n]);
-          if (!p || isNaN(p[0]) || !visible(p)) return;
+          var p = proj.invert([(W - inset) * a / n, H * c / n]);
+          if (!p || isNaN(p[0]) || !visible(p)) continue;
+          hits++;
           var l = p[0] - 360 * Math.round((p[0] - lonMid) / 360);
           if (l < lo0) lo0 = l; if (l > lo1) lo1 = l;
           if (p[1] < la0) la0 = p[1]; if (p[1] > la1) la1 = p[1];
         }
       }
-      var padLon = (lo1 - lo0) * 0.08, padLat = (la1 - la0) * 0.08;
+      if (hits < 4) return;
+      var padLon = (lo1 - lo0) * 0.08 + 0.2, padLat = (la1 - la0) * 0.08 + 0.2;
       lo0 -= padLon; lo1 += padLon; la0 = Math.max(-90, la0 - padLat); la1 = Math.min(90, la1 + padLat);
       if (lo0 < -180 || lo1 > 180 || lo1 - lo0 > 120) return;       // across the date line or too wide: keep the world image
       // the world picture is already sharp enough for this zoom: no need to ask NASA
-      var screenPx = Math.max(W, H) * dpr, worldPx = (lo1 - lo0) / 360 * sat.base.w;
+      var screenPx = Math.max(W - inset, H) * dpr, worldPx = (lo1 - lo0) / 360 * sat.base.w;
       if (worldPx >= screenPx * 0.9) { dropRegion(); return; }
       var key = [basemap, lo0.toFixed(2), lo1.toFixed(2), la0.toFixed(2), la1.toFixed(2)].join('|');
       if (key === refineKey) return;
       var g = sat.region;
       if (g && lo0 >= g.lon0 && lo1 <= g.lon1 && la0 >= g.lat0 && la1 <= g.lat1 && (g.lon1 - g.lon0) < (lo1 - lo0) * 1.6) return;
       refineKey = key;
-      var MAXPX = Math.min(gl ? 3072 : 2000, Math.round(screenPx * 1.2)), ws, hs, ratio = (lo1 - lo0) / (la1 - la0);
-      if (ratio >= 1) { ws = MAXPX; hs = Math.max(128, Math.round(MAXPX / ratio)); } else { hs = MAXPX; ws = Math.max(128, Math.round(MAXPX * ratio)); }
-      var my = satToken;
-      loadSurface(gibsUrl(STYLES[basemap], [la0.toFixed(4), lo0.toFixed(4), la1.toFixed(4), lo1.toFixed(4)], ws, hs), false, function (px) {
-        if (my !== satToken || !px || !sat || refineKey !== key) { freeTex(px); return; }
+      var my = satToken, st = STYLES[basemap];
+      function apply(px, b) {
+        if (my !== satToken || !px || !sat || refineKey !== key) { freeTex(px); return false; }
         freeTex(sat.region);
-        px.lon0 = lo0; px.lon1 = lo1; px.lat0 = la0; px.lat1 = la1; px.lonMid = (lo0 + lo1) / 2;
+        px.lon0 = b.lon0; px.lon1 = b.lon1; px.lat0 = b.lat0; px.lat1 = b.lat1; px.lonMid = (b.lon0 + b.lon1) / 2;
         sat.region = px; satFine = '';
         if (!drag && !anim && !spinning) render();
-      });
+        return true;
+      }
+      // NASA tiles at the level that matches the screen: the least detailed level that
+      // still gives about one picture pixel per screen pixel, at most 64 tiles.
+      if (st.tms) {
+        var need = screenPx / (lo1 - lo0), z = 3, cap = gl ? Math.min(glMaxTex, 8192) : 4096;
+        while (z < st.maxZ && 512 / tileSpan(z) < need * 0.85) z++;
+        var tr = tileRange(z, lo0, lo1, la0, la1);
+        while (z > 3 && (tr.n > 64 || (tr.c1 - tr.c0 + 1) * 512 > cap || (tr.r1 - tr.r0 + 1) * 512 > cap)) { z--; tr = tileRange(z, lo0, lo1, la0, la1); }
+        loadTiles(st, tr, false, function (px) {
+          if (px) { apply(px, tr); return; }
+          if (my === satToken && refineKey === key) wmsRegion();   // tiles failed: ask the WMS
+        });
+        return;
+      }
+      wmsRegion();
+      function wmsRegion() {
+        var MAXPX = Math.min(gl ? 3072 : 2000, Math.round(screenPx * 1.2)), ws, hs, ratio = (lo1 - lo0) / (la1 - la0);
+        if (ratio >= 1) { ws = MAXPX; hs = Math.max(128, Math.round(MAXPX / ratio)); } else { hs = MAXPX; ws = Math.max(128, Math.round(MAXPX * ratio)); }
+        loadSurface(gibsUrl(st, [la0.toFixed(4), lo0.toFixed(4), la1.toFixed(4), lo1.toFixed(4)], ws, hs), false, function (px) {
+          apply(px, { lon0: lo0, lon1: lo1, lat0: la0, lat1: la1 });
+        });
+      }
     }
 
     // ---- data layers ---------------------------------------------------------

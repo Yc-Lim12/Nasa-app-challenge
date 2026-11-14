@@ -190,23 +190,66 @@
   }
 
   /**
+   * Variance inflation for positively autocorrelated (AR(1)) data:
+   * n / n* = 1 + 2 * sum_{k=1}^{n-1} (1 - k/n) * r1^k
+   * (Matalas & Langbein 1962; Yue & Wang 2004). Returns 1 when r1 <= 0.
+   */
+  function ar1Factor(r1, n) {
+    if (!(r1 > 0)) return 1;
+    var f = 1, rk = 1;
+    for (var k = 1; k < n; k++) {
+      rk *= r1;
+      if (rk < 1e-12) break;
+      f += 2 * (1 - k / n) * rk;
+    }
+    return f;
+  }
+
+  /**
+   * Correct both tests for lag-1 autocorrelation of the trend residuals, by
+   * treating the series as having n* = n / f independent points: the
+   * Mann-Kendall variance and the slope's standard error are inflated by f,
+   * and the t-test uses n* - 2 degrees of freedom.
+   */
+  function adjustAR1(ols, mk) {
+    var n = ols.n, r1 = Math.min(0.95, ols.lag1), f = ar1Factor(r1, n);
+    if (f === 1) return { r1: r1, f: 1, nEff: n };
+    var nEff = n / f;
+    var varS = mk.varS * f, z = 0;
+    if (varS > 0) {
+      if (mk.S > 0) z = (mk.S - 1) / Math.sqrt(varS);
+      else if (mk.S < 0) z = (mk.S + 1) / Math.sqrt(varS);
+    }
+    mk.varS = varS; mk.z = z; mk.p = normPValue(z);
+    var df = Math.max(2, Math.round(nEff) - 2), se = ols.se * Math.sqrt(f);
+    var t = se === 0 ? (ols.slope === 0 ? 0 : Infinity) : ols.slope / se, tc = tCritical(0.95, df);
+    ols.se = se; ols.t = t; ols.df = df; ols.p = ols.r2 === 0 && ols.slope === 0 ? 1 : tPValue(t, df);
+    ols.tCrit = tc; ols.ciLow = ols.slope - tc * se; ols.ciHigh = ols.slope + tc * se;
+    ols.bandScale = Math.sqrt(f);      // widens the confidence band on the chart to match
+    return { r1: r1, f: f, nEff: nEff };
+  }
+
+  /**
    * Run every test on one series and decide a verdict.
    * Verdict uses the Mann-Kendall p-value: < 0.05 significant, < 0.10 borderline.
+   * opts.ar1: correct for autocorrelation (used for monthly data, where
+   * neighbouring months are alike and the plain tests would be overconfident).
    */
-  function analyze(x, y) {
+  function analyze(x, y, opts) {
     var ols = linearRegression(x, y);
     var mk = mannKendall(y);
     var sen = senSlope(x, y);
+    var adj = opts && opts.ar1 ? adjustAR1(ols, mk) : null;
     var verdict = mk.p < 0.05 ? 'significant' : (mk.p < 0.10 ? 'borderline' : 'none');
     var direction = sen.slope > 0 ? 'up' : (sen.slope < 0 ? 'down' : 'flat');
-    return { ols: ols, mk: mk, sen: sen, verdict: verdict, direction: direction };
+    return { ols: ols, mk: mk, sen: sen, verdict: verdict, direction: direction, adj: adj };
   }
 
   var api = {
     lgamma: lgamma, ibeta: ibeta, tPValue: tPValue, tCritical: tCritical,
     normPValue: normPValue, mean: mean, median: median,
     linearRegression: linearRegression, mannKendall: mannKendall,
-    senSlope: senSlope, analyze: analyze
+    senSlope: senSlope, analyze: analyze, ar1Factor: ar1Factor
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.TDStats = api;

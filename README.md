@@ -87,11 +87,27 @@ box, grid cells are averaged with cos(latitude) weights. Years with any missing 
 - Mann-Kendall test with tie correction and continuity correction. The verdict uses this
   test: p < 0.05 is "significant", p < 0.10 is "borderline".
 - Sen's slope (median of all pairwise slopes) for the reported rate of change.
-- The statistics in `stats.js` were checked against SciPy (`linregress`, `theilslopes`,
-  and a reference Mann-Kendall calculation).
+- Optional monthly mode: each month minus its calendar-month average (seasonal cycle
+  removed), with both tests corrected for lag-1 autocorrelation (effective sample size,
+  Matalas & Langbein 1962; Yue & Wang 2004).
+- Areas over 10° are fetched from NASA POWER as tiles of at most 10° and merged.
 
-Limits: linear trends only, no correction for autocorrelation (the page warns when it is
-strong), and the seasonal cycle is handled by yearly averaging rather than removed.
+Limits: linear trends only; yearly values are not corrected for autocorrelation (the page
+warns when it is strong); areas up to 20° × 20°, no whole-world average.
+
+## Validation (Python)
+
+The app runs entirely in the browser (JavaScript), so anyone can open the link with
+nothing to install. Python is used to check it:
+
+```
+pip install -r tools/requirements.txt
+python tools/validate_stats.py   # every number stats.js reports vs SciPy (315 checks)
+python tools/coverage.py         # simulation: 95% interval coverage and false-alarm rates
+```
+
+Both scripts run the website's own `stats.js` through Node.js, so they test the exact
+code the site uses. Results are in [tools/VALIDATION.md](tools/VALIDATION.md).
 
 ## Other tools used
 

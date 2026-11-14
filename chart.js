@@ -9,7 +9,7 @@
 
   var A;   // the app's helpers and state, from TDChart.init()
   var S, T, esc, clamp, fmtValue, fmtAnom, pEquals, ratePhrase, verdictLabel, runningMean, yearlySeries,
-    chooseMonth, setPeriod, investigate, toast, view, MONTHS, MONTH_SHORT, MIN_YEARS, MERRA, CERES, REDUCED;
+    chooseMonth, setPeriod, investigate, toast, view, MONTHS, MONTH_SHORT, MIN_YEARS, MERRA, CERES, REDUCED, whenLabel;
   function $(id) { return document.getElementById(id); }
 
   // ---- chart helpers -------------------------------------------------------
@@ -88,7 +88,8 @@
     var cbase = cmp && view.anom ? S.mean(cmp.values) : 0;
     var cvals = cmp ? cmp.values.map(function (v) { return v - cbase; }) : [];
     var cols = cmp ? cmp.stats.ols : null;
-    var smooth = view.smooth ? runningMean(vals, 5) : null;
+    var monthly = res.step === 'month', dx = monthly ? 1 / 12 : 1;   // spacing of the points, in years
+    var smooth = view.smooth ? runningMean(vals, monthly ? 61 : 5) : null;   // five years either way
 
     var W = Math.max(300, host.clientWidth), narrow = W < 560, H = narrow ? 300 : 380;
     var STRIPE = 14;
@@ -97,8 +98,8 @@
 
     function trendAt(x) { return ols.intercept + ols.slope * x - base; }
     function ctrendAt(x) { return cols.intercept + cols.slope * x - cbase; }
-    function half(x) {
-      return ols.tCrit * ols.residualSE * Math.sqrt(1 / ols.n + Math.pow(x - ols.meanX, 2) / ols.sxx);
+    function half(x) {   // bandScale widens the band when the tests were corrected for autocorrelation
+      return ols.tCrit * ols.residualSE * (ols.bandScale || 1) * Math.sqrt(1 / ols.n + Math.pow(x - ols.meanX, 2) / ols.sxx);
     }
     var a0 = yrs[0], a1 = yrs[yrs.length - 1];
     var FUT = view.future ? 10 : 0, f1 = a1 + FUT;
@@ -139,7 +140,7 @@
     // climate stripes: one per year, coloured by difference from the period mean
     var mean = S.mean(res.values), maxAbs = 0;
     res.values.forEach(function (v) { maxAbs = Math.max(maxAbs, Math.abs(v - mean)); });
-    var sc = stripeColours(vr), yw = x1 === x0 ? iw : iw / (x1 - x0);
+    var sc = stripeColours(vr), yw = x1 === x0 ? iw : iw * dx / (x1 - x0);
     var sTop = m.t + ih + 6;
     yrs.forEach(function (yy, k) {
       var d = res.values[k] - mean, pct = maxAbs ? Math.round(Math.abs(d) / maxAbs * 100) : 0;
@@ -207,7 +208,7 @@
 
     if (!narrow) {
       var labels = [
-        { y: sy(vals[vals.length - 1]), t: cmp ? res.short : T('Yearly value'), c: 'endlabel' },
+        { y: sy(vals[vals.length - 1]), t: cmp ? res.short : T(monthly ? 'Monthly value' : 'Yearly value'), c: 'endlabel' },
         { y: sy(trendAt(f1)), t: T(FUT ? 'Trend, extended' : 'Trend line'), c: 'endlabel' }
       ];
       if (smooth) {
@@ -258,7 +259,7 @@
       var yy = yrs[k], cx = sx(yy), cy = sy(vals[k]);
       cross.setAttribute('x1', cx); cross.setAttribute('x2', cx); cross.setAttribute('visibility', 'visible');
       dot.setAttribute('cx', cx); dot.setAttribute('cy', cy); dot.setAttribute('visibility', 'visible');
-      var html = '<strong>' + yy + '</strong><span><i class="key key-series"></i>' +
+      var html = '<strong>' + esc(whenLabel(yy)) + '</strong><span><i class="key key-series"></i>' +
         (cmp ? esc(res.short) + ': ' : '') +
         esc(view.anom ? fmtAnom(vals[k], vr) + ' vs average' : fmtValue(vals[k], vr)) +
         (view.anom ? ' <em>(' + esc(fmtValue(res.values[k], vr)) + ')</em>' : '') + '</span>';
@@ -327,7 +328,7 @@
     });
 
     // legend and hint
-    var lg = '<span><i class="key key-series"></i>' + esc(cmp ? res.short : 'Yearly value') + '</span>' +
+    var lg = '<span><i class="key key-series"></i>' + esc(cmp ? res.short : T(monthly ? 'Each month minus its normal' : 'Yearly value')) + '</span>' +
       '<span><i class="key key-trend"></i>Trend line</span><span><i class="key key-band"></i>95% confidence band</span>';
     if (smooth) lg += '<span><i class="key key-smooth"></i>' + T('5-year average') + '</span>';
     if (FUT) lg += '<span><i class="key key-future"></i>' + T('If the trend continues') + '</span>';
@@ -495,7 +496,7 @@
       S = api.S; T = api.T; esc = api.esc; clamp = api.clamp; fmtValue = api.fmtValue; fmtAnom = api.fmtAnom;
       pEquals = api.pEquals; ratePhrase = api.ratePhrase; verdictLabel = api.verdictLabel; runningMean = api.runningMean;
       yearlySeries = api.yearlySeries; chooseMonth = api.chooseMonth; setPeriod = api.setPeriod; investigate = api.investigate;
-      toast = api.toast; view = api.view; MONTHS = api.MONTHS; MONTH_SHORT = api.MONTH_SHORT; MIN_YEARS = api.MIN_YEARS;
+      toast = api.toast; view = api.view; MONTHS = api.MONTHS; MONTH_SHORT = api.MONTH_SHORT; MIN_YEARS = api.MIN_YEARS; whenLabel = api.whenLabel;
       MERRA = api.MERRA; CERES = api.CERES; REDUCED = api.REDUCED;
     },
     drawChart: drawChart, drawSeason: drawSeason, drawPair: drawPair, savePng: savePng

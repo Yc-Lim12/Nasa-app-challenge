@@ -171,6 +171,29 @@
 
     // ---- stories ----
     'See the full case': 'Lihat kes penuh',
+    'Time step': 'Langkah masa', 'One value per year': 'Satu nilai setahun', 'Every month, seasonal cycle removed': 'Setiap bulan, kitaran musim dibuang',
+    'month by month': 'bulan demi bulan', 'each month minus its normal': 'setiap bulan tolak normalnya',
+    'Monthly value': 'Nilai bulanan', 'Each month minus its normal': 'Setiap bulan tolak normalnya',
+    'Used {n} of {t} years.': '{n} daripada {t} tahun digunakan.', 'Used {n} of {t} months.': '{n} daripada {t} bulan digunakan.',
+    'No data for {y} here.': 'Tiada data untuk {y} di sini.', 'and {n} more': 'dan {n} lagi',
+    '{y} skipped: missing months.': '{y} dilangkau: ada bulan yang tiada data.', '{y}: some months missing.': '{y}: ada bulan yang tiada data.',
+    '{y} left out: not every month is in NASA POWER yet.': '{y} tidak dimasukkan: belum semua bulan ada dalam NASA POWER.',
+    '{y} left out: December to February needs the December before, which is before the record starts.':
+      '{y} tidak dimasukkan: Disember hingga Februari memerlukan Disember sebelumnya, yang berlaku sebelum rekod bermula.',
+    'Neighbouring months are alike (lag-1 autocorrelation {r}), so {n} monthly values carry about as much independent information as {e}. Both tests were corrected for this.':
+      'Bulan-bulan bersebelahan adalah serupa (autokorelasi lag-1 {r}), jadi {n} nilai bulanan membawa maklumat bebas lebih kurang sama seperti {e}. Kedua-dua ujian telah dibetulkan untuk ini.',
+    'Neighbouring months are not alike here, so no correction for autocorrelation was needed.':
+      'Bulan-bulan bersebelahan tidak serupa di sini, jadi tiada pembetulan autokorelasi diperlukan.',
+    'Along the trend line from {a} to {b} ({n} months of data).': 'Sepanjang garis tren dari {a} hingga {b} ({n} bulan data).',
+    'Each value is that month minus the average for the same calendar month in {a}–{b}.': 'Setiap nilai ialah bulan itu tolak purata bulan kalendar yang sama pada {a}–{b}.',
+    'The whole region ({a}° × {b}°)': 'Seluruh kawasan ({a}° × {b}°)', 'loads in parts, about a minute': 'dimuat secara berperingkat, kira-kira seminit',
+    'Fetching {v} for {p} from NASA POWER…': 'Mengambil {v} untuk {p} daripada NASA POWER…',
+    'Fetching a big area in {b} parts from NASA POWER: {a} of {b} done…': 'Mengambil kawasan besar dalam {b} bahagian daripada NASA POWER: {a} daripada {b} siap…',
+    'Only {n} usable years of {v} here for that period. A trend test needs at least {m}. Try a longer period, another place or another variable.':
+      'Hanya {n} tahun data {v} yang boleh digunakan di sini untuk tempoh itu. Ujian tren memerlukan sekurang-kurangnya {m}. Cuba tempoh lebih panjang, tempat lain atau pemboleh ubah lain.',
+    'Scanning every variable works for areas up to 10° × 10°. A bigger area would need dozens of slow requests. Choose a smaller area, or test variables one at a time.':
+      'Imbasan semua pemboleh ubah berfungsi untuk kawasan sehingga 10° × 10°. Kawasan lebih besar memerlukan berpuluh permintaan yang perlahan. Pilih kawasan lebih kecil, atau uji satu pemboleh ubah pada satu masa.',
+    'Peninsular Malaysia': 'Semenanjung Malaysia', 'all of Malaysia (with the sea between)': 'seluruh Malaysia (termasuk laut di antaranya)', 'Malaysia': 'Malaysia',
     'Grid cells': 'Sel grid', 'Smooth': 'Licin', 'Opacity': 'Kelegapan', 'How to draw the grid': 'Cara melukis grid',
     'Guided stories': 'Kisah berpandu', 'World story': 'Kisah dunia',
     'Wildfire smoke over Wisconsin': 'Asap kebakaran hutan di Wisconsin', 'Summer haze far from the fires': 'Jerebu musim panas jauh dari kebakaran',

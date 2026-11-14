@@ -43,12 +43,24 @@
   function num(x, dp) { return Number(x).toFixed(dp == null ? 2 : dp); }
   function facts(r) {
     var vr = r.variable, st = r.stats, n = r.years.length, unit = vr.unit || '';
-    var span = r.years[n - 1] - r.years[0];
+    var span = r.years[n - 1] - r.years[0], monthly = r.step === 'month';
+    var y0 = Math.floor(r.years[0]), y1 = Math.floor(r.years[n - 1]);
+    // monthly data: summarise as one mean anomaly per year, so the prompt stays small
+    var perYear = r.years.map(function (y, i) { return [y, +Number(r.values[i]).toFixed(vr.dp)]; });
+    if (monthly) {
+      var acc = {};
+      r.years.forEach(function (y, i) { var k = Math.floor(y); (acc[k] = acc[k] || []).push(r.values[i]); });
+      perYear = Object.keys(acc).map(function (k) {
+        var a = acc[k]; return [+k, +(a.reduce(function (s, v) { return s + v; }, 0) / a.length).toFixed(vr.dp)];
+      });
+    }
     return {
       variable: TD.vname(vr), unit: unit, definition: vr.def, place: r.placeName,
       lat: r.lat, lon: r.lon, area: r.cells > 1 ? r.cells + ' grid cells averaged' : 'one grid cell',
       season: r.month ? TD.MONTHS[r.month] + ' only' : 'whole year',
-      first_year: r.years[0], last_year: r.years[n - 1], years_of_data: n,
+      first_year: y0, last_year: y1, years_of_data: monthly ? perYear.length : n,
+      time_step: monthly ? 'monthly values with the seasonal cycle removed (each month minus its calendar-month mean); tests corrected for lag-1 autocorrelation' : 'one value per year',
+      effective_sample_size: st.adj ? Math.round(st.adj.nEff) : undefined,
       sen_slope_per_decade: +num(st.sen.slope * 10, 4),
       total_change_along_trend: +num(st.sen.slope * span, 4),
       ols_slope_per_decade: +num(st.ols.slope * 10, 4),
@@ -57,7 +69,7 @@
       t_test_p: +st.ols.p.toPrecision(3), r_squared: +num(st.ols.r2, 3), lag1_autocorrelation: +num(st.ols.lag1, 3),
       verdict: st.verdict, direction: st.direction,
       unusual_years: (r.spikes || []).map(function (s) { return s.year; }),
-      yearly_values: r.years.map(function (y, i) { return [y, +Number(r.values[i]).toFixed(vr.dp)]; })
+      yearly_values: perYear
     };
   }
 
@@ -107,7 +119,9 @@
     var warn = [];
     if (f.unusual_years.length) warn.push(L(f.unusual_years.join(', ') + (f.unusual_years.length > 1 ? ' stood out as unusual one-off years.' : ' stood out as an unusual one-off year.') + ' One extreme year is a spike, not a trend.',
       f.unusual_years.join(', ') + ' menonjol sebagai tahun luar biasa. Satu tahun ekstrem ialah lonjakan, bukan tren.'));
-    if (Math.abs(f.lag1_autocorrelation) > 2 / Math.sqrt(f.years_of_data)) warn.push(L('Each year tends to look like the year before, which can make a trend look more certain than it is.',
+    if (f.effective_sample_size) warn.push(L('Neighbouring months look alike, so the ' + f.yearly_values.length + ' years of monthly data count as about ' + f.effective_sample_size + ' independent values. The tests were corrected for this.',
+      'Bulan bersebelahan kelihatan serupa, jadi data bulanan ' + f.yearly_values.length + ' tahun dikira sebagai kira-kira ' + f.effective_sample_size + ' nilai bebas. Ujian telah dibetulkan untuk ini.'));
+    else if (Math.abs(f.lag1_autocorrelation) > 2 / Math.sqrt(f.years_of_data)) warn.push(L('Each year tends to look like the year before, which can make a trend look more certain than it is.',
       'Setiap tahun cenderung menyerupai tahun sebelumnya, jadi tren mungkin kelihatan lebih pasti daripada sebenarnya.'));
     if (warn.length) out.push({ title: L('Be careful', 'Berhati-hati'), text: warn.join(' ') });
 

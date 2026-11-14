@@ -613,8 +613,43 @@
     return head + ' ' + parts.join(' ');
   }
 
-  function tile(label, value, note, i) {
-    return '<div class="tile" style="--i:' + i + '"><dt>' + esc(label) + '</dt><dd>' + value + '</dd><p>' + note + '</p></div>';
+  function tile(label, value, note, i, viz, cls) {
+    return '<div class="tile' + (cls ? ' ' + cls : '') + '" style="--i:' + i + '"><dt>' + esc(label) + '</dt><dd>' + value + '</dd>' +
+      (viz || '') + '<p>' + note + '</p></div>';
+  }
+
+  // ---- small pictures inside the evidence tiles -------------------------------
+
+  /** A 95% range against zero: the bar is the range, the dot the estimate. */
+  function vizRange(lo, hi, mid, unit) {
+    var a = Math.min(lo, 0), b = Math.max(hi, 0), pad = (b - a || 1) * 0.15;
+    a -= pad; b += pad;
+    var X = function (v) { return ((v - a) / (b - a) * 100).toFixed(1) + '%'; };
+    var clear = lo > 0 || hi < 0;      // the whole range on one side of zero
+    return '<div class="viz viz-range' + (clear ? ' is-clear' : '') + '" role="img" aria-label="' +
+      esc(T('95% range from {a} to {b}', { a: signed(lo, 2), b: withUnit(signed(hi, 2), unit) })) + '">' +
+      '<span class="viz-zero" style="left:' + X(0) + '"><i>0</i></span>' +
+      '<span class="viz-bar" style="left:' + X(lo) + ';width:calc(' + X(hi) + ' - ' + X(lo) + ')"></span>' +
+      '<span class="viz-dot" style="left:' + X(mid) + '"></span></div>' +
+      '<div class="viz-ends"><span>' + esc(signed(lo, 2)) + '</span><span>' + esc(T('95% range')) + '</span><span>' + esc(signed(hi, 2)) + '</span></div>';
+  }
+  /** A p-value on a log scale from 0.0001 to 1, with the significant zone below 0.05. */
+  function vizP(p) {
+    var X = function (v) { return Math.max(0, Math.min(100, (Math.log10(Math.max(v, 1e-4)) + 4) / 4 * 100)); };
+    var zone = p < 0.05 ? 'sig' : p < 0.1 ? 'border' : 'none';
+    return '<div class="viz viz-p is-' + zone + '" role="img" aria-label="' + esc(pEquals(p)) + '">' +
+      '<span class="viz-sigzone" style="width:' + X(0.05).toFixed(1) + '%"></span>' +
+      '<span class="viz-tick" style="left:' + X(0.05).toFixed(1) + '%"></span>' +
+      '<span class="viz-dot" style="left:' + X(p).toFixed(1) + '%"></span></div>' +
+      '<div class="viz-ends"><span>0.0001</span><span>' + esc(T('significant below 0.05')) + '</span><span>1</span></div>';
+  }
+  /** A filled bar for a share (0-1) or, with two sides, for a value from -1 to 1. */
+  function vizBar(v, label, twoSided) {
+    var w = twoSided ? Math.abs(v) * 50 : Math.max(0, Math.min(1, v)) * 100;
+    var left = twoSided ? (v < 0 ? 50 - w : 50) : 0;
+    return '<div class="viz viz-share' + (twoSided ? ' two' : '') + '"><span class="viz-fill' + (v < 0 ? ' neg' : '') +
+      '" style="left:' + left.toFixed(1) + '%;width:' + w.toFixed(1) + '%"></span>' + (twoSided ? '<span class="viz-mid"></span>' : '') +
+      '</div><div class="viz-ends"><span>' + esc(label) + '</span></div>';
   }
 
   function replay(el) {
@@ -664,22 +699,33 @@
     var nYears = yearCount(res);
     var tiles = '';
     var perDec = ' <small>' + esc(T('per decade')) + '</small>';
+    var dirCls = st.direction === 'up' ? 'is-up' : st.direction === 'down' ? 'is-down' : '';
+    var lineAt = function (x) { return st.ols.intercept + st.ols.slope * x; };
+    var x0 = res.years[0], x1 = res.years[n - 1];
     tiles += tile(T('Rate of change'), esc(withUnit(signed(st.ols.slope * 10, 2), vr.unit)) + perDec,
       esc(T('Slope of the straight line through the points. With 95% confidence the true rate is between {a} and {b}.',
-        { a: signed(st.ols.ciLow * 10, 2), b: withUnit(signed(st.ols.ciHigh * 10, 2), vr.unit) })), 0);
+        { a: signed(st.ols.ciLow * 10, 2), b: withUnit(signed(st.ols.ciHigh * 10, 2), vr.unit) })), 0,
+      vizRange(st.ols.ciLow * 10, st.ols.ciHigh * 10, st.ols.slope * 10, vr.unit), dirCls);
     tiles += tile(T('Total change'), esc(withUnit(signed(total, 2), vr.unit)),
-      esc(monthly ? T('Along the trend line from {a} to {b} ({n} months of data).', { a: whenLabel(res.years[0]), b: whenLabel(res.years[n - 1]), n: n })
-        : T('Along the trend line from {a} to {b} ({n} years of data).', { a: res.years[0], b: res.years[n - 1], n: n })), 1);
+      esc(monthly ? T('Along the trend line from {a} to {b} ({n} months of data).', { a: whenLabel(x0), b: whenLabel(x1), n: n })
+        : T('Along the trend line from {a} to {b} ({n} years of data).', { a: x0, b: x1, n: n })), 1,
+      monthly ? '' : '<div class="viz-fromto"><span><small>' + esc(String(Math.floor(x0))) + '</small>' + esc(fmtValue(lineAt(x0), vr)) + '</span>' +
+        '<i aria-hidden="true">' + (total >= 0 ? '↗' : '↘') + '</i><span><small>' + esc(String(Math.floor(x1))) + '</small>' + esc(fmtValue(lineAt(x1), vr)) + '</span></div>', dirCls);
     tiles += tile(T('Mann-Kendall test'), esc(pEquals(st.mk.pAdj)),
       esc(T('Checks whether later years are mostly higher or lower than earlier ones. Below 0.05 counts as significant. Kendall’s tau is {t} (1 is always rising, −1 always falling).', { t: st.mk.tau.toFixed(2) })) +
-      ' ' + esc(T('Adjusted for year-to-year memory.')), 2);
+      ' ' + esc(T('Adjusted for year-to-year memory.')), 2,
+      vizP(st.mk.pAdj) + vizBar(st.mk.tau, T('Kendall’s tau {t}: how steadily it goes one way', { t: st.mk.tau.toFixed(2) }), true));
     tiles += tile(T('t-test on the slope'), esc(pEquals(st.ols.pAdj)),
-      esc(T('The chance of seeing a slope this steep if there were really no trend. The line explains {r}% of the year-to-year variation.', { r: Math.round(st.ols.r2 * 100) })), 3);
+      esc(T('The chance of seeing a slope this steep if there were really no trend. The line explains {r}% of the year-to-year variation.', { r: Math.round(st.ols.r2 * 100) })), 3,
+      vizP(st.ols.pAdj) + vizBar(st.ols.r2, T('{r}% of the variation explained by the line', { r: Math.round(st.ols.r2 * 100) })));
     tiles += tile(T('Sen’s slope'), esc(withUnit(signed(st.sen.slope * 10, 2), vr.unit)) + perDec,
-      esc(T('The middle value of the slopes between every pair of years. One freak year barely moves it.')), 4);
+      esc(T('The middle value of the slopes between every pair of years. One freak year barely moves it.')), 4,
+      isFinite(st.sen.ciLow) && isFinite(st.sen.ciHigh) ? vizRange(st.sen.ciLow * 10, st.sen.ciHigh * 10, st.sen.slope * 10, vr.unit) : '', dirCls);
     if (need) {
+      var have = need.total - Math.max(0, need.more);
       tiles += tile(T('Years needed to tell'), need.more > 150 ? '150+' : (need.more > 0 ? '+' + need.more + ' <small>' + esc(T('more years')) + '</small>' : esc(T('Enough'))),
-        esc(T('How long a record a trend of this size needs before a test can reliably detect it ({n} years in total), from Weatherhead et al. (1998).', { n: need.total })), 5);
+        esc(T('How long a record a trend of this size needs before a test can reliably detect it ({n} years in total), from Weatherhead et al. (1998).', { n: need.total })), 5,
+        vizBar(need.total ? have / need.total : 1, T('{a} of {b} years so far', { a: Math.round(have), b: need.total })));
     }
     $('tiles').innerHTML = tiles;
     if (fresh) replay($('tiles')); else $('tiles').classList.remove('reveal');

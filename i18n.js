@@ -248,6 +248,17 @@
       'Apa, di mana dan bila: pemboleh ubah, tempat dan kawasan, tahun, musim atau bulan, dan satu nilai setahun atau setiap bulan.',
     'Explains the result in plain words and answers questions about it. It works without an account; an OpenAI key in its settings gives longer answers.':
       'Menerangkan keputusan dalam bahasa mudah dan menjawab soalan tentangnya. Ia berfungsi tanpa akaun; kunci OpenAI dalam tetapannya memberi jawapan lebih panjang.',
+    'Ask AI a question': 'Tanya AI satu soalan',
+    '95% range from {a} to {b}': 'Julat 95% dari {a} hingga {b}', '95% range': 'Julat 95%', 'significant below 0.05': 'signifikan bawah 0.05',
+    'Kendall’s tau {t}: how steadily it goes one way': 'Tau Kendall {t}: sejauh mana ia konsisten ke satu arah',
+    '{r}% of the variation explained by the line': '{r}% variasi diterangkan oleh garis', '{a} of {b} years so far': '{a} daripada {b} tahun setakat ini',
+    'Settings': 'Tetapan', 'Appearance': 'Paparan', 'Light': 'Cerah', 'Dark': 'Gelap', 'Auto': 'Auto', 'Language': 'Bahasa', 'Map style': 'Gaya peta',
+    'Satellite': 'Satelit', 'Latest satellite pass': 'Laluan satelit terkini', 'Dark map': 'Peta gelap', 'Help': 'Bantuan', 'Close': 'Tutup',
+    'Show the tour again': 'Tunjukkan lawatan semula', 'How the maths works (Methods)': 'Cara matematik berfungsi (Kaedah)', 'AI settings (OpenAI key)': 'Tetapan AI (kunci OpenAI)',
+    'Satellite is a cloud-free NASA picture. Latest satellite pass is yesterday’s real view, clouds included.': 'Satelit ialah gambar NASA tanpa awan. Laluan satelit terkini ialah pandangan sebenar semalam, termasuk awan.',
+    '“Explain this simply” puts the result in plain words. “Ask AI a question” opens a chat about it. It works without an account; an OpenAI key in Settings gives longer answers.':
+      '“Terangkan dengan mudah” menerangkan keputusan dalam bahasa mudah. “Tanya AI satu soalan” membuka sembang tentangnya. Ia berfungsi tanpa akaun; kunci OpenAI dalam Tetapan memberi jawapan lebih panjang.',
+    'Light or dark, English or Bahasa Malaysia, the map style, and this tour again.': 'Cerah atau gelap, Bahasa Inggeris atau Bahasa Malaysia, gaya peta, dan lawatan ini semula.',
     'Grid cells': 'Sel grid', 'Smooth': 'Licin', 'Opacity': 'Kelegapan', 'How to draw the grid': 'Cara melukis grid',
     'Guided stories': 'Kisah berpandu', 'World story': 'Kisah dunia',
     'Wildfire smoke over Wisconsin': 'Asap kebakaran hutan di Wisconsin', 'Summer haze far from the fires': 'Jerebu musim panas jauh dari kebakaran',

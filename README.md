@@ -107,7 +107,9 @@ strong), and the seasonal cycle is handled by yearly averaging rather than remov
   new answer is waiting. Starting a story or opening a shared link opens the sheet. On a phone the
   case file stays below the globe.
 - **Satellite globe.** The globe is painted with NASA imagery from GIBS: Blue Marble by default, or
-  the latest daily true-colour pass from VIIRS on NOAA-20 (with clouds). The layers button under the
+  the latest daily true-colour pass from VIIRS on NOAA-20. At wide zoom the default globe adds an
+  illustrative cloud layer from a 2 June 2014 NOAA CPC snapshot visualized by the
+  [NASA Goddard Scientific Visualization Studio](https://svs.gsfc.nasa.gov/4439/). The layers button under the
   zoom buttons switches between them and the original dark map. When the globe stops, a sharper
   picture of the area in view is fetched, so you can zoom in about four times further than before.
   The mouse wheel zooms on a wide screen.
